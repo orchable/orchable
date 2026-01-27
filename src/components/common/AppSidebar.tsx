@@ -50,7 +50,7 @@ export function AppSidebar() {
           </SidebarGroupLabel>
 
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-2">
               {mainNavItems.map((item) => {
                 const isActive = location.pathname === item.url;
                 return (
@@ -59,10 +59,11 @@ export function AppSidebar() {
                       asChild
                       isActive={isActive}
                       tooltip={collapsed ? item.title : undefined}
+                      className="h-auto"
                     >
-                      <NavLink 
-                        to={item.url} 
-                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 hover:bg-sidebar-accent group"
+                      <NavLink
+                        to={item.url}
+                        className="flex items-center px-3 rounded-lg transition-all duration-200 hover:bg-sidebar-accent group"
                         activeClassName="bg-sidebar-accent text-sidebar-primary"
                       >
                         <item.icon className={`h-5 w-5 transition-colors ${isActive ? 'text-sidebar-primary' : 'text-sidebar-foreground/70 group-hover:text-sidebar-foreground'}`} />
@@ -90,8 +91,8 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip={collapsed ? 'Cài đặt' : undefined}>
-              <NavLink 
-                to="/settings" 
+              <NavLink
+                to="/settings"
                 className="flex items-center gap-3 px-3 py-2 rounded-lg transition-all hover:bg-sidebar-accent"
                 activeClassName="bg-sidebar-accent"
               >
