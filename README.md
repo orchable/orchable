@@ -2316,4 +2316,32 @@ Kiến trúc Hybrid này cung cấp:
 ✅ **Scalability**: Batch processing nhiều lessons  
 ✅ **Maintainability**: Clear separation of concerns  
 
+
 Tài liệu này đủ chi tiết để một AI Agent khác có thể implement đầy đủ hệ thống.
+
+---
+
+## ✨ Updates & New Features (v1.1)
+
+### 1. Settings & Configuration
+Hệ thống hiện hỗ trợ cấu hình runtime thông qua trang `/settings`:
+- **N8N URL Override**: Cho phép thay đổi N8N Webhook Base URL mà không cần build lại ứng dụng.
+- **Defaults**: Cấu hình mặc định cho Timeout và Retry Strategy.
+- **Persistence**: Cấu hình được lưu trong `localStorage`.
+
+### 2. Dark Mode Support
+Giao diện được tối ưu hóa hoàn toàn cho:
+- **Light Mode**: Sạch sẽ, chuyên nghiệp.
+- **Dark Mode**: Thân thiện với mắt, màu sắc tương phản cao (Slate-900 canvas).
+- Tự động đồng bộ với cài đặt hệ thống hoặc toggle thủ công.
+
+### 3. Workflow Templates
+Designer tích hợp sẵn thư viện mẫu (Templates):
+- **Standard Course**: Quy trình chuẩn (A -> B -> C -> [D, E]).
+- **Quick Lesson**: Quy trình rút gọn (A -> C).
+- **Parallel Processing**: Xử lý song song tối đa.
+
+### 4. Custom Steps
+Hỗ trợ mở rộng không giới hạn:
+- Mặc định: A, B, C, D, E.
+- Mở rộng: Cho phép thêm custom steps (F, G, H...) với mã màu tự động (hashing).
