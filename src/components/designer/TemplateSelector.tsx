@@ -4,15 +4,28 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
+    SelectGroup,
+    SelectLabel,
+    SelectSeparator
 } from "@/components/ui/select"
 
 import { useDesignerStore } from "@/stores/designerStore"
 import { StepConfig, OrchestratorConfig } from "@/lib/types";
+import { useConfigs } from "@/hooks/useConfigs";
 
 export function TemplateSelector() {
     const { loadConfig } = useDesignerStore();
+    const { data: savedConfigs } = useConfigs();
 
     const applyTemplate = (value: string) => {
+        // Check if it's a saved config
+        const savedConfig = savedConfigs?.find(c => c.id === value);
+        if (savedConfig) {
+            loadConfig(savedConfig);
+            return;
+        }
+
+        // ... Existing template logic ...
         const timestamp = new Date().toISOString();
         const baseConfig: Pick<OrchestratorConfig, "id" | "name" | "created_at" | "updated_at"> = {
             id: `temp-${Date.now()}`,
@@ -31,7 +44,7 @@ export function TemplateSelector() {
             ];
         } else if (value === 'branching') {
             steps = [
-                { id: 'step-a', name: 'A', label: 'Start', webhookUrl: '', dependsOn: [], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
+                { id: 'step-a', name: 'A', label: 'Start', webhookUrl: '', dependsOn: [], dependsOn: [], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
                 { id: 'step-b', name: 'B', label: 'Branch 1', webhookUrl: '', dependsOn: ['step-a'], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
                 { id: 'step-c', name: 'C', label: 'Branch 2', webhookUrl: '', dependsOn: ['step-a'], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
                 { id: 'step-d', name: 'D', label: 'Converge', webhookUrl: '', dependsOn: ['step-b', 'step-c'], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
@@ -51,13 +64,30 @@ export function TemplateSelector() {
 
     return (
         <Select onValueChange={applyTemplate}>
-            <SelectTrigger className="w-[180px] bg-card h-9 border-input text-foreground">
-                <SelectValue placeholder="Load Pattern..." />
+            <SelectTrigger className="w-[220px] bg-card h-9 border-input text-foreground">
+                <SelectValue placeholder="Load Pattern / Config..." />
             </SelectTrigger>
-            <SelectContent>
-                <SelectItem value="simple-linear">Linear (A→B→C)</SelectItem>
-                <SelectItem value="branching">Branching (A→[B,C]→D)</SelectItem>
-                <SelectItem value="parallel">Parallel (A, B, C)</SelectItem>
+            <SelectContent className="max-h-[300px]">
+                <SelectGroup>
+                    <SelectLabel>Templates</SelectLabel>
+                    <SelectItem value="simple-linear">Linear (A→B→C)</SelectItem>
+                    <SelectItem value="branching">Branching (A→[B,C]→D)</SelectItem>
+                    <SelectItem value="parallel">Parallel (A, B, C)</SelectItem>
+                </SelectGroup>
+
+                {savedConfigs && savedConfigs.length > 0 && (
+                    <>
+                        <SelectSeparator />
+                        <SelectGroup>
+                            <SelectLabel>Saved Configurations</SelectLabel>
+                            {savedConfigs.map(config => (
+                                <SelectItem key={config.id} value={config.id}>
+                                    {config.name}
+                                </SelectItem>
+                            ))}
+                        </SelectGroup>
+                    </>
+                )}
             </SelectContent>
         </Select>
     )

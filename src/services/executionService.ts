@@ -8,7 +8,7 @@ export const executionService = {
   }): Promise<Execution> {
     // Đầu tiên, lấy config để biết total_steps
     const { data: config } = await supabase
-      .from('orchestrator_configs')
+      .from('lab_orchestrator_configs')
       .select('steps')
       .eq('id', data.configId)
       .single();

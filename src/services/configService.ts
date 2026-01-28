@@ -8,7 +8,7 @@ export const configService = {
     steps: StepConfig[];
   }): Promise<OrchestratorConfig> {
     const { data, error } = await supabase
-      .from('orchestrator_configs')
+      .from('lab_orchestrator_configs')
       .insert({
         name: config.name,
         description: config.description,
@@ -23,7 +23,7 @@ export const configService = {
   
   async listConfigs(): Promise<OrchestratorConfig[]> {
     const { data, error } = await supabase
-      .from('orchestrator_configs')
+      .from('lab_orchestrator_configs')
       .select('*')
       .order('created_at', { ascending: false });
     
@@ -33,7 +33,7 @@ export const configService = {
   
   async getConfig(id: string): Promise<OrchestratorConfig> {
     const { data, error } = await supabase
-      .from('orchestrator_configs')
+      .from('lab_orchestrator_configs')
       .select('*')
       .eq('id', id)
       .single();
@@ -44,7 +44,7 @@ export const configService = {
   
   async updateConfig(id: string, updates: Partial<OrchestratorConfig>): Promise<OrchestratorConfig> {
     const { data, error } = await supabase
-      .from('orchestrator_configs')
+      .from('lab_orchestrator_configs')
       .update({
         ...updates,
         updated_at: new Date().toISOString()
@@ -59,7 +59,7 @@ export const configService = {
   
   async deleteConfig(id: string): Promise<void> {
     const { error } = await supabase
-      .from('orchestrator_configs')
+      .from('lab_orchestrator_configs')
       .delete()
       .eq('id', id);
     

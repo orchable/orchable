@@ -4,12 +4,18 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 
+import { Button } from '@/components/ui/button';
+import { Loader2, Save } from 'lucide-react';
+import { useSaveOrchestrator } from '@/hooks/useConfigs';
+
 export function StartConfigPanel() {
     const {
         orchestratorName,
         orchestratorDescription,
         setOrchestratorMetadata
     } = useDesignerStore();
+
+    const { save, isPending } = useSaveOrchestrator();
 
     return (
         <Card className="h-full border-none rounded-none shadow-none">
@@ -43,6 +49,15 @@ export function StartConfigPanel() {
                         This is the entry point of your orchestration.
                         Configure the name and description that will appear in the Launcher.
                     </p>
+                </div>
+
+                <div className="pt-4">
+                    <div className="w-full">
+                        <Button onClick={save} disabled={isPending || !orchestratorName} className="w-full">
+                            {isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                            Save Config
+                        </Button>
+                    </div>
                 </div>
             </CardContent>
         </Card>

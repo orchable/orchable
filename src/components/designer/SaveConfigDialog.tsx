@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useDesignerStore } from '@/stores/designerStore';
-import { useSaveConfig } from '@/hooks/useConfigs';
+import { useSaveOrchestrator } from '@/hooks/useConfigs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,44 +11,15 @@ import { Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function SaveConfigDialog() {
-    const [open, setOpen] = useState(false);
-    const [name, setName] = useState('');
-    const [description, setDescription] = useState('');
+    const { nodes, edges, orchestratorName, orchestratorDescription, setOrchestratorMetadata } = useDesignerStore();
+    const { save, isPending } = useSaveOrchestrator();
 
-    const { nodes, edges, config } = useDesignerStore();
-    const saveConfig = useSaveConfig();
+    const [open, setOpen] = useState(false);
 
     const handleSave = async () => {
-        if (nodes.length === 0) return;
-
-        // Build steps array from nodes and edges
-        const steps = nodes.map(node => {
-            const data = node.data as any;
-            return {
-                id: node.id,
-                name: data.name,
-                label: data.label,
-                webhookUrl: data.webhookUrl,
-                timeout: data.timeout,
-                retryConfig: data.retryConfig,
-                dependsOn: edges
-                    .filter(e => e.target === node.id)
-                    .map(e => e.source)
-            };
-        });
-
-        try {
-            await saveConfig.mutateAsync({
-                // id: config?.id, // If editing existing - implementation simplified for now as config has no ID in current types used here
-                name,
-                description,
-                steps
-            });
+        const success = await save();
+        if (success) {
             setOpen(false);
-            toast.success("Configuration saved successfully");
-        } catch (error) {
-            console.error("Failed to save", error);
-            toast.error("Failed to save configuration");
         }
     };
 
@@ -72,8 +43,8 @@ export function SaveConfigDialog() {
                     <div className="space-y-2">
                         <label className="text-sm font-medium">Name</label>
                         <Input
-                            value={name}
-                            onChange={e => setName(e.target.value)}
+                            value={orchestratorName}
+                            onChange={e => setOrchestratorMetadata(e.target.value, orchestratorDescription)}
                             placeholder="e.g. Standard Course Generator"
                         />
                     </div>
@@ -81,8 +52,8 @@ export function SaveConfigDialog() {
                     <div className="space-y-2">
                         <label className="text-sm font-medium">Description</label>
                         <Textarea
-                            value={description}
-                            onChange={e => setDescription(e.target.value)}
+                            value={orchestratorDescription}
+                            onChange={e => setOrchestratorMetadata(orchestratorName, e.target.value)}
                             placeholder="Describe what this workflow does..."
                         />
                     </div>
@@ -94,8 +65,9 @@ export function SaveConfigDialog() {
 
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                    <Button onClick={handleSave} disabled={saveConfig.isPending || !name}>
-                        {saveConfig.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                    <Button onClick={handleSave} disabled={isPending || !orchestratorName}>
+                        {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                         Save
                     </Button>
                 </DialogFooter>
