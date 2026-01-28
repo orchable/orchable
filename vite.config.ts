@@ -11,6 +11,15 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    proxy: {
+      // Proxy to bypass CORS for n8n.teky.vn during development
+      '/n8n-proxy': {
+        target: 'https://n8n.teky.vn',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/n8n-proxy/, ''),
+        secure: false,
+      },
+    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -8,17 +8,29 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { n8nService } from '@/services/n8nService';
+import { toast } from 'sonner';
+
 const stepConfigSchema = z.object({
     label: z.string().min(1, 'Label is required'),
-    webhookUrl: z.string().url('Must be a valid URL').or(z.literal('')),
+    webhookUrl: z.string().refine((val) => {
+        if (!val) return true;
+        // Allow absolute URLs (http/https) OR relative paths (starting with /)
+        return /^(https?:\/\/|\/)/.test(val);
+    }, 'Must be a valid URL (http/https) or relative path (starts with /)'),
     timeout: z.number().min(1000, 'Min 1s').max(600000, 'Max 10m'),
     maxRetries: z.number().min(0).max(10),
     retryDelay: z.number().min(1000).max(60000)
 });
 
+interface Workflow { id: string; name: string; }
+
 export function StepConfigPanel({ stepId }: { stepId: string }) {
     const { nodes, updateStepData, removeStep } = useDesignerStore();
     const step = nodes.find(n => n.id === stepId);
+
+    const [workflows, setWorkflows] = useState<Workflow[]>([]);
 
     const form = useForm<z.infer<typeof stepConfigSchema>>({
         resolver: zodResolver(stepConfigSchema),
@@ -30,6 +42,48 @@ export function StepConfigPanel({ stepId }: { stepId: string }) {
             retryDelay: 5000
         }
     });
+
+    useEffect(() => {
+        const loadWorkflows = async () => {
+            try {
+                const wfs = await n8nService.listWorkflows();
+                setWorkflows(wfs);
+            } catch (err: any) {
+                console.error("Failed to load workflows:", err);
+                toast.error(`Could not load workflows: ${err.message}`);
+            }
+        };
+        // Load only if panel is open and api key exists locally
+        if (localStorage.getItem("lovable_n8n_api_key")) {
+            loadWorkflows();
+        }
+    }, []);
+
+    const handleWorkflowSelect = async (workflowId: string) => {
+        if (!workflowId || workflowId === "none") return;
+
+        try {
+            toast.info("Fetching webhook URL...");
+            const webhookUrl = await n8nService.getWorkflowWebhook(workflowId);
+
+            if (webhookUrl) {
+                form.setValue("webhookUrl", webhookUrl, { shouldDirty: true });
+                toast.success("Webhook URL auto-filled!");
+
+                // Optional: Auto-set label from workflow name if empty
+                const wf = workflows.find(w => w.id === workflowId);
+                const currentLabel = form.getValues("label");
+                if (wf && (!currentLabel || currentLabel === "New Step")) {
+                    form.setValue("label", wf.name);
+                }
+            } else {
+                toast.warning("No 'Webhook' node found in this workflow.");
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to fetch workflow details.");
+        }
+    };
 
     // Load step data into form when selection changes
     useEffect(() => {
@@ -82,6 +136,33 @@ export function StepConfigPanel({ stepId }: { stepId: string }) {
                                 </FormItem>
                             )}
                         />
+
+                        {/* N8N Workflow Selection */}
+                        <div className="space-y-2">
+                            <FormLabel>Data Source</FormLabel>
+                            <Select onValueChange={(value) => handleWorkflowSelect(value)}>
+                                <FormControl>
+                                    <SelectTrigger className="text-left">
+                                        <SelectValue placeholder="Select n8n Workflow (Automatic)" />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    {workflows.map((wf) => (
+                                        <SelectItem key={wf.id} value={wf.id}>
+                                            {wf.name}
+                                        </SelectItem>
+                                    ))}
+                                    {workflows.length === 0 && (
+                                        <SelectItem value="none" disabled>
+                                            No workflows found (Check Settings)
+                                        </SelectItem>
+                                    )}
+                                </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                                Selecting a workflow will auto-fill the Webhook URL (requires 'Webhook' node).
+                            </p>
+                        </div>
 
                         <FormField
                             control={form.control}

@@ -2344,4 +2344,8 @@ Designer tích hợp sẵn thư viện mẫu (Templates):
 ### 4. Custom Steps
 Hỗ trợ mở rộng không giới hạn:
 - Mặc định: A, B, C, D, E.
-- Mở rộng: Cho phép thêm custom steps (F, G, H...) với mã màu tự động (hashing).
+### 5. N8N Integration 🚀
+Hệ thống kết nối trực tiếp với N8N API để:
+- **List Workflows**: Hiển thị danh sách workflow có sẵn trong Designer.
+- **Auto-Config**: Tự động lấy Webhook URL khi chọn workflow.
+- **Zero-Config**: Không cần paste URL thủ công (yêu cầu cấu hình API Key trong Settings).

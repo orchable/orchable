@@ -14,11 +14,20 @@ interface StepNodeProps {
 }
 
 export function StepNode({ data, selected }: StepNodeProps) {
+    const isConfigured = !!data.webhookUrl;
+
     return (
         <div className="relative group">
             <Card className={cn(
-                "w-52 p-4 cursor-pointer transition-all border-2 group-hover:border-primary/50 relative bg-card",
-                selected ? "border-primary shadow-lg shadow-primary/10" : "border-border hover:shadow-lg hover:shadow-primary/5"
+                "w-52 p-4 cursor-pointer transition-all border-2 relative",
+                // Base
+                "bg-card",
+                // Configured (Green) - only when not selected
+                isConfigured && !selected && "border-emerald-500/70 bg-emerald-50/40 dark:bg-emerald-950/20 hover:shadow-md hover:shadow-emerald-500/20",
+                // Not Configured & Not Selected
+                !isConfigured && !selected && "border-border group-hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5",
+                // Selected (Primary Blue Override)
+                selected && "border-primary shadow-lg shadow-primary/10"
             )}>
                 <div className="flex items-center gap-3">
                     <StepBadge name={data.name} />
@@ -31,13 +40,14 @@ export function StepNode({ data, selected }: StepNodeProps) {
                 </div>
 
                 {/* Connection Handles - Visual only, real handles are invisible/positioned */}
+                {/* Connection Handles - Visual only */}
                 <div className={cn(
                     "absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full border-2 bg-background transition-colors z-10",
-                    selected ? "border-primary" : "border-muted-foreground/30 group-hover:border-primary"
+                    selected ? "border-primary" : (isConfigured ? "border-emerald-500/70" : "border-muted-foreground/30 group-hover:border-primary")
                 )} />
                 <div className={cn(
                     "absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full border-2 bg-background transition-colors z-10",
-                    selected ? "border-primary" : "border-muted-foreground/30 group-hover:border-primary"
+                    selected ? "border-primary" : (isConfigured ? "border-emerald-500/70" : "border-muted-foreground/30 group-hover:border-primary")
                 )} />
             </Card>
 
