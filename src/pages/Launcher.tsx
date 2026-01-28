@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Upload, FileSpreadsheet, Rocket, ChevronRight, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { Play, Upload, FileSpreadsheet, Rocket, ChevronRight, CheckCircle2, Loader2, AlertCircle, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useConfigs } from '@/hooks/useConfigs';
 import { useCreateExecution } from '@/hooks/useExecutions';
@@ -19,6 +20,7 @@ export function LauncherPage() {
   const [syllabusData, setSyllabusData] = useState<SyllabusRow[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
   const [isLaunching, setIsLaunching] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -127,38 +129,56 @@ export function LauncherPage() {
               {isLoadingConfigs ? (
                 <div className="flex justify-center p-4"><Loader2 className="animate-spin" /></div>
               ) : (
-                <div className="grid gap-3">
-                  {configs?.map((config, idx) => (
-                    <motion.div
-                      key={config.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.2 + idx * 0.1 }}
-                      onClick={() => setSelectedConfigId(config.id)}
-                      className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${selectedConfigId === config.id
-                          ? 'border-primary bg-primary/5'
-                          : 'border-transparent bg-muted/50 hover:border-primary/30'
-                        }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          {selectedConfigId === config.id && <CheckCircle2 className="w-5 h-5 text-primary" />}
-                          <div>
-                            <p className="font-semibold">{config.name}</p>
-                            <p className="text-sm text-muted-foreground">{config.description}</p>
+                <div className="space-y-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search configurations..."
+                      className="pl-9"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="grid gap-3 max-h-[400px] overflow-y-auto pr-2">
+                    {configs
+                      ?.filter(config =>
+                        !searchTerm ||
+                        config.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        config.description?.toLowerCase().includes(searchTerm.toLowerCase())
+                      )
+                      .map((config, idx) => (
+                        <motion.div
+                          key={config.id}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.2 + idx * 0.1 }}
+                          onClick={() => setSelectedConfigId(config.id)}
+                          className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${selectedConfigId === config.id
+                            ? 'border-primary bg-primary/5'
+                            : 'border-transparent bg-muted/50 hover:border-primary/30'
+                            }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              {selectedConfigId === config.id && <CheckCircle2 className="w-5 h-5 text-primary" />}
+                              <div>
+                                <p className="font-semibold">{config.name}</p>
+                                <p className="text-sm text-muted-foreground">{config.description}</p>
+                              </div>
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {config.steps?.length || 0} steps
+                            </div>
                           </div>
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {config.steps?.length || 0} steps
-                        </div>
+                        </motion.div>
+                      ))}
+                    {(!configs || configs.length === 0) && (
+                      <div className="text-center p-4 text-muted-foreground border border-dashed rounded-lg">
+                        No configurations found. Please create one in Designer.
                       </div>
-                    </motion.div>
-                  ))}
-                  {(!configs || configs.length === 0) && (
-                    <div className="text-center p-4 text-muted-foreground border border-dashed rounded-lg">
-                      No configurations found. Please create one in Designer.
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               )}
             </CardContent>

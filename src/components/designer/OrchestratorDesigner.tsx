@@ -4,7 +4,8 @@ import { StepPalette } from './StepPalette';
 import { StepConfigPanel } from './StepConfigPanel';
 import { StartConfigPanel } from './StartConfigPanel';
 import { SaveConfigDialog } from './SaveConfigDialog';
-import { TemplateSelector } from './TemplateSelector';
+
+import { ConfigLibrary } from './ConfigLibrary';
 import { useDesignerStore } from '@/stores/designerStore';
 import { Button } from '@/components/ui/button';
 import { RotateCcw } from 'lucide-react';
@@ -28,7 +29,7 @@ export default function OrchestratorDesigner() {
             {/* Main Canvas */}
             <div className="flex-1 relative h-full">
                 <div className="absolute top-4 right-4 z-20 flex gap-2">
-                    <TemplateSelector />
+                    <ConfigLibrary />
                     <Separator orientation="vertical" className="h-9 bg-border" />
                     <Button variant="outline" size="sm" onClick={reset} className="bg-card shadow-sm hover:border-primary/50">
                         <RotateCcw className="w-4 h-4 mr-2" />
