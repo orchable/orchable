@@ -84,6 +84,8 @@ export const useDesignerStore = create<DesignerState>((set, get) => ({
         name: stepName, // A, B, C, etc.
         label: `New Step ${stepName}`,
         webhookUrl: '',
+        webhookMethod: 'POST',
+        authConfig: { type: 'none' },
         timeout: 300000,
         retryConfig: {
           maxRetries: 3,

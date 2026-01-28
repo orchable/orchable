@@ -54,13 +54,22 @@ export function LauncherPage() {
   };
 
   const handleLaunch = async () => {
-    if (!selectedConfigId || syllabusData.length === 0) return;
+    if (!selectedConfigId) return;
 
     try {
       setIsLaunching(true);
       let startedCount = 0;
 
-      for (const row of syllabusData) {
+      const dataToProcess = syllabusData.length > 0 ? syllabusData : [{
+        lessonId: `manual-${Date.now()}`,
+        lessonTitle: 'Manual Execution',
+        objective: 'Manual Run',
+        resources: [],
+        duration: 'N/A',
+        difficulty: 'N/A'
+      }];
+
+      for (const row of dataToProcess) {
         // 1. Create Execution record
         const execution = await createExecutionMutation.mutateAsync({
           configId: selectedConfigId,
@@ -79,7 +88,7 @@ export function LauncherPage() {
         startedCount++;
       }
 
-      toast.success(`Successfully launched ${startedCount} executions`);
+      toast.success(`Successfully launched ${startedCount} execution(s)`);
       navigate('/monitor');
     } catch (error) {
       console.error('Launch failed', error);
@@ -185,7 +194,7 @@ export function LauncherPage() {
           </Card>
         </motion.div>
 
-        {/* Step 2: Upload TSV */}
+        {/* Step 2: Upload Input Data */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -198,8 +207,8 @@ export function LauncherPage() {
                   2
                 </div>
                 <div>
-                  <CardTitle>Upload Syllabus Data (TSV)</CardTitle>
-                  <CardDescription>Tải lên file TSV chứa dữ liệu các bài học</CardDescription>
+                  <CardTitle>Orchestrator Input Data (TSV) <span className="text-sm font-normal text-muted-foreground">(Optional)</span></CardTitle>
+                  <CardDescription>Tải lên file TSV chứa dữ liệu đầu vào (nếu có)</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -233,7 +242,7 @@ export function LauncherPage() {
                     <FileSpreadsheet className="w-5 h-5 text-success" />
                     <div className="flex-1">
                       <p className="font-medium text-sm">{fileName}</p>
-                      <p className="text-xs text-muted-foreground">{syllabusData.length} lessons detected</p>
+                      <p className="text-xs text-muted-foreground">{syllabusData.length} rows detected</p>
                     </div>
                     <Button variant="ghost" size="sm" onClick={() => { setFileName(null); setSyllabusData([]); }}>Xóa</Button>
                   </div>
@@ -244,7 +253,7 @@ export function LauncherPage() {
         </motion.div>
 
         {/* Step 3: Preview & Launch */}
-        {syllabusData.length > 0 && (
+        {selectedConfigId && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -258,53 +267,61 @@ export function LauncherPage() {
                   </div>
                   <div>
                     <CardTitle>Preview & Launch</CardTitle>
-                    <CardDescription>Xem trước dữ liệu và khởi chạy batch execution</CardDescription>
+                    <CardDescription>{syllabusData.length > 0 ? 'Xem trước dữ liệu và khởi chạy batch execution' : 'Khởi chạy execution (Single Run)'}</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Data preview table */}
-                <div className="rounded-lg border overflow-hidden max-h-60 overflow-y-auto">
-                  <table className="w-full">
-                    <thead className="bg-muted/50 sticky top-0">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-sm font-medium">Lesson ID</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium">Title</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium">Difficulty</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {syllabusData.map((row, idx) => (
-                        <motion.tr
-                          key={idx}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ delay: 0.1 }}
-                          className="border-t hover:bg-muted/20"
-                        >
-                          <td className="px-4 py-3 text-sm font-mono">{row.lessonId}</td>
-                          <td className="px-4 py-3 text-sm">{row.lessonTitle}</td>
-                          <td className="px-4 py-3 text-sm">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground`}>
-                              {row.difficulty}
-                            </span>
-                          </td>
-                        </motion.tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                {/* Data preview table (Only show if data exists) */}
+                {syllabusData.length > 0 ? (
+                  <div className="rounded-lg border overflow-hidden max-h-60 overflow-y-auto">
+                    <table className="w-full">
+                      <thead className="bg-muted/50 sticky top-0">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-sm font-medium">Lesson ID</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium">Title</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium">Difficulty</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {syllabusData.map((row, idx) => (
+                          <motion.tr
+                            key={idx}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.1 }}
+                            className="border-t hover:bg-muted/20"
+                          >
+                            <td className="px-4 py-3 text-sm font-mono">{row.lessonId}</td>
+                            <td className="px-4 py-3 text-sm">{row.lessonTitle}</td>
+                            <td className="px-4 py-3 text-sm">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground`}>
+                                {row.difficulty}
+                              </span>
+                            </td>
+                          </motion.tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-lg bg-muted/30 text-center text-muted-foreground text-sm">
+                    Không có dữ liệu input. Hệ thống sẽ khởi chạy 1 execution test.
+                  </div>
+                )}
 
                 {/* Summary */}
                 <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
                   <div className="space-y-1">
                     <p className="text-sm text-muted-foreground">Tổng số executions:</p>
-                    <p className="text-2xl font-bold">{syllabusData.length}</p>
+                    <p className="text-2xl font-bold">{syllabusData.length || 1}</p>
                   </div>
-                  <div className="space-y-1 text-right">
-                    <p className="text-sm text-muted-foreground">Estimated time:</p>
-                    <p className="text-2xl font-bold">~{syllabusData.length * 5} phút</p>
-                  </div>
+                  {syllabusData.length > 0 && (
+                    <div className="space-y-1 text-right">
+                      <p className="text-sm text-muted-foreground">Estimated time:</p>
+                      <p className="text-2xl font-bold">~{syllabusData.length * 5} phút</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Launch button */}
@@ -326,7 +343,7 @@ export function LauncherPage() {
                     ) : (
                       <>
                         <Rocket className="w-5 h-5 mr-2" />
-                        Khởi chạy {syllabusData.length} Executions
+                        Khởi chạy {syllabusData.length || 1} Execution{syllabusData.length !== 1 ? 's' : ''}
                         <ChevronRight className="w-5 h-5 ml-2" />
                       </>
                     )}

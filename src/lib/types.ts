@@ -14,11 +14,17 @@ export interface StepConfig {
   name: string; // 'A', 'B', 'C', 'D', 'E'
   label: string;
   webhookUrl: string;
+  webhookMethod?: 'GET' | 'POST';
   dependsOn: string[];
   timeout?: number;
   retryConfig?: {
     maxRetries: number;
     retryDelay: number;
+  };
+  authConfig?: {
+    type: 'none' | 'header';
+    headerName?: string;
+    headerValue?: string;
   };
 }
 

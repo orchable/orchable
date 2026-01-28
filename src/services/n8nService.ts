@@ -41,7 +41,7 @@ export const n8nService = {
   /**
    * Fetches full workflow details to extract webhook URL
    */
-  async getWorkflowWebhook(workflowId: string): Promise<string | null> {
+  async getWorkflowWebhook(workflowId: string): Promise<{ url: string; method: 'GET' | 'POST' } | null> {
       const baseUrl = localStorage.getItem("lovable_n8n_url") || N8N_BASE_URL;
       const apiKey = localStorage.getItem("lovable_n8n_api_key");
 
@@ -60,15 +60,21 @@ export const n8nService = {
       const webhookNode = nodes.find(n => n.type === 'n8n-nodes-base.webhook');
       if (!webhookNode) return null;
 
-      // Construct path (assuming POST method by default or check node parameters)
+      // Construct path
       const path = webhookNode.parameters?.path;
       if (!path) return null;
+
+      // Extract Method (default to GET if not specified, though n8n usually has it)
+      const method = (webhookNode.parameters?.httpMethod as 'GET' | 'POST') || 'GET';
 
       // Append to base URL (handle trailing slashes)
       const cleanBase = baseUrl.replace(/\/$/, '');
       const cleanPath = path.startsWith('/') ? path : `/${path}`;
       
-      return `${cleanBase}/webhook${cleanPath}`;
+      return {
+          url: `${cleanBase}/webhook${cleanPath}`,
+          method
+      };
   },
 
   async triggerMasterWorkflow(data: {

@@ -19,6 +19,10 @@ const stepConfigSchema = z.object({
         // Allow absolute URLs (http/https) OR relative paths (starting with /)
         return /^(https?:\/\/|\/)/.test(val);
     }, 'Must be a valid URL (http/https) or relative path (starts with /)'),
+    webhookMethod: z.enum(['GET', 'POST']).default('POST'),
+    authType: z.enum(['none', 'header']).default('none'),
+    authHeaderName: z.string().optional(),
+    authHeaderValue: z.string().optional(),
     timeout: z.number().min(1000, 'Min 1s').max(600000, 'Max 10m'),
     maxRetries: z.number().min(0).max(10),
     retryDelay: z.number().min(1000).max(60000)
@@ -37,6 +41,10 @@ export function StepConfigPanel({ stepId }: { stepId: string }) {
         defaultValues: {
             label: '',
             webhookUrl: '',
+            webhookMethod: 'POST',
+            authType: 'none',
+            authHeaderName: 'X-API-KEY',
+            authHeaderValue: '',
             timeout: 300000,
             maxRetries: 3,
             retryDelay: 5000
@@ -64,11 +72,12 @@ export function StepConfigPanel({ stepId }: { stepId: string }) {
 
         try {
             toast.info("Fetching webhook URL...");
-            const webhookUrl = await n8nService.getWorkflowWebhook(workflowId);
+            const result = await n8nService.getWorkflowWebhook(workflowId);
 
-            if (webhookUrl) {
-                form.setValue("webhookUrl", webhookUrl, { shouldDirty: true });
-                toast.success("Webhook URL auto-filled!");
+            if (result) {
+                form.setValue("webhookUrl", result.url, { shouldDirty: true });
+                form.setValue("webhookMethod", result.method, { shouldDirty: true });
+                toast.success(`Webhook auto-filled! Method: ${result.method}`);
 
                 // Optional: Auto-set label from workflow name if empty
                 const wf = workflows.find(w => w.id === workflowId);
@@ -92,6 +101,10 @@ export function StepConfigPanel({ stepId }: { stepId: string }) {
             form.reset({
                 label: data.label || '',
                 webhookUrl: data.webhookUrl || '',
+                webhookMethod: data.webhookMethod || 'POST',
+                authType: data.authConfig?.type || 'none',
+                authHeaderName: data.authConfig?.headerName || 'X-API-KEY',
+                authHeaderValue: data.authConfig?.headerValue || '',
                 timeout: data.timeout || 300000,
                 maxRetries: data.retryConfig?.maxRetries || 3,
                 retryDelay: data.retryConfig?.retryDelay || 5000
@@ -103,6 +116,12 @@ export function StepConfigPanel({ stepId }: { stepId: string }) {
         updateStepData(stepId, {
             label: data.label,
             webhookUrl: data.webhookUrl,
+            webhookMethod: data.webhookMethod,
+            authConfig: {
+                type: data.authType,
+                headerName: data.authHeaderName,
+                headerValue: data.authHeaderValue
+            },
             timeout: data.timeout,
             retryConfig: {
                 maxRetries: data.maxRetries,
@@ -164,19 +183,101 @@ export function StepConfigPanel({ stepId }: { stepId: string }) {
                             </p>
                         </div>
 
-                        <FormField
-                            control={form.control}
-                            name="webhookUrl"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Webhook URL</FormLabel>
-                                    <FormControl>
-                                        <Input {...field} placeholder="https://n8n.example.com/..." />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
+                        <div className="flex gap-4">
+                            <FormField
+                                control={form.control}
+                                name="webhookMethod"
+                                render={({ field }) => (
+                                    <FormItem className="w-[120px]">
+                                        <FormLabel>Method</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Method" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="GET">GET</SelectItem>
+                                                <SelectItem value="POST">POST</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="webhookUrl"
+                                render={({ field }) => (
+                                    <FormItem className="flex-1">
+                                        <FormLabel>Webhook URL</FormLabel>
+                                        <FormControl>
+                                            <Input {...field} placeholder="https://n8n.example.com/..." />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+
+                        {/* Authentication */}
+                        <div className="space-y-4 border rounded-lg p-3 bg-muted/20">
+                            <FormField
+                                control={form.control}
+                                name="authType"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="flex items-center gap-2">
+                                            Authentication
+                                            <span className="text-xs font-normal text-muted-foreground">(Optional)</span>
+                                        </FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select Auth Type" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="none">None</SelectItem>
+                                                <SelectItem value="header">Header Auth (API Key)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            {form.watch("authType") === "header" && (
+                                <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
+                                    <FormField
+                                        control={form.control}
+                                        name="authHeaderName"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Header Name</FormLabel>
+                                                <FormControl>
+                                                    <Input {...field} placeholder="X-API-KEY" />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="authHeaderValue"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Value</FormLabel>
+                                                <FormControl>
+                                                    <Input {...field} type="password" placeholder="Key/Token" />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
                             )}
-                        />
+                        </div>
 
                         <FormField
                             control={form.control}
