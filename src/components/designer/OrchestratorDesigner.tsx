@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { FlowCanvas } from './FlowCanvas';
 import { StepPalette } from './StepPalette';
 import { StepConfigPanel } from './StepConfigPanel';
+import { StartConfigPanel } from './StartConfigPanel';
 import { SaveConfigDialog } from './SaveConfigDialog';
 import { TemplateSelector } from './TemplateSelector';
 import { useDesignerStore } from '@/stores/designerStore';
@@ -41,7 +42,11 @@ export default function OrchestratorDesigner() {
             {/* Right Sidebar: Config Panel (Conditional) */}
             {selectedNode && (
                 <div className="w-80 h-full flex-shrink-0 z-10 overflow-y-auto border-l bg-muted/30">
-                    <StepConfigPanel stepId={selectedNode.id} />
+                    {selectedNode.type === 'startNode' ? (
+                        <StartConfigPanel />
+                    ) : (
+                        <StepConfigPanel stepId={selectedNode.id} />
+                    )}
                 </div>
             )}
         </div>

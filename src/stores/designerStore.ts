@@ -30,13 +30,30 @@ interface DesignerState {
   setSelectedNode: (node: Node | null) => void;
   loadConfig: (config: OrchestratorConfig) => void;
   reset: () => void;
+  orchestratorName: string;
+  orchestratorDescription: string;
+  setOrchestratorMetadata: (name: string, description: string) => void;
 }
 
+const INITIAL_START_NODE: Node = {
+  id: 'start',
+  type: 'startNode',
+  position: { x: 250, y: 0 },
+  data: { label: 'Start' },
+  deletable: false,
+};
+
 export const useDesignerStore = create<DesignerState>((set, get) => ({
-  nodes: [],
+  nodes: [INITIAL_START_NODE],
   edges: [],
   selectedNode: null,
   config: null,
+  orchestratorName: '',
+  orchestratorDescription: '',
+
+  setOrchestratorMetadata: (name: string, description: string) => {
+    set({ orchestratorName: name, orchestratorDescription: description });
+  },
 
   onNodesChange: (changes: NodeChange[]) => {
     set({
@@ -61,7 +78,7 @@ export const useDesignerStore = create<DesignerState>((set, get) => ({
     const newNode: Node = {
       id,
       type: 'stepNode',
-      position: { x: 100, y: 100 + get().nodes.length * 100 },
+      position: { x: 250, y: 150 + (get().nodes.length - 1) * 150 }, // Offset from start node
       data: {
         stepId: id,
         name: stepName, // A, B, C, etc.
@@ -81,6 +98,7 @@ export const useDesignerStore = create<DesignerState>((set, get) => ({
   },
 
   removeStep: (id: string) => {
+    if (id === 'start') return; // Protect start node
     set({
       nodes: get().nodes.filter((n) => n.id !== id),
       edges: get().edges.filter((e) => e.source !== id && e.target !== id),
@@ -116,10 +134,10 @@ export const useDesignerStore = create<DesignerState>((set, get) => ({
 
   loadConfig: (config: OrchestratorConfig) => {
     // Determine flow from dependencies
-    const nodes: Node[] = config.steps.map((step, index) => ({
+    const stepNodes: Node[] = config.steps.map((step, index) => ({
       id: step.id,
       type: 'stepNode',
-      position: { x: 250, y: index * 150 }, // Simple layout, improvement: use dagre
+      position: { x: 250, y: 150 + index * 150 }, // Start at y=150
       data: {
         stepId: step.id,
         name: step.name,
@@ -128,10 +146,15 @@ export const useDesignerStore = create<DesignerState>((set, get) => ({
         timeout: step.timeout,
         retryConfig: step.retryConfig,
       },
+      deletable: true,
     }));
 
+    // Reconstruct edges
     const edges: Edge[] = [];
     config.steps.forEach((step) => {
+      // Config doesn't strictly store "start -> first step" connection, 
+      // but we can infer or leave it disconnected.
+      // For now, let's just load the steps and dependencies.
       step.dependsOn.forEach((depId) => {
         edges.push({
           id: `e_${depId}-${step.id}`,
@@ -139,17 +162,37 @@ export const useDesignerStore = create<DesignerState>((set, get) => ({
           target: step.id,
         });
       });
+      
+      // If a step has NO dependencies, we could optionally connect it to 'start'
+      // to make the graph look connected, but strictly speaking 'dependsOn' is empty.
+      // Let's connect roots to start for visual flow.
+      if (step.dependsOn.length === 0) {
+         edges.push({
+            id: `e_start-${step.id}`,
+            source: 'start',
+            target: step.id,
+            animated: true,
+         });
+      }
     });
 
-    set({ config, nodes, edges });
+    set({ 
+        config, 
+        nodes: [INITIAL_START_NODE, ...stepNodes], 
+        edges,
+        orchestratorName: config.name,
+        orchestratorDescription: config.description 
+    });
   },
 
   reset: () => {
     set({
-      nodes: [],
+      nodes: [INITIAL_START_NODE],
       edges: [],
       selectedNode: null,
       config: null,
+      orchestratorName: '',
+      orchestratorDescription: '',
     });
   },
 }));

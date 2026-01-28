@@ -55,12 +55,12 @@ export function StepNode({ data, selected }: StepNodeProps) {
             <Handle
                 type="target"
                 position={Position.Top}
-                className="w-4 h-4 !bg-transparent !border-none !top-[-8px] cursor-crosshair"
+                className="w-6 h-6 !bg-transparent !border-none !top-[-12px] !left-1/2 !-translate-x-1/2 cursor-crosshair z-50"
             />
             <Handle
                 type="source"
                 position={Position.Bottom}
-                className="w-4 h-4 !bg-transparent !border-none !bottom-[-8px] cursor-crosshair"
+                className="w-6 h-6 !bg-transparent !border-none !bottom-[-12px] !left-1/2 !-translate-x-1/2 cursor-crosshair z-50"
             />
         </div>
     );

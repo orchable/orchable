@@ -10,6 +10,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useDesignerStore } from '@/stores/designerStore';
+import { StartNode } from './StartNode';
 import { StepNode } from './StepNode';
 
 export function FlowCanvas() {
@@ -24,7 +25,8 @@ export function FlowCanvas() {
     } = useDesignerStore();
 
     const nodeTypes = useMemo(() => ({
-        stepNode: StepNode
+        stepNode: StepNode,
+        startNode: StartNode
     }), []);
 
     // Handle node selection
