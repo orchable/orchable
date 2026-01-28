@@ -26,6 +26,7 @@ export interface StepConfig {
     headerName?: string;
     headerValue?: string;
   };
+  n8nWorkflowId?: string;
 }
 
 // Syllabus Types

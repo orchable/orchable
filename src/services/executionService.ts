@@ -19,7 +19,7 @@ export const executionService = {
     
     // Tạo execution record
     const { data: execution, error } = await supabase
-      .from('executions')
+      .from('lab_executions')
       .insert({
         config_id: data.configId,
         syllabus_row: data.syllabusRow,
@@ -45,7 +45,7 @@ export const executionService = {
     
     if (stepExecutions.length > 0) {
         await supabase
-        .from('step_executions')
+        .from('lab_step_executions')
         .insert(stepExecutions);
     }
     
@@ -54,7 +54,7 @@ export const executionService = {
   
   async listExecutions(): Promise<Execution[]> {
     const { data, error } = await supabase
-      .from('executions')
+      .from('lab_executions')
       .select('*')
       .order('created_at', { ascending: false });
     
@@ -64,7 +64,7 @@ export const executionService = {
   
   async getExecution(id: string): Promise<Execution> {
     const { data, error } = await supabase
-      .from('executions')
+      .from('lab_executions')
       .select('*')
       .eq('id', id)
       .single();
@@ -79,7 +79,7 @@ export const executionService = {
     additionalData?: Partial<Execution>
   ): Promise<void> {
     const { error } = await supabase
-      .from('executions')
+      .from('lab_executions')
       .update({
         status,
         ...additionalData,
@@ -92,7 +92,7 @@ export const executionService = {
 
   async getStepExecutions(executionId: string) {
       const { data, error } = await supabase
-        .from('step_executions')
+        .from('lab_step_executions')
         .select('*')
         .eq('execution_id', executionId)
         .order('step_name', { ascending: true }); // A, B, C...

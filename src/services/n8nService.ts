@@ -90,8 +90,23 @@ export const n8nService = {
         return;
     }
 
+    // Check if we should use the legacy Master Workflow or the new Compiled Workflow
+    // For now, we default to Compiled (using configId) as requested by user.
+    // Spec: The compiler generates webhook with path = config.id
+    
+    // Legacy fallback (optional, can be toggled via settings if needed)
+    const masterSlug = localStorage.getItem("lovable_n8n_master_slug");
+    
+    // If masterSlug is explicitly set AND it's not the default 'master-orchestrator', 
+    // user might want to use it. But the new architecture favors configId.
+    // Let's use configId as slug.
+    const slug = data.configId; 
+    
+    const useTest = localStorage.getItem("lovable_n8n_use_test_webhook") === 'true';
+    const pathPrefix = useTest ? 'webhook-test' : 'webhook';
+
     const response = await fetch(
-      `${baseUrl}/webhook/master-orchestrator`,
+      `${baseUrl}/${pathPrefix}/${slug}`,
       {
         method: 'POST',
         headers: {
@@ -102,8 +117,84 @@ export const n8nService = {
     );
     
     if (!response.ok) {
-      throw new Error(`n8n trigger failed: ${response.statusText}`);
+      const errorText = await response.text().catch(() => 'No error details');
+      console.error('n8n Trigger Error Body:', errorText);
+      throw new Error(`n8n trigger failed (${response.status}): ${errorText || response.statusText}`);
     }
+  },
+
+  /**
+   * Create a new workflow in n8n
+   */
+  async createWorkflow(workflowJson: any): Promise<any> {
+      const baseUrl = localStorage.getItem("lovable_n8n_url") || N8N_BASE_URL;
+      const apiKey = localStorage.getItem("lovable_n8n_api_key");
+      
+      if (!baseUrl || !apiKey) throw new Error("Missing n8n config");
+      
+      const response = await fetch(`${baseUrl.replace(/\/$/, '')}/api/v1/workflows`, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              'X-N8N-API-KEY': apiKey
+          },
+          body: JSON.stringify(workflowJson)
+      });
+      
+      if (!response.ok) {
+           const err = await response.text();
+           throw new Error(`Create Workflow Failed: ${err}`);
+      }
+      
+      return await response.json();
+  },
+
+  /**
+   * Update existing workflow
+   */
+  async updateWorkflow(id: string, workflowJson: any): Promise<any> {
+      const baseUrl = localStorage.getItem("lovable_n8n_url") || N8N_BASE_URL;
+      const apiKey = localStorage.getItem("lovable_n8n_api_key");
+
+      if (!baseUrl || !apiKey) throw new Error("Missing n8n config");
+
+      const response = await fetch(`${baseUrl.replace(/\/$/, '')}/api/v1/workflows/${id}`, {
+          method: 'PUT',
+          headers: {
+              'Content-Type': 'application/json',
+              'X-N8N-API-KEY': apiKey
+          },
+          body: JSON.stringify(workflowJson)
+      });
+
+      if (!response.ok) {
+           const err = await response.text();
+           throw new Error(`Update Workflow Failed: ${err}`);
+      }
+
+      return await response.json();
+  },
+
+  /**
+   * Activate workflow
+   */
+  async activateWorkflow(id: string, active: boolean = true): Promise<any> {
+    const baseUrl = localStorage.getItem("lovable_n8n_url") || N8N_BASE_URL;
+    const apiKey = localStorage.getItem("lovable_n8n_api_key");
+
+    if (!baseUrl || !apiKey) throw new Error("Missing n8n config");
+
+    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/api/v1/workflows/${id}/activate`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-N8N-API-KEY': apiKey
+        },
+        body: JSON.stringify({ active })
+    });
+
+    if (!response.ok) throw new Error("Failed to toggle activation");
+    return await response.json();
   }
 };
 

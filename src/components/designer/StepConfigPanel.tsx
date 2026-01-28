@@ -25,7 +25,8 @@ const stepConfigSchema = z.object({
     authHeaderValue: z.string().optional(),
     timeout: z.number().min(1000, 'Min 1s').max(600000, 'Max 10m'),
     maxRetries: z.number().min(0).max(10),
-    retryDelay: z.number().min(1000).max(60000)
+    retryDelay: z.number().min(1000).max(60000),
+    n8nWorkflowId: z.string().optional()
 });
 
 interface Workflow { id: string; name: string; }
@@ -71,7 +72,11 @@ export function StepConfigPanel({ stepId }: { stepId: string }) {
         if (!workflowId || workflowId === "none") return;
 
         try {
+            // Store the ID
+            form.setValue("n8nWorkflowId", workflowId, { shouldDirty: true });
+
             toast.info("Fetching webhook URL...");
+            // ... existing fetch logic
             const result = await n8nService.getWorkflowWebhook(workflowId);
 
             if (result) {
@@ -79,7 +84,7 @@ export function StepConfigPanel({ stepId }: { stepId: string }) {
                 form.setValue("webhookMethod", result.method, { shouldDirty: true });
                 toast.success(`Webhook auto-filled! Method: ${result.method}`);
 
-                // Optional: Auto-set label from workflow name if empty
+                // ... label logic
                 const wf = workflows.find(w => w.id === workflowId);
                 const currentLabel = form.getValues("label");
                 if (wf && (!currentLabel || currentLabel === "New Step")) {
@@ -89,6 +94,7 @@ export function StepConfigPanel({ stepId }: { stepId: string }) {
                 toast.warning("No 'Webhook' node found in this workflow.");
             }
         } catch (error) {
+            // ... error handling
             console.error(error);
             toast.error("Failed to fetch workflow details.");
         }
@@ -107,12 +113,14 @@ export function StepConfigPanel({ stepId }: { stepId: string }) {
                 authHeaderValue: data.authConfig?.headerValue || '',
                 timeout: data.timeout || 300000,
                 maxRetries: data.retryConfig?.maxRetries || 3,
-                retryDelay: data.retryConfig?.retryDelay || 5000
+                retryDelay: data.retryConfig?.retryDelay || 5000,
+                // @ts-ignore
+                n8nWorkflowId: data.n8nWorkflowId || ''
             });
         }
     }, [step, form]);
 
-    const onSubmit = (data: z.infer<typeof stepConfigSchema>) => {
+    const onSubmit = (data: z.infer<typeof stepConfigSchema> & { n8nWorkflowId?: string }) => {
         updateStepData(stepId, {
             label: data.label,
             webhookUrl: data.webhookUrl,
@@ -126,7 +134,8 @@ export function StepConfigPanel({ stepId }: { stepId: string }) {
             retryConfig: {
                 maxRetries: data.maxRetries,
                 retryDelay: data.retryDelay
-            }
+            },
+            n8nWorkflowId: form.getValues("n8nWorkflowId")
         });
     };
 

@@ -65,12 +65,49 @@ export function useSaveOrchestrator() {
         });
 
         try {
-            await saveConfig.mutateAsync({
+            // 1. Save to Supabase
+            const savedConfig = await saveConfig.mutateAsync({
                 name: orchestratorName,
                 description: orchestratorDescription,
                 steps
             });
-            toast.success("Configuration saved successfully");
+            
+            // 2. Compile & Publish to n8n (Fire & Forget or Await?) -> Await to show status
+            const n8nApiKey = localStorage.getItem("lovable_n8n_api_key");
+            if (n8nApiKey) {
+                 try {
+                     const { compilerService } = await import('@/services/compilerService');
+                     const { n8nService } = await import('@/services/n8nService');
+                     
+                     // Compile
+                     const workflowJson = compilerService.compile(savedConfig);
+                     
+                     // Enforce unique naming convention: [Orchestrator] Name (UUID)
+                     const n8nName = `[Orchestrator] ${savedConfig.name} (${savedConfig.id})`;
+                     workflowJson.name = n8nName;
+                     
+                     // Check existence
+                     const existingWorkflows = await n8nService.listWorkflows();
+                     const match = existingWorkflows.find(w => w.name === n8nName);
+                     
+                     if (match) {
+                         await n8nService.updateWorkflow(match.id, workflowJson);
+                         // Ensure active
+                         await n8nService.activateWorkflow(match.id, true);
+                         toast.success("Saved to DB & Updated n8n Workflow!");
+                     } else {
+                         const created = await n8nService.createWorkflow(workflowJson);
+                         await n8nService.activateWorkflow(created.id, true);
+                         toast.success("Saved to DB & Created n8n Workflow!");
+                     }
+                 } catch (n8nError: any) {
+                     console.error("n8n Publish Error:", n8nError);
+                     toast.warning(`Saved to DB, but n8n publish failed: ${n8nError.message}`);
+                 }
+            } else {
+                toast.success("Saved to DB (n8n publish skipped - No API Key)");
+            }
+
             return true;
         } catch (error) {
             console.error("Failed to save", error);
