@@ -265,6 +265,16 @@ export function LauncherPage() {
                 config_id: selectedConfigId
               },
               // L3: Orchestrator Override Logic
+              current_stage_config: {
+                template_id: `${config.id}_${firstStage.stage_key}`,
+                cardinality: (firstStage.cardinality === '1:N' || firstStage.cardinality === 'one_to_many')
+                  ? 'one_to_many'
+                  : 'one_to_one',
+                split_path: firstStage.split_path || null,
+                split_mode: firstStage.split_mode || 'per_item',
+                output_mapping: firstStage.output_mapping || 'result',
+                delimiters: firstStage.contract?.input?.delimiters
+              },
               next_stage_config: nextStageKey ? {
                 template_id: `${config.id}_${nextStageKey}`,
                 cardinality: (firstStage.cardinality === '1:N')
