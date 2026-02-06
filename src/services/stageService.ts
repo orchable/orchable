@@ -34,7 +34,6 @@ interface PromptTemplateRecord {
     version: number;
     is_active: boolean;
     default_ai_settings?: Record<string, unknown>;
-    next_stage_template_id?: string | null;
     next_stage_template_ids?: string[] | null;
     organization_code?: string;
     input_schema?: Record<string, unknown>;
@@ -108,7 +107,7 @@ function getNextStages(
 
 /**
  * Sync orchestrator stages to prompt_templates table
- * Creates orchestrator-specific templates with next_stage_template_id
+ * Creates orchestrator-specific templates with next_stage_template_ids
  * Uses 2-pass approach to avoid FK constraint violations
  */
 export async function syncStagesToPromptTemplates(
@@ -129,7 +128,7 @@ export async function syncStagesToPromptTemplates(
         templateIdMap.set(stage.id, templateId);
     });
 
-    // PASS 1: Insert/update all templates WITHOUT next_stage_template_id (to avoid FK violation)
+    // PASS 1: Insert/update all templates WITHOUT next_stage_template_ids (to avoid FK violation)
     for (const stage of sortedStages) {
         const templateId = templateIdMap.get(stage.id)!;
 
@@ -201,7 +200,7 @@ export async function syncStagesToPromptTemplates(
             stage_config: stageConfig,
             requires_approval: stage.requires_approval || false,
             organization_code: orchestratorId
-            // NOTE: next_stage_template_id NOT set here to avoid FK violation
+            // NOTE: next_stage_template_ids NOT set here to avoid FK violation
         };
 
         // Upsert (insert or update)
@@ -215,7 +214,7 @@ export async function syncStagesToPromptTemplates(
         }
     }
 
-    // PASS 2: Update next_stage_template_id now that all templates exist
+    // PASS 2: Update next_stage_template_ids now that all templates exist
     for (const stage of sortedStages) {
         const templateId = templateIdMap.get(stage.id)!;
         
@@ -228,7 +227,6 @@ export async function syncStagesToPromptTemplates(
             const { error } = await supabase
                 .from('prompt_templates')
                 .update({ 
-                    next_stage_template_id: nextTemplateId,
                     next_stage_template_ids: nextTemplateIds 
                 })
                 .eq('id', templateId);

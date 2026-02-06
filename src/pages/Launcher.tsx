@@ -282,7 +282,6 @@ export function LauncherPage() {
             batch_id: batchId,
             stage_key: firstStage?.stage_key || 'start',
             prompt_template_id: firstStage?.stage_key ? `${config.id}_${firstStage.stage_key}` : null,
-            next_stage_template_id: nextStageKey ? `${config.id}_${nextStageKey}` : null,
             sequence: idx, // sequence should be 0-indexed for the current batch
             test_mode: false
           };
