@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { FlowCanvas } from './FlowCanvas';
 import { StepPalette } from './StepPalette';
-import { StepConfigPanel } from './StepConfigPanel';
+import { StageConfigPanel } from './StageConfigPanel';
 import { StartConfigPanel } from './StartConfigPanel';
 import { SaveConfigDialog } from './SaveConfigDialog';
+import { RunExecutionDialog } from './RunExecutionDialog';
 
 import { ConfigLibrary } from './ConfigLibrary';
 import { useDesignerStore } from '@/stores/designerStore';
@@ -12,7 +13,7 @@ import { RotateCcw } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
 export default function OrchestratorDesigner() {
-    const { selectedNode, reset } = useDesignerStore();
+    const { selectedNode, reset, config } = useDesignerStore();
 
     useEffect(() => {
         // Clean up on unmount
@@ -36,6 +37,7 @@ export default function OrchestratorDesigner() {
                         Reset
                     </Button>
                     <SaveConfigDialog />
+                    <RunExecutionDialog disabled={!config?.id} />
                 </div>
                 <FlowCanvas />
             </div>
@@ -46,7 +48,7 @@ export default function OrchestratorDesigner() {
                     {selectedNode.type === 'startNode' ? (
                         <StartConfigPanel />
                     ) : (
-                        <StepConfigPanel stepId={selectedNode.id} />
+                        <StageConfigPanel stageId={selectedNode.id} />
                     )}
                 </div>
             )}

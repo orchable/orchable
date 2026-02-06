@@ -6,13 +6,17 @@ export const configService = {
     name: string;
     description?: string;
     steps: StepConfig[];
+    viewport?: { x: number; y: number; zoom: number };
+    n8n_workflow_id?: string;
   }): Promise<OrchestratorConfig> {
     const { data, error } = await supabase
       .from('lab_orchestrator_configs')
       .insert({
         name: config.name,
         description: config.description,
-        steps: config.steps
+        steps: config.steps,
+        viewport: config.viewport, // Save viewport
+        n8n_workflow_id: config.n8n_workflow_id
       })
       .select()
       .single();

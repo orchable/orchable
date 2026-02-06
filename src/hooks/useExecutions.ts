@@ -36,3 +36,10 @@ export function useCreateExecution() {
     }
   });
 }
+
+export function useAiTasks() {
+  return useQuery({
+    queryKey: ['ai_tasks'],
+    queryFn: executionService.listAiTasks
+  });
+}

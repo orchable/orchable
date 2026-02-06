@@ -191,46 +191,45 @@ export default function SettingsPage() {
                                 Changing Supabase configuration will trigger a page reload.
                             </p>
                         </div>
-                    </div>
-                </CardContent>
-            </Card>
+                    </CardContent>
+                </Card>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Orchestrator Defaults</CardTitle>
-                    <CardDescription>
-                        Set default values for new steps in the designer.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="timeout">Default Timeout (ms)</Label>
-                            <Input
-                                id="timeout"
-                                type="number"
-                                value={defaultTimeout}
-                                onChange={(e) => setDefaultTimeout(e.target.value)}
-                            />
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Orchestrator Defaults</CardTitle>
+                        <CardDescription>
+                            Set default values for new steps in the designer.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="timeout">Default Timeout (ms)</Label>
+                                <Input
+                                    id="timeout"
+                                    type="number"
+                                    value={defaultTimeout}
+                                    onChange={(e) => setDefaultTimeout(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="retries">Default Max Retries</Label>
+                                <Input
+                                    id="retries"
+                                    type="number"
+                                    value={defaultRetries}
+                                    onChange={(e) => setDefaultRetries(e.target.value)}
+                                />
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="retries">Default Max Retries</Label>
-                            <Input
-                                id="retries"
-                                type="number"
-                                value={defaultRetries}
-                                onChange={(e) => setDefaultRetries(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+                    </CardContent>
+                </Card>
 
-            <div className="flex justify-between">
-                <Button variant="outline" onClick={handleReset}>Reset to Defaults</Button>
-                <Button onClick={handleSave}>Save Changes</Button>
+                <div className="flex justify-between">
+                    <Button variant="outline" onClick={handleReset}>Reset to Defaults</Button>
+                    <Button onClick={handleSave}>Save Changes</Button>
+                </div>
             </div>
-        </div>
         </div >
     );
 }

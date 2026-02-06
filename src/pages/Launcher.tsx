@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Upload, FileSpreadsheet, Rocket, ChevronRight, CheckCircle2, Loader2, AlertCircle, Search } from 'lucide-react';
+import { Play, Upload, FileSpreadsheet, Rocket, ChevronRight, CheckCircle2, Loader2, AlertCircle, Search, FileJson, Settings2, Link as LinkIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -8,8 +8,17 @@ import { useConfigs } from '@/hooks/useConfigs';
 import { useCreateExecution } from '@/hooks/useExecutions';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import type { SyllabusRow } from '@/lib/types';
+import type { SyllabusRow, OrchestratorConfig, StepConfig } from '@/lib/types';
 import { n8nService } from '@/services/n8nService';
+import { analyzeJsonStructure, getValueByPath, processTaskData } from '@/lib/jsonAnalyzer';
+import type { FieldSelection, FieldMapping, StageContract } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
+import { JsonInputSection } from '@/components/launcher/JsonInputSection';
+import { FieldMappingDialog } from '@/components/launcher/FieldMappingDialog';
+import { TaskSelectionTable } from '@/components/launcher/TaskSelectionTable';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Link } from 'react-router-dom';
 
 export function LauncherPage() {
   const navigate = useNavigate();
@@ -21,78 +30,300 @@ export function LauncherPage() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [isLaunching, setIsLaunching] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [inputMode, setInputMode] = useState<'tsv' | 'json'>('tsv');
+  const [isParsing, setIsParsing] = useState(false);
+
+  // JSON Mode State
+  const [jsonData, setJsonData] = useState<any | null>(null);
+  const [jsonAnalysis, setJsonAnalysis] = useState<any | null>(null);
+  const [fieldSelection, setFieldSelection] = useState<FieldSelection>({ shared: [], perTask: [] });
+  const [fieldMapping, setFieldMapping] = useState<FieldMapping>({});
+  const [selectedTaskIndices, setSelectedTaskIndices] = useState<number[]>([]);
+  const [rootStages, setRootStages] = useState<(StepConfig & { id: string; name: string })[]>([]);
+  const [mappingWarning, setMappingWarning] = useState<string[]>([]);
+  const [isMappingDialogOpen, setIsMappingDialogOpen] = useState(false);
+
+  // Sync root stages' contracts when configuration changes
+  useEffect(() => {
+    if (!selectedConfigId || !configs) {
+      setRootStages([]);
+      return;
+    }
+
+    const config = configs.find(c => c.id === selectedConfigId);
+    if (!config) return;
+
+    // Find all steps that have no dependencies (root steps)
+    const roots = config.steps
+      .filter(s => !s.dependsOn || s.dependsOn.length === 0)
+      .filter(s => s.contract)
+      .map(s => {
+        // Find next stage(s) - for now, take first child only
+        const nextStage = config.steps.find(child => child.dependsOn?.includes(s.id));
+
+        return {
+          ...s,
+          id: s.id,
+          name: s.label || s.name,
+          // We'll use this nextStage info during launch
+          _nextStage: nextStage
+        } as any;
+      });
+
+    setRootStages(roots);
+  }, [selectedConfigId, configs]);
+
+  // Validate fields against contracts of all root stages
+  const validation = useMemo(() => {
+    if (inputMode === 'tsv' || rootStages.length === 0) return { isValid: true, problems: [] };
+
+    const problems: { stageName: string; missing: string[]; delimiters: { start: string; end: string } }[] = [];
+
+    const mappedFields = Object.entries(fieldMapping)
+      .filter(([_, value]) => value && (value.startsWith("static:") ? value.length > 7 : true))
+      .map(([name]) => name);
+
+    const perTaskFields = fieldSelection.perTask.map(f => f.split('.').pop() || f);
+
+    // SMART VALIDATION: If 'input_data' object is selected, unroll its keys into selectedFields
+    const unrolledFields: string[] = [];
+    if (perTaskFields.includes('input_data') && jsonAnalysis?.sampleTasks?.[0]?.input_data) {
+      const inputDataObj = jsonAnalysis.sampleTasks[0].input_data;
+      if (typeof inputDataObj === 'object' && inputDataObj !== null) {
+        unrolledFields.push(...Object.keys(inputDataObj));
+      }
+    }
+
+    const selectedFields = [
+      ...fieldSelection.shared.map(f => f.split('.').pop() || f),
+      ...perTaskFields,
+      ...unrolledFields,
+      ...mappedFields
+    ];
+
+    rootStages.forEach(stage => {
+      const requiredFields = stage.contract?.input.fields
+        .filter(f => f.required)
+        .map(f => f.name) || [];
+
+      const missing = requiredFields.filter(f => !selectedFields.includes(f));
+
+      if (missing.length > 0) {
+        problems.push({
+          stageName: stage.name,
+          missing,
+          delimiters: stage.contract?.input.delimiters || { start: '{{', end: '}}' }
+        });
+      }
+    });
+
+    return {
+      isValid: problems.length === 0,
+      problems
+    };
+  }, [inputMode, rootStages, fieldSelection, fieldMapping, jsonAnalysis]);
+
+  const orchestrationMetadata = useMemo(() => {
+    if (!selectedConfigId || rootStages.length === 0) return null;
+
+    const config = configs?.find(c => c.id === selectedConfigId);
+    if (!config) return null;
+
+    const firstStage = rootStages[0];
+    const nextStage = (firstStage as any)?._nextStage;
+    const nextStageKey = nextStage?.stage_key;
+
+    return {
+      next_stage_config: nextStageKey ? {
+        template_id: `${config.id}_${nextStageKey}`,
+        cardinality: (firstStage.cardinality === '1:N') ? 'one_to_many' : 'one_to_one',
+        split_path: (firstStage as any).split_path || 'result.questions',
+        split_mode: (firstStage as any).split_mode || 'per_item',
+        output_mapping: (firstStage as any).output_mapping || 'result',
+        delimiters: nextStage?.contract?.input?.delimiters
+      } : null,
+      pre_process: firstStage.pre_process?.enabled ? firstStage.pre_process : undefined,
+      post_process: firstStage.post_process?.enabled ? firstStage.post_process : undefined,
+      'return-along-with': firstStage.return_along_with || []
+    };
+  }, [selectedConfigId, rootStages, configs]);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     setFileName(file.name);
+    const isJson = file.name.endsWith('.json');
+    setIsParsing(true);
+
     const reader = new FileReader();
     reader.onload = (e) => {
-      const text = e.target?.result as string;
-      const rows = text.trim().split('\n').map(row => row.split('\t'));
+      try {
+        const text = e.target?.result as string;
 
-      // Assume header row exists and check mapping, or simple index mapping
-      // For now, simple mapping based on expected columns: lessonId, title, objective, etc.
-      // Or just map to SyllabusRow interface assuming columns match README example or standard
+        if (isJson) {
+          const json = JSON.parse(text);
+          setJsonData(json);
+          const analysis = analyzeJsonStructure(json);
 
-      // Let's assume standard columns: lessonId, lessonTitle, objective, resources(json?), duration, difficulty
-      // Skip header
-      const data: SyllabusRow[] = rows.slice(1).map(cols => ({
-        lessonId: cols[0],
-        lessonTitle: cols[1],
-        objective: cols[2],
-        resources: [], // Parse if needed or kept simple
-        duration: cols[4] || 'N/A',
-        difficulty: cols[5] || 'Start'
-      })).filter(r => r.lessonId); // Filter empty
+          if (!analysis.taskArrayPath) {
+            throw new Error('Không tìm thấy danh sách task trong file JSON. Vui lòng kiểm tra lại cấu trúc file.');
+          }
 
-      setSyllabusData(data);
-      toast.success(`Parsed ${data.length} lessons from ${file.name}`);
+          setJsonAnalysis(analysis);
+          setInputMode('json');
+
+          // Initial selection: all fields (map FieldInfo to path strings)
+          setFieldSelection({
+            shared: analysis.sharedFields.map(f => f.path),
+            perTask: analysis.perTaskFields.map(f => f.path)
+          });
+
+          // Initial task selection: all tasks
+          if (analysis.sampleTasks) {
+            setSelectedTaskIndices(analysis.sampleTasks.map((_, i) => i));
+          }
+
+          toast.success(`Parsed JSON with ${analysis.sampleTasks.length} tasks`);
+          return;
+        }
+
+        // TSV logic
+        const rows = text.trim().split('\n').map(row => row.split('\t'));
+        const data: SyllabusRow[] = rows.slice(1).map(cols => ({
+          lessonId: cols[0],
+          lessonTitle: cols[1],
+          objective: cols[2],
+          resources: [],
+          duration: cols[4] || 'N/A',
+          difficulty: cols[5] || 'Start'
+        })).filter(r => r.lessonId);
+
+        setSyllabusData(data);
+        toast.success(`Parsed ${data.length} lessons from ${file.name}`);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to parse file');
+        console.error(err);
+        setFileName(null);
+      } finally {
+        setIsParsing(false);
+      }
+    };
+    reader.onerror = () => {
+      toast.error('Lỗi khi đọc file');
+      setIsParsing(false);
     };
     reader.readAsText(file);
   };
 
   const handleLaunch = async () => {
     if (!selectedConfigId) return;
+    setIsLaunching(true);
 
     try {
-      setIsLaunching(true);
-      let startedCount = 0;
+      if (inputMode === 'json' && jsonData && jsonAnalysis) {
+        // 1. Prepare data for bulk insert into ai_tasks
+        const taskArray = getValueByPath(jsonData, jsonAnalysis.taskArrayPath);
+        const selectedTasks = selectedTaskIndices.map(idx => taskArray[idx]);
 
-      const dataToProcess = syllabusData.length > 0 ? syllabusData : [{
-        lessonId: `manual-${Date.now()}`,
-        lessonTitle: 'Manual Execution',
-        objective: 'Manual Run',
-        resources: [],
-        duration: 'N/A',
-        difficulty: 'N/A'
-      }];
+        if (selectedTasks.length === 0) {
+          toast.error('Vui lòng chọn ít nhất một task');
+          setIsLaunching(false);
+          return;
+        }
 
-      for (const row of dataToProcess) {
-        // 1. Create Execution record
-        const execution = await createExecutionMutation.mutateAsync({
-          configId: selectedConfigId,
-          syllabusRow: row
+        const batchId = crypto.randomUUID();
+        const config = configs?.find(c => c.id === selectedConfigId);
+        if (!config) {
+          toast.error('Configuration not found.');
+          setIsLaunching(false);
+          return;
+        }
+
+        const tasksToInsert = selectedTasks.map((task, idx) => {
+          const processed = processTaskData(
+            task,
+            jsonData,
+            fieldSelection,
+            fieldMapping,
+            rootStages[0]?.contract?.input.fields.map(f => f.name) || []
+          );
+
+          const firstStage = rootStages[0];
+          const nextStage = (firstStage as any)?._nextStage;
+          const nextStageKey = nextStage?.stage_key;
+
+          const taskObj = {
+            task_type: firstStage?.task_type || 'generic',
+            status: 'pending',
+            input_data: processed.input_data,
+            extra: {
+              ...processed.extra,
+              launcher_metadata: {
+                original_index: idx,
+                source_file: fileName,
+                config_id: selectedConfigId
+              },
+              // L3: Orchestrator Override Logic
+              next_stage_config: nextStageKey ? {
+                template_id: `${config.id}_${nextStageKey}`,
+                cardinality: (firstStage.cardinality === '1:N')
+                  ? 'one_to_many'
+                  : 'one_to_one',
+                split_path: firstStage.split_path || 'result.questions',
+                split_mode: firstStage.split_mode || 'per_item',
+                output_mapping: firstStage.output_mapping || 'result',
+                delimiters: nextStage?.contract?.input?.delimiters
+              } : null,
+              pre_process: firstStage.pre_process?.enabled ? firstStage.pre_process : undefined,
+              post_process: firstStage.post_process?.enabled ? firstStage.post_process : undefined,
+              'return-along-with': firstStage.return_along_with || []
+            },
+            batch_id: batchId,
+            stage_key: firstStage?.stage_key || 'start',
+            prompt_template_id: firstStage?.stage_key ? `${config.id}_${firstStage.stage_key}` : null,
+            next_stage_template_id: nextStageKey ? `${config.id}_${nextStageKey}` : null,
+            sequence: idx, // sequence should be 0-indexed for the current batch
+            test_mode: false
+          };
+          return taskObj;
         });
 
-        // 2. Trigger n8n Master Workflow
-        // Note: In a real app we might want to do this via Edge Function triggered by DB insert
-        // But per requirements we trigger it here or service.
-        await n8nService.triggerMasterWorkflow({
-          executionId: execution.id,
-          configId: selectedConfigId,
-          syllabusRow: row
-        });
+        // 2. Perform bulk insert
+        const { error } = await supabase.from('ai_tasks').insert(tasksToInsert);
+        if (error) throw error;
 
-        startedCount++;
+        toast.success(`Successfully queued ${tasksToInsert.length} tasks to ai_tasks`);
+      } else {
+        // TSV Mode (Legacy / Standard)
+        const dataToProcess = syllabusData.length > 0 ? syllabusData : [{
+          lessonId: `manual-${Date.now()}`,
+          lessonTitle: 'Manual Execution',
+          objective: 'Manual Run',
+          resources: [],
+          duration: 'N/A',
+          difficulty: 'N/A'
+        } as SyllabusRow];
+
+        for (const row of dataToProcess) {
+          const execution = await createExecutionMutation.mutateAsync({
+            configId: selectedConfigId,
+            syllabusRow: row
+          });
+
+          await n8nService.triggerMasterWorkflow({
+            executionId: execution.id,
+            configId: selectedConfigId,
+            syllabusRow: row
+          });
+        }
+        toast.success(`Successfully launched ${dataToProcess.length} execution(s)`);
       }
 
-      toast.success(`Successfully launched ${startedCount} execution(s)`);
       navigate('/monitor');
     } catch (error) {
       console.error('Launch failed', error);
-      toast.error('Failed to launch executions. Check console.');
+      toast.error('Failed to launch. Check console.');
     } finally {
       setIsLaunching(false);
     }
@@ -163,20 +394,24 @@ export function LauncherPage() {
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: 0.2 + idx * 0.1 }}
                           onClick={() => setSelectedConfigId(config.id)}
-                          className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${selectedConfigId === config.id
-                            ? 'border-primary bg-primary/5'
-                            : 'border-transparent bg-muted/50 hover:border-primary/30'
+                          className={`group p-4 rounded-lg border-2 cursor-pointer transition-all ${selectedConfigId === config.id
+                            ? 'border-primary bg-primary text-primary-foreground shadow-md scale-[1.02]'
+                            : 'border-transparent bg-muted/50 hover:border-primary/30 hover:bg-muted/80'
                             }`}
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                              {selectedConfigId === config.id && <CheckCircle2 className="w-5 h-5 text-primary" />}
+                              {selectedConfigId === config.id ? (
+                                <CheckCircle2 className="w-5 h-5 text-white animate-in zoom-in duration-300" />
+                              ) : (
+                                <div className="w-5 h-5 rounded-full border-2 border-muted-foreground/30 group-hover:border-primary/30" />
+                              )}
                               <div>
-                                <p className="font-semibold">{config.name}</p>
-                                <p className="text-sm text-muted-foreground">{config.description}</p>
+                                <p className={`font-semibold ${selectedConfigId === config.id ? 'text-white' : ''}`}>{config.name}</p>
+                                <p className={`text-sm ${selectedConfigId === config.id ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>{config.description}</p>
                               </div>
                             </div>
-                            <div className="text-sm text-muted-foreground">
+                            <div className={`text-sm ${selectedConfigId === config.id ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
                               {config.steps?.length || 0} steps
                             </div>
                           </div>
@@ -207,16 +442,36 @@ export function LauncherPage() {
                   2
                 </div>
                 <div>
-                  <CardTitle>Orchestrator Input Data (TSV) <span className="text-sm font-normal text-muted-foreground">(Optional)</span></CardTitle>
-                  <CardDescription>Tải lên file TSV chứa dữ liệu đầu vào (nếu có)</CardDescription>
+                  <CardTitle>Orchestrator Input Data</CardTitle>
+                  <CardDescription>Tải lên file TSV hoặc JSON chứa dữ liệu đầu vào</CardDescription>
                 </div>
+              </div>
+              <div className="flex bg-muted p-1 rounded-lg self-start mt-2">
+                <Button
+                  variant={inputMode === 'tsv' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setInputMode('tsv')}
+                  className="text-xs h-8 px-3"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" />
+                  TSV Mode
+                </Button>
+                <Button
+                  variant={inputMode === 'json' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setInputMode('json')}
+                  className="text-xs h-8 px-3"
+                >
+                  <FileJson className="w-3.5 h-3.5 mr-1.5" />
+                  JSON Mode
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
               <div className="relative">
                 <input
                   type="file"
-                  accept=".tsv,.txt,.csv"
+                  accept=".tsv,.txt,.csv,.json"
                   onChange={handleFileUpload}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                 />
@@ -225,9 +480,18 @@ export function LauncherPage() {
                   whileTap={{ scale: 0.99 }}
                   className="border-2 border-dashed border-muted-foreground/30 rounded-xl p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all"
                 >
-                  <Upload className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
-                  <p className="font-medium mb-1">Click để upload file TSV</p>
-                  <p className="text-sm text-muted-foreground">hoặc kéo thả file vào đây</p>
+                  {isParsing ? (
+                    <div className="flex flex-col items-center py-4">
+                      <Loader2 className="w-10 h-10 mb-3 text-primary animate-spin" />
+                      <p className="font-medium mb-1">Đang phân tích dữ liệu...</p>
+                    </div>
+                  ) : (
+                    <>
+                      <Upload className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
+                      <p className="font-medium mb-1">Click để upload file {inputMode.toUpperCase()}</p>
+                      <p className="text-sm text-muted-foreground">hoặc kéo thả file vào đây</p>
+                    </>
+                  )}
                 </motion.div>
               </div>
 
@@ -239,27 +503,95 @@ export function LauncherPage() {
                   className="mt-4 p-4 rounded-lg bg-success/10 border border-success/20"
                 >
                   <div className="flex items-center gap-3">
-                    <FileSpreadsheet className="w-5 h-5 text-success" />
+                    {inputMode === 'json' ? <FileJson className="w-5 h-5 text-success" /> : <FileSpreadsheet className="w-5 h-5 text-success" />}
                     <div className="flex-1">
                       <p className="font-medium text-sm">{fileName}</p>
-                      <p className="text-xs text-muted-foreground">{syllabusData.length} rows detected</p>
+                      <p className="text-xs text-muted-foreground">
+                        {inputMode === 'json' ? `${jsonAnalysis?.sampleTasks?.length || 0} tasks` : `${syllabusData.length} rows`} detected
+                      </p>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => { setFileName(null); setSyllabusData([]); }}>Xóa</Button>
+                    <Button variant="ghost" size="sm" onClick={() => { setFileName(null); setSyllabusData([]); setJsonData(null); setJsonAnalysis(null); }}>Xóa</Button>
                   </div>
                 </motion.div>
+              )}
+
+              {inputMode === 'json' && jsonData && jsonAnalysis && (
+                <div className="space-y-4">
+                  <JsonInputSection
+                    analysis={jsonAnalysis}
+                    selection={fieldSelection}
+                    mapping={fieldMapping}
+                    onSelectionChange={setFieldSelection}
+                    sampleJson={jsonData}
+                    contract={rootStages[0]?.contract || null}
+                    orchestrationMetadata={orchestrationMetadata}
+                  />
+
+                  {rootStages.length > 0 && !validation.isValid && (
+                    <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 mt-4">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle className="text-sm font-semibold">Cảnh báo: Thiếu thông tin yêu cầu</AlertTitle>
+                      <AlertDescription className="text-xs space-y-3">
+                        {validation.problems.map((problem, i) => (
+                          <div key={i} className="pb-2 border-b border-destructive/10 last:border-0 last:pb-0">
+                            <p className="font-semibold text-destructive mb-1">Stage "{problem.stageName}":</p>
+                            <p>Yêu cầu các trường:
+                              <span className="font-mono ml-1 font-bold">
+                                {problem.missing.map(m => `${problem.delimiters.start}${m}${problem.delimiters.end}`).join(', ')}
+                              </span>
+                            </p>
+                          </div>
+                        ))}
+                        <div className="flex gap-2 pt-2">
+                          <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => setIsMappingDialogOpen(true)}>
+                            <LinkIcon className="w-3 h-3 mr-1" />
+                            Khớp nối thủ công (Mapping)
+                          </Button>
+                          <Link to={`/designer?configId=${selectedConfigId}`}>
+                            <Button size="sm" variant="ghost" className="h-7 text-[10px]">
+                              <Settings2 className="w-3 h-3 mr-1" />
+                              Sửa Contract của Stage
+                            </Button>
+                          </Link>
+                        </div>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {rootStages.length > 0 && validation.isValid && (
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-success/10 border border-success/20 text-success text-xs mt-4">
+                      <CheckCircle2 className="w-4 h-4" />
+                      Dữ liệu đã khớp với contract của các stage đầu tiên.
+                    </div>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>
         </motion.div>
 
+        <FieldMappingDialog
+          open={isMappingDialogOpen}
+          onOpenChange={setIsMappingDialogOpen}
+          contract={rootStages[0]?.contract || null}
+          availableFields={jsonAnalysis ? [
+            ...jsonAnalysis.sharedFields.map((f: any) => f.path),
+            ...jsonAnalysis.perTaskFields.map((f: any) => f.path)
+          ] : []}
+          mapping={fieldMapping}
+          onMappingChange={setFieldMapping}
+          onConfirm={() => setIsMappingDialogOpen(false)}
+        />
+
         {/* Step 3: Preview & Launch */}
         {selectedConfigId && (
           <motion.div
+            id="step-3-preview"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
           >
-            <Card>
+            <Card className={inputMode === 'json' && validation.isValid ? 'border-primary shadow-lg transition-all' : ''}>
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">
@@ -273,7 +605,7 @@ export function LauncherPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Data preview table (Only show if data exists) */}
-                {syllabusData.length > 0 ? (
+                {inputMode === 'tsv' && syllabusData.length > 0 && (
                   <div className="rounded-lg border overflow-hidden max-h-60 overflow-y-auto">
                     <table className="w-full">
                       <thead className="bg-muted/50 sticky top-0">
@@ -304,22 +636,44 @@ export function LauncherPage() {
                       </tbody>
                     </table>
                   </div>
-                ) : (
+                )}
+
+                {inputMode === 'json' && jsonData && jsonAnalysis && (
+                  <TaskSelectionTable
+                    tasks={jsonAnalysis.sampleTasks}
+                    selectedIndices={selectedTaskIndices}
+                    onSelectionChange={setSelectedTaskIndices}
+                    selection={fieldSelection}
+                    sampleJson={jsonData}
+                    mapping={fieldMapping}
+                    contract={rootStages[0]?.contract || null}
+                  />
+                )}
+
+                {inputMode === 'tsv' && syllabusData.length === 0 && (
                   <div className="p-4 rounded-lg bg-muted/30 text-center text-muted-foreground text-sm">
                     Không có dữ liệu input. Hệ thống sẽ khởi chạy 1 execution test.
+                  </div>
+                )}
+
+                {inputMode === 'json' && (!jsonData || selectedTaskIndices.length === 0) && (
+                  <div className="p-4 rounded-lg bg-muted/30 text-center text-muted-foreground text-sm">
+                    {!jsonData ? 'Vui lòng upload file JSON ở Bước 2.' : 'Vui lòng chọn ít nhất 1 task để khởi chạy.'}
                   </div>
                 )}
 
                 {/* Summary */}
                 <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
                   <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Tổng số executions:</p>
-                    <p className="text-2xl font-bold">{syllabusData.length || 1}</p>
+                    <p className="text-sm text-muted-foreground">Tổng số {inputMode === 'json' ? 'tasks' : 'executions'}:</p>
+                    <p className="text-2xl font-bold">
+                      {inputMode === 'json' ? selectedTaskIndices.length : (syllabusData.length || 1)}
+                    </p>
                   </div>
-                  {syllabusData.length > 0 && (
+                  {(inputMode === 'json' ? selectedTaskIndices.length > 0 : syllabusData.length > 0) && (
                     <div className="space-y-1 text-right">
                       <p className="text-sm text-muted-foreground">Estimated time:</p>
-                      <p className="text-2xl font-bold">~{syllabusData.length * 5} phút</p>
+                      <p className="text-2xl font-bold">~{(inputMode === 'json' ? selectedTaskIndices.length : syllabusData.length) * 5} phút</p>
                     </div>
                   )}
                 </div>
@@ -333,7 +687,7 @@ export function LauncherPage() {
                     size="lg"
                     className="w-full h-14 text-lg bg-gradient-to-r from-success to-primary text-white shadow-lg hover:shadow-glow transition-shadow"
                     onClick={handleLaunch}
-                    disabled={isLaunching || !selectedConfigId}
+                    disabled={isLaunching || !selectedConfigId || (inputMode === 'json' && (!jsonData || selectedTaskIndices.length === 0 || !validation.isValid))}
                   >
                     {isLaunching ? (
                       <>
@@ -343,7 +697,7 @@ export function LauncherPage() {
                     ) : (
                       <>
                         <Rocket className="w-5 h-5 mr-2" />
-                        Khởi chạy {syllabusData.length || 1} Execution{syllabusData.length !== 1 ? 's' : ''}
+                        Khởi chạy {inputMode === 'json' ? selectedTaskIndices.length : (syllabusData.length || 1)} Execution{(inputMode === 'json' ? selectedTaskIndices.length : (syllabusData.length || 1)) !== 1 ? 's' : ''}
                         <ChevronRight className="w-5 h-5 ml-2" />
                       </>
                     )}

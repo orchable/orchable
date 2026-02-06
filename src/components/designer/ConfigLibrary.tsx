@@ -101,15 +101,15 @@ export function ConfigLibrary() {
                     </div>
                 </div>
 
-                <Tabs defaultValue="saved" className="flex-1 flex flex-col">
-                    <TabsList className="grid w-full grid-cols-2">
+                <Tabs defaultValue="saved" className="flex-1 flex flex-col min-h-0">
+                    <TabsList className="grid w-full grid-cols-2 flex-shrink-0">
                         <TabsTrigger value="saved">My Configs</TabsTrigger>
                         <TabsTrigger value="templates">Templates</TabsTrigger>
                     </TabsList>
 
-                    <TabsContent value="saved" className="flex-1 overflow-hidden mt-4">
+                    <TabsContent value="saved" className="flex-1 overflow-hidden mt-4 data-[state=inactive]:hidden">
                         <ScrollArea className="h-full pr-4">
-                            <div className="space-y-3">
+                            <div className="space-y-3 pb-8">
                                 {filteredConfigs?.length === 0 && (
                                     <div className="text-center py-8 text-muted-foreground text-sm">
                                         No saved configurations found matching "{searchTerm}"
@@ -144,9 +144,9 @@ export function ConfigLibrary() {
                         </ScrollArea>
                     </TabsContent>
 
-                    <TabsContent value="templates" className="flex-1 overflow-hidden mt-4">
+                    <TabsContent value="templates" className="flex-1 overflow-hidden mt-4 data-[state=inactive]:hidden">
                         <ScrollArea className="h-full pr-4">
-                            <div className="space-y-3">
+                            <div className="space-y-3 pb-8">
                                 {templates.map((template) => (
                                     <div
                                         key={template.id}

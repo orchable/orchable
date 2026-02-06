@@ -56,7 +56,7 @@ const iconSizes = {
 };
 
 export function StatusBadge({ status, size = 'md', showIcon = true }: StatusBadgeProps) {
-  const config = statusConfig[status];
+  const config = statusConfig[status] || statusConfig.pending;
   const Icon = config.icon;
 
   return (
@@ -68,11 +68,11 @@ export function StatusBadge({ status, size = 'md', showIcon = true }: StatusBadg
       )}
     >
       {showIcon && (
-        <Icon 
+        <Icon
           className={cn(
             iconSizes[size],
             status === 'running' && 'animate-spin'
-          )} 
+          )}
         />
       )}
       {config.label}

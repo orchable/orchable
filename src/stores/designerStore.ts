@@ -32,9 +32,11 @@ interface DesignerState {
   reset: () => void;
   orchestratorName: string;
   orchestratorDescription: string;
+  viewport: { x: number; y: number; zoom: number };
   setOrchestratorMetadata: (name: string, description: string) => void;
+  setViewport: (viewport: { x: number; y: number; zoom: number }) => void;
 }
-
+  
 const INITIAL_START_NODE: Node = {
   id: 'start',
   type: 'startNode',
@@ -50,9 +52,14 @@ export const useDesignerStore = create<DesignerState>((set, get) => ({
   config: null,
   orchestratorName: '',
   orchestratorDescription: '',
+  viewport: { x: 0, y: 0, zoom: 1 },
 
   setOrchestratorMetadata: (name: string, description: string) => {
     set({ orchestratorName: name, orchestratorDescription: description });
+  },
+
+  setViewport: (viewport) => {
+    set({ viewport });
   },
 
   onNodesChange: (changes: NodeChange[]) => {
@@ -139,14 +146,28 @@ export const useDesignerStore = create<DesignerState>((set, get) => ({
     const stepNodes: Node[] = config.steps.map((step, index) => ({
       id: step.id,
       type: 'stepNode',
-      position: { x: 250, y: 150 + index * 150 }, // Start at y=150
+      position: step.position || { x: 250, y: 150 + index * 150 }, // Use saved position or default stack
       data: {
         stepId: step.id,
         name: step.name,
         label: step.label,
+        // Legacy webhook-based fields
         webhookUrl: step.webhookUrl,
+        webhookMethod: step.webhookMethod,
+        authConfig: step.authConfig,
         timeout: step.timeout,
         retryConfig: step.retryConfig,
+        n8nWorkflowId: step.n8nWorkflowId,
+        // N-Stage Orchestrator fields
+        stage_key: step.stage_key,
+        task_type: step.task_type,
+        prompt_template_id: step.prompt_template_id,
+        cardinality: step.cardinality,
+        ai_settings: step.ai_settings,
+        // Pre/Post Process Hooks
+        pre_process: step.pre_process,
+        post_process: step.post_process,
+        contract: step.contract,
       },
       deletable: true,
     }));
@@ -183,7 +204,8 @@ export const useDesignerStore = create<DesignerState>((set, get) => ({
         nodes: [INITIAL_START_NODE, ...stepNodes], 
         edges,
         orchestratorName: config.name,
-        orchestratorDescription: config.description 
+        orchestratorDescription: config.description,
+        viewport: config.viewport || { x: 0, y: 0, zoom: 1 }
     });
   },
 
@@ -195,6 +217,7 @@ export const useDesignerStore = create<DesignerState>((set, get) => ({
       config: null,
       orchestratorName: '',
       orchestratorDescription: '',
+      viewport: { x: 0, y: 0, zoom: 1 },
     });
   },
 }));

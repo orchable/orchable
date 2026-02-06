@@ -5,7 +5,7 @@ export const n8nService = {
   /**
    * Fetches list of workflows from n8n API
    */
-  async listWorkflows(): Promise<{ id: string; name: string }[]> {
+  async listWorkflows(): Promise<{ id: string; name: string; active: boolean; tags: any[] }[]> {
       let baseUrl = localStorage.getItem("lovable_n8n_url") || N8N_BASE_URL;
       const apiKey = localStorage.getItem("lovable_n8n_api_key"); 
 
@@ -31,11 +31,37 @@ export const n8nService = {
         }
 
         const data = await response.json();
-        return data.data.map((wf: any) => ({ id: wf.id, name: wf.name }));
+        return data.data.map((wf: any) => ({ 
+            id: wf.id, 
+            name: wf.name,
+            active: wf.active,
+            tags: wf.tags 
+        }));
       } catch (error: any) {
         console.error("N8N List Error:", error);
         throw new Error(error.message || "Failed to connect to N8N (CORS or Network Error)");
       }
+  },
+
+  /**
+   * Fetch workflow by ID
+   */
+  async getWorkflow(workflowId: string): Promise<any> {
+      const baseUrl = localStorage.getItem("lovable_n8n_url") || N8N_BASE_URL;
+      const apiKey = localStorage.getItem("lovable_n8n_api_key");
+
+      if (!baseUrl || !apiKey) throw new Error("Missing n8n config");
+
+      const response = await fetch(`${baseUrl.replace(/\/$/, '')}/api/v1/workflows/${workflowId}`, {
+          headers: { 'X-N8N-API-KEY': apiKey }
+      });
+
+      if (!response.ok) {
+          if (response.status === 404) return null; // specific null for not found
+          throw new Error(`Failed to fetch workflow: ${response.status}`);
+      }
+
+      return await response.json();
   },
 
   /**

@@ -28,6 +28,7 @@ export interface IN8nWorkflowJSON {
     name: string;
     nodes: IN8nNode[];
     connections: IN8nConnections;
+    settings?: Record<string, any>;
     meta?: any;
 }
 
@@ -192,7 +193,10 @@ export const compilerService = {
         return {
             name: `[Orchestrator] ${config.name}`,
             nodes,
-            connections
+            connections,
+            settings: {
+                executionOrder: 'v1'
+            }
         };
     }
 };

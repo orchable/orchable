@@ -7,10 +7,12 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { n8nService } from '@/services/n8nService';
 import { toast } from 'sonner';
+import { PrePostProcessSection } from './PrePostProcessSection';
+import type { PreProcessConfig, PostProcessConfig } from '@/lib/types';
 
 const stepConfigSchema = z.object({
     label: z.string().min(1, 'Label is required'),
@@ -36,6 +38,8 @@ export function StepConfigPanel({ stepId }: { stepId: string }) {
     const step = nodes.find(n => n.id === stepId);
 
     const [workflows, setWorkflows] = useState<Workflow[]>([]);
+    const [preProcessConfig, setPreProcessConfig] = useState<PreProcessConfig | undefined>(undefined);
+    const [postProcessConfig, setPostProcessConfig] = useState<PostProcessConfig | undefined>(undefined);
 
     const form = useForm<z.infer<typeof stepConfigSchema>>({
         resolver: zodResolver(stepConfigSchema),
@@ -117,6 +121,9 @@ export function StepConfigPanel({ stepId }: { stepId: string }) {
                 // @ts-ignore
                 n8nWorkflowId: data.n8nWorkflowId || ''
             });
+            // Load pre/post process configs
+            setPreProcessConfig(data.pre_process);
+            setPostProcessConfig(data.post_process);
         }
     }, [step, form]);
 
@@ -135,8 +142,12 @@ export function StepConfigPanel({ stepId }: { stepId: string }) {
                 maxRetries: data.maxRetries,
                 retryDelay: data.retryDelay
             },
-            n8nWorkflowId: form.getValues("n8nWorkflowId")
+            n8nWorkflowId: form.getValues("n8nWorkflowId"),
+            // Pre/Post Process Hooks
+            pre_process: preProcessConfig,
+            post_process: postProcessConfig,
         });
+        toast.success("Step updated successfully!");
     };
 
     if (!step) return null;
@@ -168,7 +179,10 @@ export function StepConfigPanel({ stepId }: { stepId: string }) {
                         {/* N8N Workflow Selection */}
                         <div className="space-y-2">
                             <FormLabel>Data Source</FormLabel>
-                            <Select onValueChange={(value) => handleWorkflowSelect(value)}>
+                            <Select
+                                value={form.watch("n8nWorkflowId")}
+                                onValueChange={(value) => handleWorkflowSelect(value)}
+                            >
                                 <FormControl>
                                     <SelectTrigger className="text-left">
                                         <SelectValue placeholder="Select n8n Workflow (Automatic)" />
@@ -221,7 +235,16 @@ export function StepConfigPanel({ stepId }: { stepId: string }) {
                                     <FormItem className="flex-1">
                                         <FormLabel>Webhook URL</FormLabel>
                                         <FormControl>
-                                            <Input {...field} placeholder="https://n8n.example.com/..." />
+                                            <Input
+                                                {...field}
+                                                onChange={(e) => {
+                                                    field.onChange(e);
+                                                    // If user manually edits URL, clear the linked workflow ID
+                                                    // to switch back to HTTP Request mode
+                                                    form.setValue("n8nWorkflowId", undefined, { shouldDirty: true });
+                                                }}
+                                                placeholder="https://n8n.example.com/..."
+                                            />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -328,6 +351,24 @@ export function StepConfigPanel({ stepId }: { stepId: string }) {
                                         <FormMessage />
                                     </FormItem>
                                 )}
+                            />
+                        </div>
+
+                        {/* Pre/Post Process Hooks */}
+                        <Separator className="my-4" />
+                        <div className="space-y-3">
+                            <h4 className="text-sm font-medium">Processing Hooks</h4>
+                            <PrePostProcessSection
+                                type="pre"
+                                config={preProcessConfig}
+                                onChange={(config) => setPreProcessConfig(config as PreProcessConfig | undefined)}
+                                workflows={workflows}
+                            />
+                            <PrePostProcessSection
+                                type="post"
+                                config={postProcessConfig}
+                                onChange={(config) => setPostProcessConfig(config as PostProcessConfig | undefined)}
+                                workflows={workflows}
                             />
                         </div>
 

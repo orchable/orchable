@@ -99,5 +99,16 @@ export const executionService = {
 
       if (error) throw error;
       return data as StepExecution[];
+  },
+
+  async listAiTasks(): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('ai_tasks')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    
+    if (error) throw error;
+    return data;
   }
 };

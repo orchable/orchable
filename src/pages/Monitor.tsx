@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Activity, Clock, CheckCircle2, XCircle, Loader2, ChevronDown, ExternalLink, FileCode, FileText, Presentation, HelpCircle, HardDrive } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { StepBadge } from '@/components/common/StepBadge';
-import { useExecutions, useExecution } from '@/hooks/useExecutions';
+import { useExecutions, useExecution, useAiTasks } from '@/hooks/useExecutions';
 import { useStepExecutions } from '@/hooks/useStepExecutions';
 import { formatDistanceToNow, format } from 'date-fns';
 import type { StepExecution, StepResult } from '@/lib/types';
@@ -139,16 +139,20 @@ function StepMonitorItem({ step, index, expanded, onToggle }: { step: StepExecut
 }
 
 // Side Panel: Execution Detail
-function ExecutionDetailPanel({ executionId }: { executionId: string }) {
-  const { data: execution } = useExecution(executionId, 3000);
-  const { data: steps } = useStepExecutions(executionId, 3000);
+function ExecutionDetailPanel({ executionData }: { executionData: any }) {
+  const isAiTask = executionData.task_type !== undefined;
+
+  // Only query standard execution details if NOT an AI task
+  const { data: execution } = useExecution(executionData.id, isAiTask ? null : 3000);
+  const { data: steps } = useStepExecutions(executionData.id, isAiTask ? null : 3000);
   const [expandedStep, setExpandedStep] = useState<string | null>(null);
 
-  if (!execution) return <div className="p-8 flex justify-center"><Loader2 className="animate-spin text-muted-foreground" /></div>;
+  const displayData = isAiTask ? executionData : (execution || executionData);
+  if (!displayData) return <div className="p-8 flex justify-center"><Loader2 className="animate-spin text-muted-foreground" /></div>;
 
   return (
     <motion.div
-      key={execution.id}
+      key={displayData.id}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -158,57 +162,125 @@ function ExecutionDetailPanel({ executionId }: { executionId: string }) {
       <div className="mb-6 sticky top-0 bg-background/95 backdrop-blur z-20 pb-4 border-b">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-4">
-            <h1 className="text-xl font-bold truncate max-w-lg">{execution.syllabus_row.lessonTitle}</h1>
-            <StatusBadge status={execution.status} size="lg" />
+            <h1 className="text-xl font-bold truncate max-w-lg">
+              {isAiTask ? displayData.task_type : displayData.syllabus_row.lessonTitle}
+            </h1>
+            <StatusBadge status={displayData.status} size="lg" />
           </div>
         </div>
         <div className="flex items-center gap-6 text-sm text-muted-foreground">
           <span className="flex items-center gap-2">
-            <span className="font-mono bg-muted px-2 py-1 rounded text-xs">ID: {execution.id.slice(0, 8)}</span>
+            <span className="font-mono bg-muted px-2 py-1 rounded text-xs">ID: {displayData.id.slice(0, 8)}</span>
           </span>
           <span className="flex items-center gap-1">
             <Clock className="w-4 h-4" />
-            Started: {execution.started_at ? format(new Date(execution.started_at), 'Pp') : 'Pending'}
+            Created: {format(new Date(displayData.created_at), 'Pp')}
           </span>
+          {isAiTask && displayData.batch_id && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">Batch: {displayData.batch_id.slice(0, 8)}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[10px] gap-1 px-2 border-primary/30 text-primary hover:bg-primary/5"
+                onClick={() => window.open(`/batch/${displayData.batch_id}`, '_blank')}
+              >
+                <Activity className="w-3 h-3" />
+                View Batch Progress
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Timeline */}
-      <div className="mb-8">
-        <h2 className="font-semibold mb-4 flex items-center gap-2">
-          <Activity className="w-5 h-5" />
-          Execution Timeline
-        </h2>
+      {/* Basic Data Viewer for AI Tasks */}
+      {isAiTask ? (
+        <div className="space-y-6">
+          <Card>
+            <CardContent className="p-4 space-y-4">
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Input Data</p>
+                <pre className="text-xs bg-muted p-3 rounded-lg overflow-auto max-h-60">
+                  {JSON.stringify(displayData.input_data, null, 2)}
+                </pre>
+              </div>
+              {displayData.output_data && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Output Data</p>
+                  <pre className="text-xs bg-success/5 border border-success/20 p-3 rounded-lg overflow-auto max-h-60">
+                    {JSON.stringify(displayData.output_data, null, 2)}
+                  </pre>
+                </div>
+              )}
+              {displayData.error_message && (
+                <div className="p-3 bg-destructive/10 text-destructive rounded-lg text-sm">
+                  Error: {displayData.error_message}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        /* Timeline for legacy executions */
+        <div className="mb-8">
+          <h2 className="font-semibold mb-4 flex items-center gap-2">
+            <Activity className="w-5 h-5" />
+            Execution Timeline
+          </h2>
 
-        <div className="relative pl-4">
-          {/* Vertical line connecting steps */}
-          <div className="absolute left-[2.4rem] top-4 bottom-10 w-0.5 bg-border z-0" />
+          <div className="relative pl-4">
+            {/* Vertical line connecting steps */}
+            <div className="absolute left-[2.4rem] top-4 bottom-10 w-0.5 bg-border z-0" />
 
-          <div className="space-y-6">
-            {steps?.map((step, idx) => (
-              <StepMonitorItem
-                key={step.id}
-                step={step}
-                index={idx}
-                expanded={expandedStep === step.id}
-                onToggle={() => setExpandedStep(expandedStep === step.id ? null : step.id)}
-              />
-            ))}
+            <div className="space-y-6">
+              {steps?.map((step, idx) => (
+                <StepMonitorItem
+                  key={step.id}
+                  step={step}
+                  index={idx}
+                  expanded={expandedStep === step.id}
+                  onToggle={() => setExpandedStep(expandedStep === step.id ? null : step.id)}
+                />
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </motion.div>
   );
 }
 
 export function MonitorPage() {
-  const { data: executions, isLoading } = useExecutions();
+  const { data: executions, isLoading: isLoadingExec } = useExecutions();
+  const { data: aiTasks, isLoading: isLoadingAi } = useAiTasks();
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
 
+  // Unified list
+  const unifiedList = useMemo(() => {
+    const list = [
+      ...(executions || []),
+      ...(aiTasks || []).map(task => ({
+        id: task.id,
+        status: task.status,
+        created_at: task.created_at,
+        syllabus_row: {
+          lessonId: (task.extra?.launcher_metadata?.original_index !== undefined) ? `JSON #${task.extra.launcher_metadata.original_index + 1}` : 'AI',
+          lessonTitle: task.task_type || 'AI Task',
+        },
+        total_steps: 1,
+        completed_steps: task.status === 'completed' ? 1 : 0,
+        ...task // spread for detail panel
+      }))
+    ];
+    return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [executions, aiTasks]);
+
   // Auto-select first if none selected
-  if (!selectedExecutionId && executions && executions.length > 0 && !isLoading) {
-    setSelectedExecutionId(executions[0].id);
+  if (!selectedExecutionId && unifiedList.length > 0 && !isLoadingExec && !isLoadingAi) {
+    setSelectedExecutionId(unifiedList[0].id);
   }
+
+  const selectedExecution = unifiedList.find(e => e.id === selectedExecutionId);
 
   return (
     <div className="h-full flex overflow-hidden">
@@ -226,12 +298,12 @@ export function MonitorPage() {
         </div>
 
         <div className="overflow-y-auto p-3 space-y-2 flex-1">
-          {isLoading ? (
+          {(isLoadingExec || isLoadingAi) ? (
             <div className="flex justify-center p-4"><Loader2 className="animate-spin text-muted-foreground" /></div>
-          ) : executions?.length === 0 ? (
+          ) : unifiedList?.length === 0 ? (
             <div className="text-center p-4 text-muted-foreground text-sm">No executions found.</div>
           ) : (
-            executions?.map((execution, idx) => (
+            unifiedList?.map((execution, idx) => (
               <motion.div
                 key={execution.id}
                 initial={{ opacity: 0, y: 10 }}
@@ -246,12 +318,16 @@ export function MonitorPage() {
                 )}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-mono text-xs font-medium bg-muted px-1.5 py-0.5 rounded opacity-70">{execution.syllabus_row.lessonId}</span>
-                  <StatusBadge status={execution.status} size="sm" showIcon={false} />
+                  <span className="font-mono text-xs font-medium bg-muted px-1.5 py-0.5 rounded opacity-70">
+                    {execution.syllabus_row?.lessonId || execution.task_type || 'Task'}
+                  </span>
+                  <StatusBadge status={(execution.status as any) || 'pending'} size="sm" showIcon={false} />
                 </div>
-                <p className="text-sm font-medium truncate mb-2">{execution.syllabus_row.lessonTitle}</p>
+                <p className="text-sm font-medium truncate mb-2">
+                  {execution.syllabus_row?.lessonTitle || execution.task_type || 'Unknown AI Task'}
+                </p>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{execution.completed_steps}/{execution.total_steps} steps</span>
+                  <span>{execution.completed_steps || 0}/{execution.total_steps || 1} steps</span>
                   <span className="flex items-center gap-1">
                     <Clock className="w-3 h-3" />
                     {formatDistanceToNow(new Date(execution.created_at || new Date()), { addSuffix: true })}
@@ -278,8 +354,8 @@ export function MonitorPage() {
       {/* Main Content - Execution Detail */}
       <div className="flex-1 overflow-y-auto relative">
         <AnimatePresence mode="wait">
-          {selectedExecutionId ? (
-            <ExecutionDetailPanel executionId={selectedExecutionId} />
+          {selectedExecution ? (
+            <ExecutionDetailPanel executionData={selectedExecution} />
           ) : (
             <motion.div
               initial={{ opacity: 0 }}

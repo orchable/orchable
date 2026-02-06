@@ -1,55 +1,225 @@
 import { Handle, Position } from '@xyflow/react';
+import { useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { StepBadge } from '@/components/common/StepBadge';
+import { Badge } from '@/components/ui/badge';
+
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import type { Cardinality, StageContract } from '@/lib/types';
+import { summarizeInputFields, summarizeOutputSchema, extractInputFields } from '@/lib/schemaUtils';
 
 interface StepNodeProps {
     data: {
         stepId: string;
         name: string; // 'A', 'B', 'C', 'D', 'E'
         label: string;
-        webhookUrl: string;
+        webhookUrl?: string;       // Legacy
+        task_type?: string;        // New: stage task type
+        stage_key?: string;        // New: stage key
+        cardinality?: Cardinality; // New: 1:1, 1:N, N:1
+        prompt_template?: string;  // Prompt template content for input extraction
+        contract?: StageContract;  // Input/Output contract
     };
     selected: boolean;
 }
 
+const SchemaField = ({ field, depth = 0 }: { field: import('@/lib/types').OutputSchemaField; depth?: number }) => {
+    return (
+        <div className="space-y-0.5">
+            <div className={cn(
+                "text-[10px] grid grid-cols-[1fr_auto] gap-2 items-center hover:bg-muted/50 px-1 rounded cursor-default group/field",
+                depth > 0 && "ml-3 border-l pl-2"
+            )}>
+                <div className="flex items-center gap-1 min-w-0">
+                    <code className="bg-muted/50 px-1 rounded text-green-600 truncate font-mono" title={field.name}>
+                        {field.name}
+                    </code>
+                    {field.description && (
+                        <span className="text-muted-foreground truncate opacity-70 max-w-[80px]" title={field.description}>
+                            - {field.description}
+                        </span>
+                    )}
+                </div>
+                <span className="text-muted-foreground font-mono opacity-70">{field.type}</span>
+            </div>
+
+            {/* Recursive render for Object properties */}
+            {field.type === 'object' && field.properties?.map((subField, i) => (
+                <SchemaField key={i} field={subField} depth={depth + 1} />
+            ))}
+
+            {/* Recursive render for Array items */}
+            {field.type === 'array' && field.items && (
+                <div className={cn("ml-3 border-l pl-2")}>
+                    <div className="text-[9px] text-muted-foreground italic px-1">Array Item:</div>
+                    <SchemaField field={{ ...field.items, name: 'item' }} depth={depth + 1} />
+                </div>
+            )}
+        </div>
+    );
+};
+
 export function StepNode({ data, selected }: StepNodeProps) {
-    const isConfigured = !!data.webhookUrl;
+    // Check if configured: either webhook (legacy) or task_type (new)
+    const isConfigured = !!(data.webhookUrl || data.task_type);
+    const cardinality = data.cardinality || '1:1';
+
+    // Compute IN/OUT summary
+    const ioSummary = useMemo(() => {
+        if (!isConfigured) return null;
+
+        // Get input summary from contract or extract from prompt
+        let inputSummary = 'none';
+        if (data.contract?.input.fields.length) {
+            inputSummary = summarizeInputFields(data.contract.input.fields);
+        } else if (data.prompt_template) {
+            const extracted = extractInputFields(data.prompt_template);
+            inputSummary = summarizeInputFields(extracted);
+        }
+
+        // Get output summary from contract
+        let outputSummary = '—';
+        if (data.contract?.output.schema?.length) {
+            outputSummary = summarizeOutputSchema(data.contract);
+        }
+
+        return { input: inputSummary, output: outputSummary };
+    }, [data.contract, data.prompt_template, isConfigured]);
 
     return (
         <div className="relative group">
-            <Card className={cn(
-                "w-52 p-4 cursor-pointer transition-all border-2 relative",
-                // Base
-                "bg-card",
-                // Configured (Green) - only when not selected
-                isConfigured && !selected && "border-emerald-500/70 bg-emerald-50/40 dark:bg-emerald-950/20 hover:shadow-md hover:shadow-emerald-500/20",
-                // Not Configured & Not Selected
-                !isConfigured && !selected && "border-border group-hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5",
-                // Selected (Primary Blue Override)
-                selected && "border-primary shadow-lg shadow-primary/10"
-            )}>
-                <div className="flex items-center gap-3">
-                    <StepBadge name={data.name} />
-                    <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm truncate">{data.label}</p>
-                        <p className="text-xs text-muted-foreground truncate">
-                            {data.webhookUrl ? 'Webhook configured' : 'No webhook'}
-                        </p>
-                    </div>
-                </div>
+            <HoverCard openDelay={300}>
+                <HoverCardTrigger asChild>
+                    <Card className={cn(
+                        "w-52 p-4 cursor-pointer transition-all border-2 relative",
+                        // Base
+                        "bg-card",
+                        // Configured (Green) - only when not selected
+                        isConfigured && !selected && "border-emerald-500/70 bg-emerald-50/40 dark:bg-emerald-950/20 hover:shadow-md hover:shadow-emerald-500/20",
+                        // Not Configured & Not Selected
+                        !isConfigured && !selected && "border-border group-hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5",
+                        // Selected (Primary Blue Override)
+                        selected && "border-primary shadow-lg shadow-primary/10"
+                    )}>
+                        <div className="flex items-center gap-3">
+                            <StepBadge name={data.name} />
+                            <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm truncate">{data.label}</p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                    {data.task_type || data.webhookUrl ? (
+                                        data.task_type ? `Task: ${data.task_type}` : 'Webhook configured'
+                                    ) : (
+                                        'Not configured'
+                                    )}
+                                </p>
+                            </div>
+                        </div>
 
-                {/* Connection Handles - Visual only, real handles are invisible/positioned */}
-                {/* Connection Handles - Visual only */}
-                <div className={cn(
-                    "absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full border-2 bg-background transition-colors z-10",
-                    selected ? "border-primary" : (isConfigured ? "border-emerald-500/70" : "border-muted-foreground/30 group-hover:border-primary")
-                )} />
-                <div className={cn(
-                    "absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full border-2 bg-background transition-colors z-10",
-                    selected ? "border-primary" : (isConfigured ? "border-emerald-500/70" : "border-muted-foreground/30 group-hover:border-primary")
-                )} />
-            </Card>
+                        {/* IO Summary - Show when configured and has contract */}
+                        {ioSummary && (ioSummary.input !== 'none' || ioSummary.output !== '—') && (
+                            <div className="mt-2 pt-2 border-t border-dashed border-muted-foreground/20 text-[10px] font-mono space-y-0.5">
+                                <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400 truncate">
+                                    <span className="opacity-60">IN:</span>
+                                    <span className="truncate">{ioSummary.input}</span>
+                                </div>
+                                <div className="flex items-center gap-1 text-green-600 dark:text-green-400 truncate">
+                                    <span className="opacity-60">OUT:</span>
+                                    <span className="truncate">{ioSummary.output}</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Cardinality Badge */}
+                        {cardinality !== '1:1' && (
+                            <Badge
+                                variant="secondary"
+                                className="absolute -top-2 -right-2 text-[10px] font-mono px-1.5 py-0"
+                            >
+                                {cardinality}
+                            </Badge>
+                        )}
+
+                        {/* Connection Handles - Visual only */}
+                        <div className={cn(
+                            "absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full border-2 bg-background transition-colors z-10",
+                            selected ? "border-primary" : (isConfigured ? "border-emerald-500/70" : "border-muted-foreground/30 group-hover:border-primary")
+                        )} />
+                        <div className={cn(
+                            "absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full border-2 bg-background transition-colors z-10",
+                            selected ? "border-primary" : (isConfigured ? "border-emerald-500/70" : "border-muted-foreground/30 group-hover:border-primary")
+                        )} />
+                    </Card>
+                </HoverCardTrigger>
+
+                {/* Hover Content: Contract Details */}
+                {data.contract && (
+                    <HoverCardContent className="w-[500px] p-0 overflow-hidden z-[1000]" align="start" side="right">
+                        <div className="bg-muted/40 p-3 border-b">
+                            <h4 className="font-semibold text-sm flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                    <StepBadge name={data.name} size="sm" className="w-5 h-5 text-[10px]" />
+                                    {data.label}
+                                </div>
+                                <div className="text-[10px] text-muted-foreground font-mono">
+                                    Type: {data.task_type || 'generic'}
+                                </div>
+                            </h4>
+                        </div>
+
+                        <ScrollArea className="max-h-[350px]">
+                            <div className="grid grid-cols-2 divide-x h-full min-h-[150px]">
+                                {/* Input Section */}
+                                <div className="p-2 space-y-1.5 bg-blue-50/5 dark:bg-blue-900/5">
+                                    <div className="flex items-center justify-between px-1 mb-1">
+                                        <Badge variant="outline" className="text-[10px] h-4 px-1 border-blue-200 bg-blue-50 text-blue-700">INPUT</Badge>
+                                        <span className="text-[10px] text-muted-foreground">
+                                            {data.contract.input.fields.length} fields
+                                        </span>
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        {data.contract.input.fields.length > 0 ? (
+                                            data.contract.input.fields.map((field, i) => (
+                                                <div key={i} className="text-[10px] grid grid-cols-[1fr_auto] gap-2 items-center hover:bg-muted/50 px-1 rounded">
+                                                    <code className="bg-muted/50 px-1 rounded text-blue-600 font-mono truncate" title={field.name}>{field.name}</code>
+                                                    <span className="text-muted-foreground font-mono opacity-70">{field.type}</span>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="text-[10px] text-muted-foreground italic px-1">No input fields</div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Output Section */}
+                                <div className="p-2 space-y-1.5 bg-green-50/5 dark:bg-green-900/5">
+                                    <div className="flex items-center justify-between px-1 mb-1">
+                                        <Badge variant="outline" className="text-[10px] h-4 px-1 border-green-200 bg-green-50 text-green-700">OUTPUT</Badge>
+                                        <span className="text-[10px] text-muted-foreground font-mono">
+                                            Root: {data.contract.output.rootType || 'object'}
+                                        </span>
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        {data.contract.output.schema && data.contract.output.schema.length > 0 ? (
+                                            data.contract.output.schema.map((field, i) => (
+                                                <SchemaField key={i} field={field} />
+                                            ))
+                                        ) : (
+                                            <div className="text-[10px] text-muted-foreground italic px-1">
+                                                {data.contract.output.format_injection === 'none'
+                                                    ? 'No output schema'
+                                                    : 'Auto-generated'}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </ScrollArea>
+                    </HoverCardContent>
+                )}
+            </HoverCard>
 
             {/* Actual ReactFlow Handles */}
             <Handle

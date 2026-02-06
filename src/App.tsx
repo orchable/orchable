@@ -8,6 +8,7 @@ import { HomePage } from "./pages/Home";
 import { DesignerPage } from "./pages/Designer";
 import { LauncherPage } from "./pages/Launcher";
 import { MonitorPage } from "./pages/Monitor";
+import { BatchProgress } from "./pages/BatchProgress";
 import SettingsPage from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -25,6 +26,7 @@ const App = () => (
             <Route path="/designer" element={<DesignerPage />} />
             <Route path="/launcher" element={<LauncherPage />} />
             <Route path="/monitor" element={<MonitorPage />} />
+            <Route path="/batch/:batchId" element={<BatchProgress />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

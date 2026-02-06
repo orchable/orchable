@@ -26,12 +26,26 @@ export function useSaveConfig() {
   });
 }
 
+export function useUpdateConfig() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<any> }) => 
+      configService.updateConfig(id, updates),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['configs'] });
+      queryClient.setQueryData(['config', data.id], data);
+    }
+  });
+}
+
 import { useDesignerStore } from '@/stores/designerStore';
 import { toast } from 'sonner';
+import { syncStagesToPromptTemplates } from '@/services/stageService';
 
 export function useSaveOrchestrator() {
-    const { nodes, edges, orchestratorName, orchestratorDescription } = useDesignerStore();
+    const { nodes, edges, orchestratorName, orchestratorDescription, config: currentConfig, loadConfig } = useDesignerStore();
     const saveConfig = useSaveConfig();
+    const updateConfig = useUpdateConfig();
 
     const save = async () => {
         // Filter out Start Node
@@ -47,66 +61,103 @@ export function useSaveOrchestrator() {
             return false;
         }
 
-        // Build steps array from nodes and edges
+        // Build steps array with ALL stage fields
         const steps = stepNodes.map(node => {
             const data = node.data as any;
             return {
+                // Identity
                 id: node.id,
                 name: data.name,
                 label: data.label,
-                webhookUrl: data.webhookUrl,
-                timeout: data.timeout,
-                retryConfig: data.retryConfig,
+                
+                // Stage-specific (new)
+                stage_key: data.stage_key || data.name?.toLowerCase() || node.id,
+                task_type: data.task_type || '',
+                prompt_template_id: data.prompt_template_id || '',
+                cardinality: data.cardinality || '1:1',
+                
+                // 1:N Split config (these were missing!)
+                split_path: data.split_path || '',
+                split_mode: data.split_mode || 'per_item',
+                output_mapping: data.output_mapping || 'result',
+                return_along_with: data.return_along_with || [],
+                
+                // AI Settings (new)
+                ai_settings: data.ai_settings || {
+                    model_id: 'gemini-flash-latest',
+                    generationConfig: {
+                        temperature: 1.0,
+                        topP: 0.95,
+                        topK: 40,
+                        maxOutputTokens: 8192
+                    }
+                },
+                
+                // Execution config
+                timeout: data.timeout || 300000,
+                retryConfig: data.retryConfig || { maxRetries: 3, retryDelay: 5000 },
+                
+                // Layout
+                position: node.position,
+                
+                // Dependencies (computed from edges)
                 dependsOn: edges
                     .filter(e => e.target === node.id)
                     .map(e => e.source)
-                    .filter(sourceId => sourceId !== 'start') // Don't include 'start' as a dependency in the saved config
+                    .filter(sourceId => sourceId !== 'start'),
+
+                // Pre/Post Process Hooks
+                pre_process: data.pre_process,
+                post_process: data.post_process,
+
+                // Input/Output Contract
+                contract: data.contract,
+                
+                // Approval flow
+                requires_approval: data.requires_approval || false
             };
         });
 
         try {
-            // 1. Save to Supabase
-            const savedConfig = await saveConfig.mutateAsync({
+            let savedConfig;
+            const payload = {
                 name: orchestratorName,
                 description: orchestratorDescription,
+                viewport: useDesignerStore.getState().viewport,
                 steps
-            });
-            
-            // 2. Compile & Publish to n8n (Fire & Forget or Await?) -> Await to show status
-            const n8nApiKey = localStorage.getItem("lovable_n8n_api_key");
-            if (n8nApiKey) {
-                 try {
-                     const { compilerService } = await import('@/services/compilerService');
-                     const { n8nService } = await import('@/services/n8nService');
-                     
-                     // Compile
-                     const workflowJson = compilerService.compile(savedConfig);
-                     
-                     // Enforce unique naming convention: [Orchestrator] Name (UUID)
-                     const n8nName = `[Orchestrator] ${savedConfig.name} (${savedConfig.id})`;
-                     workflowJson.name = n8nName;
-                     
-                     // Check existence
-                     const existingWorkflows = await n8nService.listWorkflows();
-                     const match = existingWorkflows.find(w => w.name === n8nName);
-                     
-                     if (match) {
-                         await n8nService.updateWorkflow(match.id, workflowJson);
-                         // Ensure active
-                         await n8nService.activateWorkflow(match.id, true);
-                         toast.success("Saved to DB & Updated n8n Workflow!");
-                     } else {
-                         const created = await n8nService.createWorkflow(workflowJson);
-                         await n8nService.activateWorkflow(created.id, true);
-                         toast.success("Saved to DB & Created n8n Workflow!");
-                     }
-                 } catch (n8nError: any) {
-                     console.error("n8n Publish Error:", n8nError);
-                     toast.warning(`Saved to DB, but n8n publish failed: ${n8nError.message}`);
-                 }
+            };
+
+            // 1. Save to Supabase (Create or Update)
+            if (currentConfig?.id) {
+                savedConfig = await updateConfig.mutateAsync({
+                    id: currentConfig.id,
+                    updates: payload
+                });
+                toast.success("Configuration updated!");
             } else {
-                toast.success("Saved to DB (n8n publish skipped - No API Key)");
+                savedConfig = await saveConfig.mutateAsync(payload);
+                toast.success("New configuration saved!");
+                loadConfig(savedConfig);
             }
+            
+            // 2. Sync stages to prompt_templates
+            try {
+                const templateIdMap = await syncStagesToPromptTemplates(
+                    savedConfig.id,
+                    savedConfig.name,
+                    steps,
+                    edges
+                );
+                
+                console.log('Synced templates:', Object.fromEntries(templateIdMap));
+                toast.success(`Synced ${templateIdMap.size} stage templates!`);
+            } catch (syncError: any) {
+                console.error("Failed to sync stage templates:", syncError);
+                toast.warning(`Config saved, but template sync failed: ${syncError.message}`);
+            }
+
+            // NOTE: n8n workflow compilation removed
+            // The universal agent will read from prompt_templates at runtime
 
             return true;
         } catch (error) {

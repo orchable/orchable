@@ -21,7 +21,10 @@ export function FlowCanvas() {
         onEdgesChange,
         onConnect,
         setSelectedNode,
-        removeStep
+        removeStep,
+        config,
+        viewport,
+        setViewport
     } = useDesignerStore();
 
     const nodeTypes = useMemo(() => ({
@@ -61,6 +64,7 @@ export function FlowCanvas() {
     return (
         <div className="w-full h-full bg-slate-50 dark:bg-slate-900">
             <ReactFlow
+                key={config?.id || 'default-canvas'} // Force remount on config load to reset viewport
                 nodes={nodes}
                 edges={edges}
                 onNodesChange={onNodesChange}
@@ -69,8 +73,9 @@ export function FlowCanvas() {
                 onNodeClick={onNodeClick}
                 onPaneClick={onPaneClick}
                 onNodesDelete={onNodesDelete}
+                onMoveEnd={(_, viewport) => setViewport(viewport)}
                 nodeTypes={nodeTypes}
-                fitView
+                defaultViewport={viewport}
                 deleteKeyCode={['Backspace', 'Delete']}
                 defaultEdgeOptions={{
                     animated: true,
