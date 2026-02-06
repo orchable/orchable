@@ -35,6 +35,7 @@ interface PromptTemplateRecord {
     is_active: boolean;
     default_ai_settings?: Record<string, unknown>;
     next_stage_template_id?: string | null;
+    next_stage_template_ids?: string[] | null;
     organization_code?: string;
     input_schema?: Record<string, unknown>;
     output_schema?: Record<string, unknown>;
@@ -218,21 +219,22 @@ export async function syncStagesToPromptTemplates(
     for (const stage of sortedStages) {
         const templateId = templateIdMap.get(stage.id)!;
         
-        // Find next stage(s) - for now, take first child only
+        // Find next stage(s)
         const nextStages = getNextStages(stage.id, edges, stageMap);
-        const nextTemplateId = nextStages.length > 0 
-            ? templateIdMap.get(nextStages[0].id) || null
-            : null;
+        const nextTemplateIds = nextStages.map(ns => templateIdMap.get(ns.id)).filter(Boolean) as string[];
+        const nextTemplateId = nextTemplateIds.length > 0 ? nextTemplateIds[0] : null;
 
-        if (nextTemplateId) {
+        if (nextTemplateIds.length > 0) {
             const { error } = await supabase
                 .from('prompt_templates')
-                .update({ next_stage_template_id: nextTemplateId })
+                .update({ 
+                    next_stage_template_id: nextTemplateId,
+                    next_stage_template_ids: nextTemplateIds 
+                })
                 .eq('id', templateId);
             
             if (error) {
-                console.error(`Failed to update next_stage for ${stage.stage_key}:`, error);
-                // Non-fatal - template was created, just linking failed
+                console.error(`Failed to update next_stage(s) for ${stage.stage_key}:`, error);
             }
         }
     }

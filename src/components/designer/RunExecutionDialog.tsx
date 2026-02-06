@@ -110,8 +110,12 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
             }
 
             // Create initial tasks for Stage 1 (no FK constraints - all metadata in input_data)
-            const nextStage = sortedStages.length > 1 ? sortedStages[1] : null;
-            const nextStageKey = nextStage?.stage_key;
+            const nextStages = edges
+                .filter(e => e.source === firstStage.id)
+                .map(e => nodes.find(n => n.id === e.target))
+                .filter(Boolean);
+
+            const nextStageTemplateIds = nextStages.map(ns => `${config.id}_${(ns!.data as any).stage_key || (ns!.data as any).name?.toLowerCase() || ns!.id}`);
 
             const initialTasks = inputItems.map((item, index) => ({
                 task_type: firstStage.task_type || 'generic',
@@ -121,17 +125,14 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
                     _orchestrator_config_id: config.id,
                     _orchestrator_name: config.name,
                     _prompt_template_id: `${config.id}_${firstStage.stage_key}`,
-                    _next_stage_template_id: nextStageKey ? `${config.id}_${nextStageKey}` : null
+                    _next_stage_template_ids: nextStageTemplateIds
                 },
-                model_id: firstStage.ai_settings?.model_id || 'gemini-2.5-flash',
-                temperature: firstStage.ai_settings?.generationConfig?.temperature || 0.7,
                 lo_code: item.lo_code || item.code || null,
                 stage_key: firstStage.stage_key,
                 step_number: 1,
                 total_steps: sortedStages.length,
                 batch_id: batchId,
-                // prompt_template_id: MOVED TO input_data to avoid FK constraint
-                // next_stage_template_id: MOVED TO input_data to avoid FK constraint
+                prompt_template_id: `${config.id}_${firstStage.stage_key}`, // FK to prompt_templates
                 sequence: index,
                 root_task_id: null,
                 hierarchy_path: [],
@@ -145,17 +146,30 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
                         split_mode: (firstStage as any).split_mode || 'per_item',
                         output_mapping: (firstStage as any).output_mapping || 'result'
                     },
-                    next_stage_config: nextStageKey ? {
-                        template_id: `${config.id}_${nextStageKey}`,
-                        // Map UI '1:1'/'1:N' to backend 'one_to_one'/'one_to_many'
-                        cardinality: (firstStage.cardinality === '1:N' || firstStage.cardinality === 'one_to_many')
+                    next_stage_configs: nextStages.map(ns => {
+                        const nsData = ns!.data as any;
+                        const nsKey = nsData.stage_key || nsData.name?.toLowerCase() || ns!.id;
+                        return {
+                            template_id: `${config.id}_${nsKey}`,
+                            cardinality: (nsData.cardinality === '1:N' || nsData.cardinality === 'one_to_many')
+                                ? 'one_to_many'
+                                : 'one_to_one',
+                            split_path: nsData.split_path || 'result.questions',
+                            split_mode: nsData.split_mode || 'per_item',
+                            output_mapping: nsData.output_mapping || 'result',
+                            delimiters: nsData.contract?.input?.delimiters
+                        };
+                    }),
+                    // Deprecated: keep for backward compatibility
+                    next_stage_config: nextStages.length > 0 ? {
+                        template_id: nextStageTemplateIds[0],
+                        cardinality: ((nextStages[0]!.data as any).cardinality === '1:N' || (nextStages[0]!.data as any).cardinality === 'one_to_many')
                             ? 'one_to_many'
                             : 'one_to_one',
-                        split_path: (firstStage as any).split_path || 'result.questions',
-                        split_mode: (firstStage as any).split_mode || 'per_item',
-                        output_mapping: (firstStage as any).output_mapping || 'result',
-                        // Pass next stage delimiters for the orchestrator to use when creating next task
-                        delimiters: nextStage?.contract?.input?.delimiters
+                        split_path: (nextStages[0]!.data as any).split_path || 'result.questions',
+                        split_mode: (nextStages[0]!.data as any).split_mode || 'per_item',
+                        output_mapping: (nextStages[0]!.data as any).output_mapping || 'result',
+                        delimiters: (nextStages[0]!.data as any).contract?.input?.delimiters
                     } : null,
                     // Pre/Post process hooks (injected from stage config)
                     pre_process: firstStage.pre_process?.enabled ? firstStage.pre_process : undefined,
