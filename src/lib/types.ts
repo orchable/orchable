@@ -100,7 +100,7 @@ export interface PostProcessConfig {
 }
 
 // N-Stage Orchestrator Types
-export type Cardinality = '1:1' | '1:N' | 'N:1';
+export type Cardinality = '1:1' | '1:N' | 'N:1' | 'one_to_one' | 'one_to_many';
 export type AIModel = 'gemini-flash-latest' | 'gemini-pro-latest';
 
 export interface AISettings {
