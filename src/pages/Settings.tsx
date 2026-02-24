@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 
 
 export default function SettingsPage() {
+    const { user } = useAuth();
     const [geminiApiKey, setGeminiApiKey] = useState("");
     const [n8nUrl, setN8nUrl] = useState("");
     const [n8nApiKey, setN8nApiKey] = useState("");
@@ -122,106 +124,108 @@ export default function SettingsPage() {
                     </CardContent>
                 </Card>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Infrastructure Settings (Advanced)</CardTitle>
-                        <CardDescription>
-                            Configure connections to external services for Free and Premium tiers.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
+                {user && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Infrastructure Settings (Advanced)</CardTitle>
+                            <CardDescription>
+                                Configure connections to external services for Free and Premium tiers.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
 
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="n8n-url">n8n Base URL</Label>
-                                <Input
-                                    id="n8n-url"
-                                    placeholder="https://n8n.example.com"
-                                    value={n8nUrl}
-                                    onChange={(e) => setN8nUrl(e.target.value)}
-                                />
-                                <p className="text-xs text-muted-foreground">
-                                    The base URL for your n8n workflows.
-                                </p>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="n8n-api-key">n8n API Key</Label>
-                                <Input
-                                    id="n8n-api-key"
-                                    type="password"
-                                    placeholder="n8n_api_..."
-                                    value={n8nApiKey}
-                                    onChange={(e) => setN8nApiKey(e.target.value)}
-                                />
-                                <p className="text-xs text-muted-foreground">
-                                    Required to list available workflows in the Designer.
-                                </p>
-                            </div>
-                        </div>
-
-                        <Separator />
-
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-medium">Master Workflow Configuration</h3>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="master-slug">Webhook Slug</Label>
+                                    <Label htmlFor="n8n-url">n8n Base URL</Label>
                                     <Input
-                                        id="master-slug"
-                                        value={masterSlug}
-                                        onChange={(e) => setMasterSlug(e.target.value)}
-                                        placeholder="master-orchestrator"
+                                        id="n8n-url"
+                                        placeholder="https://n8n.example.com"
+                                        value={n8nUrl}
+                                        onChange={(e) => setN8nUrl(e.target.value)}
                                     />
                                     <p className="text-xs text-muted-foreground">
-                                        The path part of the webhook URL.
+                                        The base URL for your n8n workflows.
                                     </p>
                                 </div>
-                                <div className="space-y-2 flex flex-col justify-end pb-2">
-                                    <div className="flex items-center space-x-2">
-                                        <input
-                                            type="checkbox"
-                                            id="test-webhook"
-                                            checked={useTestWebhook}
-                                            onChange={(e) => setUseTestWebhook(e.target.checked)}
-                                            className="h-4 w-4 rounded border-gray-300"
-                                        />
-                                        <Label htmlFor="test-webhook">Use Test Webhook URL</Label>
-                                    </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="n8n-api-key">n8n API Key</Label>
+                                    <Input
+                                        id="n8n-api-key"
+                                        type="password"
+                                        placeholder="n8n_api_..."
+                                        value={n8nApiKey}
+                                        onChange={(e) => setN8nApiKey(e.target.value)}
+                                    />
                                     <p className="text-xs text-muted-foreground">
-                                        Switch to <code>/webhook-test/</code> for debugging active workflows.
+                                        Required to list available workflows in the Designer.
                                     </p>
                                 </div>
                             </div>
-                        </div>
 
-                        <Separator />
+                            <Separator />
 
-                        <div className="space-y-2">
-                            <Label htmlFor="supa-url">Supabase URL</Label>
-                            <Input
-                                id="supa-url"
-                                placeholder="https://xxx.supabase.co"
-                                value={supabaseUrl}
-                                onChange={(e) => setSupabaseUrl(e.target.value)}
-                            />
-                        </div>
+                            <div className="space-y-4">
+                                <h3 className="text-sm font-medium">Master Workflow Configuration</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="master-slug">Webhook Slug</Label>
+                                        <Input
+                                            id="master-slug"
+                                            value={masterSlug}
+                                            onChange={(e) => setMasterSlug(e.target.value)}
+                                            placeholder="master-orchestrator"
+                                        />
+                                        <p className="text-xs text-muted-foreground">
+                                            The path part of the webhook URL.
+                                        </p>
+                                    </div>
+                                    <div className="space-y-2 flex flex-col justify-end pb-2">
+                                        <div className="flex items-center space-x-2">
+                                            <input
+                                                type="checkbox"
+                                                id="test-webhook"
+                                                checked={useTestWebhook}
+                                                onChange={(e) => setUseTestWebhook(e.target.checked)}
+                                                className="h-4 w-4 rounded border-gray-300"
+                                            />
+                                            <Label htmlFor="test-webhook">Use Test Webhook URL</Label>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Switch to <code>/webhook-test/</code> for debugging active workflows.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="supa-key">Supabase Anon Key</Label>
-                            <Input
-                                id="supa-key"
-                                type="password"
-                                placeholder="ey..."
-                                value={supabaseKey}
-                                onChange={(e) => setSupabaseKey(e.target.value)}
-                            />
-                            <p className="text-xs text-muted-foreground text-orange-600">
-                                Changing Supabase configuration will trigger a page reload.
-                            </p>
-                        </div>
-                    </CardContent>
-                </Card>
+                            <Separator />
+
+                            <div className="space-y-2">
+                                <Label htmlFor="supa-url">Supabase URL</Label>
+                                <Input
+                                    id="supa-url"
+                                    placeholder="https://xxx.supabase.co"
+                                    value={supabaseUrl}
+                                    onChange={(e) => setSupabaseUrl(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="supa-key">Supabase Anon Key</Label>
+                                <Input
+                                    id="supa-key"
+                                    type="password"
+                                    placeholder="ey..."
+                                    value={supabaseKey}
+                                    onChange={(e) => setSupabaseKey(e.target.value)}
+                                />
+                                <p className="text-xs text-muted-foreground text-orange-600">
+                                    Changing Supabase configuration will trigger a page reload.
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 <Card>
                     <CardHeader>
