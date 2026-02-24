@@ -37,15 +37,16 @@ export const configService = {
 			data: { user },
 		} = await supabase.auth.getUser();
 
-		let query = supabase
+		// If not logged in, return an empty array instead of fetching all configs
+		if (!user) {
+			return [];
+		}
+
+		const query = supabase
 			.from("lab_orchestrator_configs")
 			.select("*")
+			.eq("created_by", user.id)
 			.order("created_at", { ascending: false });
-
-		// Restrict configs to owner
-		if (user?.id) {
-			query = query.eq("created_by", user.id);
-		}
 
 		const { data, error } = await query;
 
@@ -58,15 +59,16 @@ export const configService = {
 			data: { user },
 		} = await supabase.auth.getUser();
 
-		let query = supabase
+		// If not logged in, don't allow fetching config from DB
+		if (!user) {
+			throw new Error("Bạn cần đăng nhập để xem cấu hình này");
+		}
+
+		const query = supabase
 			.from("lab_orchestrator_configs")
 			.select("*")
-			.eq("id", id);
-
-		// Filter by owner
-		if (user?.id) {
-			query = query.eq("created_by", user.id);
-		}
+			.eq("id", id)
+			.eq("created_by", user.id);
 
 		const { data, error } = await query.single();
 
