@@ -1,241 +1,584 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from "@/lib/supabase";
+import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
 // Types
 export interface StageProgress {
-    stage_key: string;
-    stage_number: number;
-    total_tasks: number;
-    completed_tasks: number;
-    pending_tasks: number;
-    running_tasks: number;
-    failed_tasks: number;
-    progress_percentage: number;
+	stage_key: string;
+	stage_number: number;
+	total_tasks: number;
+	completed_tasks: number;
+	pending_tasks: number;
+	running_tasks: number;
+	failed_tasks: number;
+	progress_percentage: number;
 }
 
 export interface ExecutionProgress {
-    orchestrator_execution_id: string;
-    orchestrator_name: string;
-    status: string;
-    started_at: string | null;
-    completed_at: string | null;
-    total_stages: number;
-    current_stage: number;
-    overall_progress: number;
-    stages: StageProgress[];
+	orchestrator_execution_id: string;
+	orchestrator_name: string;
+	batch_name?: string | null;
+	config_name?: string | null;
+	status: string;
+	started_at: string | null;
+	completed_at: string | null;
+	total_stages: number;
+	current_stage: number;
+	overall_progress: number;
+	stages: StageProgress[];
 }
 
 export interface TaskSummary {
-    id: string;
-    stage_key: string;
-    stage_number: number;
-    status: string;
-    lo_code: string | null;
-    created_at: string;
-    completed_at: string | null;
-    error_message: string | null;
-    parent_task_id?: string | null;
-    root_task_id?: string | null;
-    hierarchy_path?: string[];
+	id: string;
+	batch_id?: string | null;
+	stage_key: string;
+	stage_number?: number;
+	step_number?: number | null;
+	task_type?: string | null;
+	status: string;
+	lo_code?: string | null;
+	created_at: string;
+	started_at?: string | null;
+	completed_at?: string | null;
+	error_message?: string | null;
+	user_id?: string | null;
+	parent_task_id?: string | null;
+	root_task_id?: string | null;
+	hierarchy_path?: string[];
+	input_data?: Record<string, unknown> | null;
+	output_data?: Record<string, unknown> | null;
+	prompt_template_id?: string | null;
 }
+
+/**
+ * Safe JSON parse that handles both objects and nested stringified JSON
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const parseSafe = (val: any): any => {
+	if (!val) return null;
+	if (typeof val === "object") return val;
+	try {
+		let parsed = JSON.parse(val);
+		// Handle double-stringified case (common in current n8n setup)
+		if (typeof parsed === "string") {
+			try {
+				parsed = JSON.parse(parsed);
+			} catch (e) {
+				// Return as string if it's not actually double-JSON
+			}
+		}
+		return parsed;
+	} catch (e) {
+		return val;
+	}
+};
 
 /**
  * Get execution progress with stage breakdown
  * Now queries by batch_id instead of orchestrator_execution_id
  */
-export async function getExecutionProgress(batchId: string): Promise<ExecutionProgress | null> {
-    // Get all tasks for this batch
-    const { data: tasks, error: tasksError } = await supabase
-        .from('ai_tasks')
-        .select('id, stage_key, step_number, status, created_at, completed_at, input_data')
-        .eq('batch_id', batchId);
+export async function getExecutionProgress(
+	id: string,
+): Promise<ExecutionProgress | null> {
+	// 1. Get batch info AND join with orchestration config to get expected stages
+	const { data: batchData, error: batchError } = await supabase
+		.from("task_batches")
+		.select(
+			`
+            name, 
+            status, 
+            orchestrator_config_id,
+            lab_orchestrator_configs!task_batches_orchestrator_config_id_fkey (
+                name,
+                steps
+            )
+        `,
+		)
+		.eq("id", id)
+		.maybeSingle();
 
-    if (tasksError) {
-        console.error('Failed to fetch tasks:', tasksError);
-        return null;
-    }
+	if (batchError) {
+		console.error("Failed to fetch batch info:", batchError);
+	}
 
-    if (!tasks || tasks.length === 0) {
-        return null;
-    }
+	// Helper: Supabase FK joins return a single object (not array)
+	const orchestratorConfig = (batchData as Record<string, unknown>)
+		?.lab_orchestrator_configs as {
+		name: string;
+		steps: Record<string, unknown>[];
+	} | null;
 
-    // Extract orchestrator info from first task's input_data
-    const firstTask = tasks[0];
-    const orchestratorName = (firstTask.input_data as any)?._orchestrator_name || 'Unknown Orchestrator';
-    const configId = (firstTask.input_data as any)?._orchestrator_config_id || batchId;
+	// 2. Get all tasks for this batch OR launch (campaign)
+	const { data: tasks, error: tasksError } = await supabase
+		.from("ai_tasks")
+		.select(
+			"id, stage_key, step_number, status, created_at, started_at, completed_at, input_data",
+		)
+		.or(`batch_id.eq.${id},launch_id.eq.${id}`);
 
-    // Determine status from tasks
-    const hasRunning = tasks.some(t => t.status === 'processing' || t.status === 'running');
-    const hasFailed = tasks.some(t => t.status === 'failed');
-    const allCompleted = tasks.every(t => t.status === 'completed');
-    
-    let status = 'running';
-    if (allCompleted) status = 'completed';
-    else if (hasFailed) status = 'failed';
-    else if (hasRunning) status = 'processing';
+	if (tasksError) {
+		console.error("Failed to fetch tasks:", tasksError);
+		return null;
+	}
 
-    // Find earliest and latest timestamps
-    const startedAt = tasks.reduce((min, t) => {
-        const d = t.created_at;
-        return !min || d < min ? d : min;
-    }, null as string | null);
-    
-    const completedAt = allCompleted
-        ? tasks.reduce((max, t) => {
-            const d = t.completed_at;
-            return !max || (d && d > max) ? d : max;
-        }, null as string | null)
-        : null;
+	// Apply parseSafe to all tasks data
+	const safeTasks = (tasks || []).map((t) => ({
+		...t,
+		input_data: parseSafe(t.input_data),
+	}));
 
-    // Group by stage
-    const stageMap = new Map<string, {
-        stage_key: string;
-        stage_number: number;
-        tasks: typeof tasks;
-    }>();
+	if (!safeTasks || safeTasks.length === 0) {
+		// If batch exists but no tasks yet, it's pending
+		if (batchData) {
+			return {
+				orchestrator_execution_id: id,
+				orchestrator_name:
+					orchestratorConfig?.name || "Initializing...",
+				batch_name: batchData.name,
+				status: batchData.status || "pending",
+				started_at: null,
+				completed_at: null,
+				total_stages: 0,
+				current_stage: 0,
+				overall_progress: 0,
+				stages: [],
+			};
+		}
+		return null;
+	}
 
-    tasks.forEach(task => {
-        const key = task.stage_key || `stage_${task.step_number || 1}`;
-        if (!stageMap.has(key)) {
-            stageMap.set(key, {
-                stage_key: key,
-                stage_number: task.step_number || 1,
-                tasks: []
-            });
-        }
-        stageMap.get(key)!.tasks.push(task);
-    });
+	// Extract orchestrator info from multiple sources with fallbacks
+	// Prioritize the Batch Name (which could be the User's Alias or the auto-generated launch name)
+	const firstTask = safeTasks[0];
+	const orchestratorNameFromTask = (
+		firstTask.input_data as Record<string, unknown> | null
+	)?._orchestrator_name;
+	const orchestratorName =
+		batchData?.name ||
+		orchestratorConfig?.name ||
+		orchestratorNameFromTask ||
+		"Orchestrator";
 
-    // Calculate per-stage progress
-    const stages: StageProgress[] = [];
-    let totalCompleted = 0;
-    let totalTasks = 0;
+	// 3. Determine status from tasks (Calculate actual current state)
+	const hasRunning = safeTasks.some(
+		(t) => t.status === "processing" || t.status === "running",
+	);
+	const hasFailed = safeTasks.some((t) => t.status === "failed");
+	const allCompleted = safeTasks.every((t) => t.status === "completed");
 
-    stageMap.forEach(({ stage_key, stage_number, tasks: stageTasks }) => {
-        const completed = stageTasks.filter(t => t.status === 'completed').length;
-        const pending = stageTasks.filter(t => t.status === 'pending').length;
-        const running = stageTasks.filter(t => t.status === 'processing' || t.status === 'running').length;
-        const failed = stageTasks.filter(t => t.status === 'failed').length;
-        const total = stageTasks.length;
+	let calculatedStatus = "running";
+	if (allCompleted) calculatedStatus = "completed";
+	else if (hasFailed) calculatedStatus = "failed";
+	else if (hasRunning) calculatedStatus = "processing";
 
-        stages.push({
-            stage_key,
-            stage_number,
-            total_tasks: total,
-            completed_tasks: completed,
-            pending_tasks: pending,
-            running_tasks: running,
-            failed_tasks: failed,
-            progress_percentage: total > 0 ? Math.round((completed / total) * 100) : 0
-        });
+	// EDGE CASE: Stuck Workflow Detection
+	// The `steps` column in lab_orchestrator_configs is a JSONB array of stage configs.
+	// If all tasks completed but fewer stages have tasks than expected, the workflow is stuck.
+	const expectedSteps = orchestratorConfig?.steps || [];
+	const actualStageKeys = new Set(safeTasks.map((t) => t.stage_key));
+	const isStuck =
+		allCompleted &&
+		expectedSteps.length > 0 &&
+		actualStageKeys.size < expectedSteps.length;
 
-        totalCompleted += completed;
-        totalTasks += total;
-    });
+	if (isStuck) {
+		calculatedStatus = "failed"; // Mark as failed if stages are missing
+	}
 
-    // Sort by stage number
-    stages.sort((a, b) => a.stage_number - b.stage_number);
+	// Use calculated status, but respect terminal manual states if set in batchData
+	const finalStatus =
+		batchData?.status === "completed" || batchData?.status === "failed"
+			? batchData.status
+			: isStuck
+				? "failed"
+				: calculatedStatus;
 
-    return {
-        orchestrator_execution_id: batchId,
-        orchestrator_name: orchestratorName,
-        status,
-        started_at: startedAt,
-        completed_at: completedAt,
-        total_stages: stages.length,
-        current_stage: stages.filter(s => s.completed_tasks > 0).length,
-        overall_progress: totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0,
-        stages
-    };
+	// Find earliest and latest timestamps
+	const startedAt = safeTasks.reduce(
+		(min, t) => {
+			const d = t.created_at;
+			return !min || d < min ? d : min;
+		},
+		null as string | null,
+	);
+
+	const completedAt =
+		allCompleted && !isStuck
+			? safeTasks.reduce(
+					(max, t) => {
+						const d = t.completed_at;
+						return !max || (d && d > max) ? d : max;
+					},
+					null as string | null,
+				)
+			: null;
+
+	// Group by stage
+	const stageMap = new Map<
+		string,
+		{
+			stage_key: string;
+			stage_number: number;
+			tasks: typeof safeTasks;
+		}
+	>();
+
+	safeTasks.forEach((task) => {
+		const key = task.stage_key || `stage_${task.step_number || 1}`;
+		if (!stageMap.has(key)) {
+			stageMap.set(key, {
+				stage_key: key,
+				stage_number: task.step_number || 1,
+				tasks: [],
+			});
+		}
+		stageMap.get(key)!.tasks.push(task);
+	});
+
+	// Calculate per-stage progress
+	const stages: StageProgress[] = [];
+	let totalCompleted = 0;
+	let totalTasks = 0;
+
+	stageMap.forEach(({ stage_key, stage_number, tasks: stageTasks }) => {
+		const completed = stageTasks.filter(
+			(t) => t.status === "completed",
+		).length;
+		const pending = stageTasks.filter((t) => t.status === "pending").length;
+		const running = stageTasks.filter(
+			(t) => t.status === "processing" || t.status === "running",
+		).length;
+		const failed = stageTasks.filter((t) => t.status === "failed").length;
+		const total = stageTasks.length;
+
+		stages.push({
+			stage_key,
+			stage_number,
+			total_tasks: total,
+			completed_tasks: completed,
+			pending_tasks: pending,
+			running_tasks: running,
+			failed_tasks: failed,
+			progress_percentage:
+				total > 0 ? Math.round((completed / total) * 100) : 0,
+		});
+
+		totalCompleted += completed;
+		totalTasks += total;
+	});
+
+	// Sort by stage number
+	stages.sort((a, b) => a.stage_number - b.stage_number);
+
+	return {
+		orchestrator_execution_id: id,
+		orchestrator_name: orchestratorName,
+		batch_name: batchData?.name,
+		config_name: orchestratorConfig?.name,
+		status: finalStatus,
+		started_at: startedAt,
+		completed_at: completedAt,
+		total_stages: stages.length,
+		current_stage: stages.filter((s) => s.completed_tasks > 0).length,
+		overall_progress:
+			totalTasks > 0
+				? Math.round((totalCompleted / totalTasks) * 100)
+				: 0,
+		stages,
+	};
 }
 
 /**
  * Get task list for an execution/batch with optional stage filter
  */
 export async function getExecutionTasks(
-    batchId: string,
-    stageKey?: string
+	id: string,
+	stageKey?: string,
 ): Promise<TaskSummary[]> {
-    let query = supabase
-        .from('ai_tasks')
-        .select('id, stage_key, step_number, status, lo_code, created_at, completed_at, error_message, parent_task_id, root_task_id, hierarchy_path')
-        .or(`batch_id.eq.${batchId},orchestrator_execution_id.eq.${batchId}`)
-        .order('step_number')
-        .order('created_at');
+	let query = supabase
+		.from("ai_tasks")
+		.select(
+			"id, stage_key, step_number, task_type, status, lo_code, created_at, started_at, completed_at, error_message, user_id, parent_task_id, root_task_id, hierarchy_path, input_data, output_data, prompt_template_id",
+		)
+		.or(
+			`batch_id.eq.${id},launch_id.eq.${id},orchestrator_execution_id.eq.${id}`,
+		)
+		.order("step_number")
+		.order("created_at");
 
-    if (stageKey) {
-        query = query.eq('stage_key', stageKey);
-    }
+	if (stageKey) {
+		query = query.eq("stage_key", stageKey);
+	}
 
-    const { data, error } = await query;
+	const { data, error } = await query;
 
-    if (error) {
-        console.error('Failed to fetch tasks:', error);
-        return [];
-    }
+	if (error) {
+		console.error("Failed to fetch tasks:", error);
+		return [];
+	}
 
-    return (data || []).map(task => ({
-        id: task.id,
-        stage_key: task.stage_key || `stage_${task.step_number || 1}`,
-        stage_number: task.step_number || 1,
-        status: task.status,
-        lo_code: task.lo_code,
-        created_at: task.created_at,
-        completed_at: task.completed_at,
-        error_message: task.error_message,
-        parent_task_id: task.parent_task_id,
-        root_task_id: task.root_task_id,
-        hierarchy_path: task.hierarchy_path
-    }));
+	return (data || []).map((task) => ({
+		id: task.id,
+		stage_key: task.stage_key || `stage_${task.step_number || 1}`,
+		stage_number: task.step_number || 1,
+		task_type: task.task_type,
+		status: task.status,
+		lo_code: task.lo_code,
+		created_at: task.created_at,
+		started_at: task.started_at,
+		completed_at: task.completed_at,
+		error_message: task.error_message,
+		user_id: task.user_id,
+		parent_task_id: task.parent_task_id,
+		root_task_id: task.root_task_id,
+		hierarchy_path: parseSafe(task.hierarchy_path) || [],
+		input_data: parseSafe(task.input_data),
+		output_data: parseSafe(task.output_data),
+		prompt_template_id: task.prompt_template_id,
+	}));
 }
-
 /**
  * Get batch tasks specifically
  */
-export async function getBatchTasks(batchId: string) {
-    return getExecutionTasks(batchId);
+export async function getBatchTasks(id: string) {
+	return getExecutionTasks(id);
 }
 
 /**
  * Get list of executions for an orchestrator config
  */
 export async function getOrchestratorExecutions(orchestratorId: string) {
-    const { data, error } = await supabase
-        .from('orchestrator_executions')
-        .select('id, status, started_at, completed_at, created_at, input_data')
-        .eq('orchestrator_id', orchestratorId)
-        .order('created_at', { ascending: false })
-        .limit(20);
+	const { data, error } = await supabase
+		.from("orchestrator_executions")
+		.select("id, status, started_at, completed_at, created_at, input_data")
+		.eq("orchestrator_id", orchestratorId)
+		.order("created_at", { ascending: false })
+		.limit(20);
 
-    if (error) {
-        console.error('Failed to fetch executions:', error);
-        return [];
-    }
+	if (error) {
+		console.error("Failed to fetch executions:", error);
+		return [];
+	}
 
-    return data || [];
+	return data || [];
 }
 
 /**
  * Subscribe to real-time task updates for a batch
  */
 export function subscribeToExecutionUpdates(
-    batchId: string,
-    onUpdate: (payload: any) => void
+	id: string,
+	onUpdate: (
+		payload: RealtimePostgresChangesPayload<Record<string, unknown>>,
+	) => void,
 ) {
-    const channel = supabase
-        .channel(`batch_${batchId}`)
-        .on(
-            'postgres_changes',
-            {
-                event: '*',
-                schema: 'public',
-                table: 'ai_tasks',
-                filter: `batch_id=eq.${batchId}`
-            },
-            onUpdate
-        )
-        .subscribe();
+	// We listen to both batch_id and launch_id updates on the same channel
+	const channel = supabase
+		.channel(`exec_${id}`)
+		.on(
+			"postgres_changes",
+			{
+				event: "*",
+				schema: "public",
+				table: "ai_tasks",
+				filter: `batch_id=eq.${id}`,
+			},
+			onUpdate,
+		)
+		.on(
+			"postgres_changes",
+			{
+				event: "*",
+				schema: "public",
+				table: "ai_tasks",
+				filter: `launch_id=eq.${id}`,
+			},
+			onUpdate,
+		)
+		.subscribe();
 
-    return () => {
-        supabase.removeChannel(channel);
-    };
+	return () => {
+		supabase.removeChannel(channel);
+	};
+}
+
+export interface BatchSummary {
+	id: string;
+	orchestrator_name: string;
+	status: string;
+	created_at: string;
+	task_count: number;
+	completed_tasks: number;
+	failed_tasks: number;
+	progress: number;
+	launch_id?: string;
+}
+
+/**
+ * Get a list of recent batches from the task_batches table
+ */
+export async function getRecentBatches(
+	limit: number = 20,
+): Promise<BatchSummary[]> {
+	const { storage } = await import("@/lib/storage");
+	const adapter = storage.adapter;
+
+	// If using IndexedDB (Lite tiers), query there instead of Supabase
+	if (adapter.constructor.name === "IndexedDBAdapter") {
+		const batches = await adapter.listBatches(limit);
+		return batches.map((b) => ({
+			id: b.id,
+			orchestrator_name: b.name || "Generic Execution",
+			status: b.status || "pending",
+			created_at: b.created_at,
+			task_count: b.total_tasks || 0,
+			completed_tasks: b.completed_tasks || 0,
+			failed_tasks: b.failed_tasks || 0,
+			progress:
+				(b.total_tasks || 0) > 0
+					? Math.round(
+							((b.completed_tasks || 0) / b.total_tasks!) * 100,
+						)
+					: 0,
+			launch_id: b.launch_id,
+		}));
+	}
+
+	const { data, error } = await supabase
+		.from("task_batches")
+		.select(
+			`
+            *,
+            lab_orchestrator_configs!task_batches_orchestrator_config_id_fkey (
+                steps
+            )
+        `,
+		)
+		.order("created_at", { ascending: false })
+		.limit(limit);
+
+	if (error) {
+		console.error("Failed to fetch recent batches:", error);
+		return getRecentBatchesFallback(limit);
+	}
+
+	if (!data || data.length === 0) {
+		return getRecentBatchesFallback(limit);
+	}
+
+	return data.map((b) => {
+		const total = b.total_tasks || 0;
+		const completed = b.completed_tasks || 0;
+		const failed = b.failed_tasks || 0;
+		const processing = b.processing_tasks || 0;
+
+		// Calculate status from counters
+		let calculatedStatus = b.status || "pending";
+
+		if (total > 0) {
+			if (completed + failed >= total) {
+				calculatedStatus = failed > 0 ? "failed" : "completed";
+			} else if (processing > 0 || completed + failed > 0) {
+				calculatedStatus = "processing";
+			}
+		}
+
+		// STUCK DETECTION in list view
+		const orchestratorConfig = (b as Record<string, unknown>)
+			?.lab_orchestrator_configs as {
+			steps: Record<string, unknown>[];
+		} | null;
+		const expectedSteps = orchestratorConfig?.steps || [];
+
+		// We calculate "actual stages" roughly from b.completed_tasks vs b.total_tasks if we don't have task data here
+		// However, a better way is to just trust the 'completed' state ONLY if all stage logic in getExecutionProgress is happy.
+		// For list view, we'll focus on reconciling the Pending vs Completed mismatch first.
+
+		return {
+			id: b.id,
+			orchestrator_name: b.name || "Generic Execution",
+			status:
+				b.status === "completed" || b.status === "failed"
+					? b.status
+					: calculatedStatus,
+			created_at: b.created_at,
+			task_count: total,
+			completed_tasks: completed,
+			failed_tasks: failed,
+			progress: total > 0 ? Math.round((completed / total) * 100) : 0,
+			launch_id: b.launch_id,
+		};
+	});
+}
+
+/**
+ * Legacy fallback: Grouping recent ai_tasks (used if task_batches is empty or migration not run)
+ */
+async function getRecentBatchesFallback(
+	limit: number = 20,
+): Promise<BatchSummary[]> {
+	// Fetch last 200 tasks
+	const { data: tasks, error } = await supabase
+		.from("ai_tasks")
+		.select("id, batch_id, status, created_at, input_data")
+		.order("created_at", { ascending: false })
+		.limit(200);
+
+	if (error || !tasks || tasks.length === 0) return [];
+
+	const batchMap = new Map<string, BatchSummary>();
+
+	tasks.forEach((task) => {
+		const batchId = task.batch_id;
+		if (!batchId) return;
+
+		if (!batchMap.has(batchId)) {
+			const orchestratorName =
+				((task.input_data as Record<string, unknown> | null)
+					?._orchestrator_name as string) || "Generic Execution";
+			batchMap.set(batchId, {
+				id: batchId,
+				orchestrator_name: orchestratorName,
+				status: "pending",
+				created_at: task.created_at,
+				task_count: 0,
+				completed_tasks: 0,
+				failed_tasks: 0,
+				progress: 0,
+			});
+		}
+
+		const b = batchMap.get(batchId)!;
+		b.task_count++;
+		if (task.status === "completed") b.completed_tasks++;
+		if (task.status === "failed") b.failed_tasks++;
+
+		if (task.created_at < b.created_at) {
+			b.created_at = task.created_at;
+		}
+	});
+
+	const batches = Array.from(batchMap.values()).map((b) => {
+		let status = "processing";
+		if (b.completed_tasks === b.task_count) status = "completed";
+		else if (b.failed_tasks > 0) status = "failed";
+		else if (b.completed_tasks === 0 && b.failed_tasks === 0)
+			status = "pending";
+
+		return {
+			...b,
+			status,
+			progress:
+				b.task_count > 0
+					? Math.round((b.completed_tasks / b.task_count) * 100)
+					: 0,
+		};
+	});
+
+	return batches
+		.sort(
+			(a, b) =>
+				new Date(b.created_at).getTime() -
+				new Date(a.created_at).getTime(),
+		)
+		.slice(0, limit);
 }

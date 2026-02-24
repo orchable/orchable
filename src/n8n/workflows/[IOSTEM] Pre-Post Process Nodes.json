@@ -1,0 +1,195 @@
+{
+  "_comment": "Pre/Post Process Nodes for N8N Agent Workflow - Import these nodes into your existing workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Pre/Post Process Hooks\n\nThese nodes check for optional pre/post process configurations in task.extra and execute webhooks as configured.\n\n**Pre-Process:** Runs BEFORE AI, merges external data into input\n**Post-Process:** Runs AFTER AI, pushes results externally",
+        "height": 200,
+        "width": 600,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [-496, 800],
+      "typeVersion": 1,
+      "id": "pre-post-sticky-note",
+      "name": "Pre/Post Process Note"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "pre-process-enabled",
+              "leftValue": "={{ $json.extra?.pre_process?.enabled }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-288, 800],
+      "id": "check-pre-process",
+      "name": "Check Pre-Process"
+    },
+    {
+      "parameters": {
+        "method": "={{ $('JSON Parse').item.json.extra?.pre_process?.webhook_method || 'POST' }}",
+        "url": "={{ $('JSON Parse').item.json.extra?.pre_process?.webhook_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('JSON Parse').item.json.data) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-80, 720],
+      "id": "execute-pre-webhook",
+      "name": "Execute Pre-Process Webhook",
+      "onError": "continueErrorOutput",
+      "notesInFlow": true,
+      "notes": "Fetch external data before AI processing"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge Pre-Process Output into input_data\nconst task = $('JSON Parse').first().json;\nconst preOutput = $json;\nconst preConfig = task.extra?.pre_process || {};\nconst outputHandling = preConfig.output_handling || 'merge';\n\nlet mergedData = { ...task.data };\n\nif (preOutput && !preOutput.error) {\n  if (outputHandling === 'replace') {\n    mergedData = preOutput;\n  } else if (outputHandling === 'merge') {\n    mergedData = { ...mergedData, ...preOutput };\n  } else if (outputHandling === 'nested') {\n    const fieldName = preConfig.nested_field_name || 'pre_output';\n    mergedData[fieldName] = preOutput;\n  }\n}\n\nreturn {\n  ...task,\n  data: mergedData,\n  _pre_process_executed: true\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [128, 720],
+      "id": "merge-pre-output",
+      "name": "Merge Pre-Process Output"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Handle Pre-Process Failure\nconst task = $('JSON Parse').first().json;\nconst preConfig = task.extra?.pre_process || {};\nconst onFailure = preConfig.on_failure || 'continue';\n\nif (onFailure === 'abort') {\n  throw new Error('Pre-process webhook failed: ' + JSON.stringify($json.error));\n}\n\n// Continue with original data\nreturn {\n  ...task,\n  _pre_process_failed: true,\n  _pre_process_error: $json.error\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-80, 880],
+      "id": "handle-pre-failure",
+      "name": "Handle Pre-Process Failure"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "post-process-enabled",
+              "leftValue": "={{ $('JSON Parse').item.json.extra?.post_process?.enabled }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [704, 256],
+      "id": "check-post-process",
+      "name": "Check Post-Process"
+    },
+    {
+      "parameters": {
+        "method": "={{ $('JSON Parse').item.json.extra?.post_process?.webhook_method || 'POST' }}",
+        "url": "={{ $('JSON Parse').item.json.extra?.post_process?.webhook_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify((function() { const cfg = $('JSON Parse').item.json.extra?.post_process; const src = cfg?.input_source || 'output_only'; if (src === 'output_only') return $json.result; if (src === 'input_and_output') return { input: $('JSON Parse').item.json.data, output: $json.result }; return $json.result; })()) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [912, 176],
+      "id": "execute-post-webhook",
+      "name": "Execute Post-Process Webhook",
+      "onError": "continueErrorOutput",
+      "notesInFlow": true,
+      "notes": "Push results to external system after AI processing"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Handle Post-Process result\nconst originalResult = $('Add AlongWith Attributes').first().json;\nconst postConfig = $('JSON Parse').first().json.extra?.post_process || {};\nconst onFailure = postConfig.on_failure || 'continue';\n\n// If post-process failed but on_failure = 'continue', proceed with original result\nif ($json.error && onFailure === 'abort') {\n  throw new Error('Post-process webhook failed: ' + JSON.stringify($json.error));\n}\n\n// Return original result (post-process doesn't modify task output)\nreturn {\n  ...originalResult,\n  _post_process_executed: true,\n  _post_process_response: $json.error ? null : $json\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [912, 336],
+      "id": "handle-post-result",
+      "name": "Handle Post-Process Result"
+    }
+  ],
+  "connections": {
+    "JSON Parse → Check Pre-Process": {
+      "description": "Replace existing 'JSON Parse → Get Active Key' connection with 'JSON Parse → Check Pre-Process'"
+    },
+    "Check Pre-Process": {
+      "main": [
+        [{"node": "Execute Pre-Process Webhook", "type": "main", "index": 0}],
+        [{"node": "Get Active Key", "type": "main", "index": 0}]
+      ]
+    },
+    "Execute Pre-Process Webhook": {
+      "main": [
+        [{"node": "Merge Pre-Process Output", "type": "main", "index": 0}],
+        [{"node": "Handle Pre-Process Failure", "type": "main", "index": 0}]
+      ]
+    },
+    "Merge Pre-Process Output": {
+      "main": [[{"node": "Get Active Key", "type": "main", "index": 0}]]
+    },
+    "Handle Pre-Process Failure": {
+      "main": [[{"node": "Get Active Key", "type": "main", "index": 0}]]
+    },
+    "Add AlongWith Attributes → Check Post-Process": {
+      "description": "Replace existing 'Add AlongWith Attributes → Input - Submit Result Phase1' with 'Add AlongWith Attributes → Check Post-Process'"
+    },
+    "Check Post-Process": {
+      "main": [
+        [{"node": "Execute Post-Process Webhook", "type": "main", "index": 0}],
+        [{"node": "Input - Submit Result Phase1", "type": "main", "index": 0}]
+      ]
+    },
+    "Execute Post-Process Webhook": {
+      "main": [
+        [{"node": "Handle Post-Process Result", "type": "main", "index": 0}],
+        [{"node": "Handle Post-Process Result", "type": "main", "index": 0}]
+      ]
+    },
+    "Handle Post-Process Result": {
+      "main": [[{"node": "Input - Submit Result Phase1", "type": "main", "index": 0}]]
+    }
+  },
+  "integration_guide": {
+    "step_1": "Copy all nodes from this file into your existing workflow",
+    "step_2": "Delete connection: JSON Parse → Get Active Key",
+    "step_3": "Create connection: JSON Parse → Check Pre-Process",
+    "step_4": "Delete connection: Add AlongWith Attributes → Input - Submit Result Phase1",
+    "step_5": "Create connection: Add AlongWith Attributes → Check Post-Process",
+    "step_6": "Verify all other connections match the 'connections' section above"
+  }
+}

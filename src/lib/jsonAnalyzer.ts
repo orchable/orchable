@@ -126,6 +126,27 @@ export function getValueByPath(obj: any, path: string): any {
     if (!path) return obj;
     return path.split('.').reduce((acc, part) => acc && acc[part], obj);
 }
+/**
+ * Checks if a saved input mapping is compatible with a new JSON analysis.
+ */
+export function isStructureCompatible(savedMapping: any, newAnalysis: AnalysisResult): boolean {
+    if (!savedMapping || !savedMapping.fieldSelection) return false;
+
+    const { shared, perTask } = savedMapping.fieldSelection;
+
+    // Check if all previously selected shared paths exist in the new analysis
+    const sharedPaths = new Set(newAnalysis.sharedFields.map(f => f.path));
+    const allSharedMatch = shared.every((p: string) => sharedPaths.has(p));
+    if (!allSharedMatch) return false;
+
+    // Check if all previously selected per-task paths exist in the new analysis
+    const perTaskPaths = new Set(newAnalysis.perTaskFields.map(f => f.path));
+    const allPerTaskMatch = perTask.every((p: string) => perTaskPaths.has(p));
+    if (!allPerTaskMatch) return false;
+
+    return true;
+}
+
 export interface ProcessedTask {
     input_data: Record<string, any>;
     extra: Record<string, any>;
@@ -146,14 +167,16 @@ export function processTaskData(
     const extra: Record<string, any> = {};
 
     // Helper to add data to the right bucket
-    const addToBucket = (key: string, value: any) => {
+    const addToBucket = (key: string, value: any, sourcePath?: string) => {
         // PREVENT adding entire contract or metadata objects to extra to avoid massive duplication
         if ((key === 'input_data' || key === 'extra') && typeof value === 'object' && value !== null) {
             console.debug(`Skipping nested object '${key}' from bucket to prevent duplication`);
             return;
         }
 
-        if (contractFields.includes(key)) {
+        const isInputDataPath = sourcePath === 'input_data' || sourcePath?.startsWith('input_data.');
+
+        if (contractFields.includes(key) || isInputDataPath) {
             input_data[key] = value;
         } else {
             extra[key] = value;
@@ -164,7 +187,7 @@ export function processTaskData(
     fieldSelection.shared.forEach(f => {
         const sourceValue = getValueByPath(rootJson, f);
         const lastPart = f.split('.').pop() || f;
-        addToBucket(lastPart, sourceValue);
+        addToBucket(lastPart, sourceValue, f);
     });
 
     // 2. Map Per-Task Fields (from task object)
@@ -175,12 +198,12 @@ export function processTaskData(
         // SMART UNROLL: If user selected 'input_data' object, unwrap it
         if (lastPart === 'input_data' && typeof sourceValue === 'object' && sourceValue !== null) {
             Object.entries(sourceValue).forEach(([k, v]) => {
-                addToBucket(k, v);
+                addToBucket(k, v, `input_data.${k}`);
             });
             return;
         }
 
-        addToBucket(lastPart, sourceValue);
+        addToBucket(lastPart, sourceValue, f);
     });
 
     // 3. Apply Manual Mappings (Contract fields)

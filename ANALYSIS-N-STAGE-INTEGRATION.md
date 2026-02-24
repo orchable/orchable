@@ -1,4 +1,4 @@
-# Analysis: Integrating N-Stage Orchestrator into lovable-app-insights
+# Analysis: Integrating N-Stage Orchestrator into n8n-gen
 
 > **Date:** 2026-01-31  
 > **Reference:** [enhance-n-stage-orchestrator](file:///Users/tonypham/MEGA/WebApp/pbl-asset-tools/openspec/changes/enhance-n-stage-orchestrator)
@@ -47,7 +47,7 @@ lab_step_executions (individual steps)
 
 ### Features IN enhance-n-stage-orchestrator
 
-| Feature | Status in lovable-app-insights |
+| Feature | Status in n8n-gen |
 |---------|-------------------------------|
 | `root_task_id` (hierarchy root) | ❌ Missing |
 | `hierarchy_path` (ancestor chain) | ❌ Missing |
@@ -159,8 +159,8 @@ Need adaptation:
 
 ## Next Steps
 
-1. Confirm approach với user
+1. Confirm approach with user
 2. Create DB migration (if not already done in main DB)
 3. Add `PipelineProgress` component
-4. Integrate vào `MonitorPage`
+4. Integrate into `MonitorPage`
 5. Test with existing executions

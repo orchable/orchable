@@ -15,6 +15,9 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { extractInputFields, generateOutputFormatSection, createDefaultContract, injectOutputFormatIntoPrompt, mapContractToInputSchema, mapContractToOutputSchema, ensureGeminiSchema } from '@/lib/schemaUtils';
+import { OutputSchemaEditor } from '@/components/designer/OutputSchemaEditor';
+import { IconPicker } from '@/components/common/IconPicker';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
@@ -41,8 +44,12 @@ import {
     Share2,
     Code,
     History,
-    Braces
+    Braces,
+    Check,
+    CheckCircle2,
+    Layout
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import {
     Dialog,
     DialogContent,
@@ -65,6 +72,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { PrePostProcessSection } from './PrePostProcessSection';
 import { ContractSection } from './ContractSection';
 import type { AIModel, Cardinality, PreProcessConfig, PostProcessConfig, StageContract } from '@/lib/types';
+import { PromptEditorDialog } from './PromptEditorDialog';
+import { ICONS } from '@/lib/icons';
 
 // Types
 interface PromptTemplate {
@@ -78,6 +87,14 @@ interface PromptTemplate {
         temperature?: number;
     } | null;
     stage_config?: any;
+    custom_component_id?: string | null;
+    custom_component?: any;
+}
+
+interface CustomComponentOption {
+    id: string;
+    name: string;
+    description?: string;
 }
 
 // Model options
@@ -87,9 +104,9 @@ const AI_MODELS: { value: AIModel; label: string }[] = [
 ];
 
 const CARDINALITY_OPTIONS: { value: Cardinality; label: string; description: string }[] = [
-    { value: '1:1', label: '1:1', description: 'One input → One output' },
-    { value: '1:N', label: '1:N', description: 'One input → Multiple outputs' },
-    { value: 'N:1', label: 'N:1', description: 'Multiple inputs → One output' }
+    { value: 'one_to_one', label: '1:1 (One to One)', description: 'One input → One output' },
+    { value: 'one_to_many', label: '1:N (One to Many)', description: 'One input → Multiple outputs' },
+    { value: 'many_to_one', label: 'N:1 (Many to One)', description: 'Multiple inputs → One output (Merge)' }
 ];
 
 const SPLIT_MODES = [
@@ -98,14 +115,18 @@ const SPLIT_MODES = [
 ];
 
 const stageConfigSchema = z.object({
+    name: z.string().min(1, 'Name is required').max(50, 'Max 50 chars'),
     stage_key: z.string().min(1, 'Stage key is required').regex(/^[a-z0-9_]+$/, 'Only lowercase, numbers, underscores'),
     label: z.string().min(1, 'Label is required'),
     task_type: z.string().min(1, 'Task type is required'),
-    cardinality: z.enum(['1:1', '1:N', 'N:1', 'one_to_one', 'one_to_many']),
+    cardinality: z.enum(['1:1', '1:N', 'N:1', 'one_to_one', 'one_to_many', 'many_to_one']),
     split_path: z.string().optional(),
     split_mode: z.enum(['per_item', 'per_batch']).optional(),
+    batch_grouping: z.enum(['global', 'isolated']).default('global'),
+    merge_path: z.string().optional(),
     output_mapping: z.string().optional(),
     prompt_template_id: z.string().optional(),
+    custom_component_id: z.string().optional(),
     model_id: z.enum(['gemini-flash-latest', 'gemini-pro-latest']),
     temperature: z.number().min(0).max(2),
     topP: z.number().min(0).max(1),
@@ -119,9 +140,7 @@ const stageConfigSchema = z.object({
     return_along_with: z.string().optional()
 });
 
-type StageFormData = z.infer<typeof stageConfigSchema> & {
-    cardinality: '1:1' | '1:N' | 'one_to_one' | 'one_to_many';
-};
+type StageFormData = z.infer<typeof stageConfigSchema>;
 
 // Component to highlight variable patterns in template
 function TemplatePreview({ template, delimiters }: { template: string; delimiters?: { start: string; end: string } }) {
@@ -182,7 +201,8 @@ function extractVariables(template: string, delimiters?: { start: string; end: s
 }
 
 export function StageConfigPanel({ stageId }: { stageId: string }) {
-    const { nodes, edges, updateStepData, removeStep } = useDesignerStore();
+    const { nodes, edges, updateStepData, removeStep, duplicateStep } = useDesignerStore();
+    const navigate = useNavigate();
     const stage = nodes.find(n => n.id === stageId);
     const [activeTab, setActiveTab] = useState('basic');
 
@@ -199,6 +219,10 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
     // Contract state
     const [contract, setContract] = useState<StageContract | undefined>(undefined);
 
+    // Registry components state
+    const [registryComponents, setRegistryComponents] = useState<CustomComponentOption[]>([]);
+    const [loadingComponents, setLoadingComponents] = useState(false);
+
     // Delete template state
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -206,14 +230,18 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
     const form = useForm<StageFormData>({
         resolver: zodResolver(stageConfigSchema as any),
         defaultValues: {
+            name: '',
             stage_key: '',
             label: '',
             task_type: '',
             cardinality: '1:1',
-            split_path: 'result.questions',
+            split_path: '',
             split_mode: 'per_item',
+            batch_grouping: 'global',
+            merge_path: 'output_data',
             output_mapping: 'result',
             prompt_template_id: '',
+            custom_component_id: '',
             model_id: 'gemini-flash-latest',
             temperature: 1.0,
             topP: 0.95,
@@ -233,7 +261,7 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
         try {
             const { data, error } = await supabase
                 .from('prompt_templates')
-                .select('id, name, description, template, version, default_ai_settings, stage_config')
+                .select('id, name, description, template, version, default_ai_settings, stage_config, custom_component_id')
                 .eq('is_active', true)
                 .order('name');
 
@@ -247,8 +275,25 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
         }
     };
 
+    const fetchComponents = async () => {
+        setLoadingComponents(true);
+        try {
+            const { data, error } = await supabase
+                .from('custom_components')
+                .select('id, name, description')
+                .order('name');
+            if (error) throw error;
+            setRegistryComponents(data || []);
+        } catch (err) {
+            console.error('Failed to fetch components:', err);
+        } finally {
+            setLoadingComponents(false);
+        }
+    };
+
     useEffect(() => {
         fetchTemplates();
+        fetchComponents();
     }, []);
 
     // Prompt Editor State
@@ -274,6 +319,7 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                 cardinality: form.getValues('cardinality') || '1:1',
                 split_path: form.getValues('split_path') || '',
                 split_mode: form.getValues('split_mode') || 'per_item',
+                merge_path: form.getValues('merge_path') || '',
                 output_mapping: form.getValues('output_mapping') || '',
                 requires_approval: form.getValues('requires_approval') || false,
                 timeout: form.getValues('timeout') || 300000,
@@ -372,7 +418,7 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
         if (!selectedTemplate) return;
 
         // Update local state immediately for responsiveness
-        const updated = { ...selectedTemplate, template: newPrompt };
+        const updated: PromptTemplate = { ...selectedTemplate, template: newPrompt };
         setSelectedTemplate(updated);
         setTemplates(prev => prev.map(t => t.id === updated.id ? updated : t));
 
@@ -401,14 +447,16 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
         if (stage) {
             const data = stage.data as any;
             const templateId = data.prompt_template_id || data.prompt_template_name || '';
-
             form.reset({
+                name: data.name || '',
                 stage_key: data.stage_key || data.name || '',
                 label: data.label || '',
                 task_type: data.task_type || '',
-                cardinality: (data.cardinality === 'one_to_many' || data.cardinality === '1:N') ? '1:N' : '1:1',
-                split_path: data.split_path || 'result.questions',
+                cardinality: (data.cardinality === 'many_to_one' || data.cardinality === 'N:1') ? 'many_to_one' : ((data.cardinality === 'one_to_many' || data.cardinality === '1:N') ? 'one_to_many' : 'one_to_one'),
+                split_path: data.split_path || '',
                 split_mode: data.split_mode || 'per_item',
+                batch_grouping: data.batch_grouping || 'global',
+                merge_path: data.merge_path || 'output_data',
                 output_mapping: data.output_mapping || 'result',
                 prompt_template_id: templateId,
                 model_id: data.ai_settings?.model_id || 'gemini-flash-latest',
@@ -421,6 +469,7 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                 timeout: data.timeout ?? data.ai_settings?.timeout ?? 300000,
                 maxRetries: data.retryConfig?.maxRetries ?? data.ai_settings?.maxRetries ?? 3,
                 retryDelay: data.retryConfig?.retryDelay ?? data.ai_settings?.retryDelay ?? 5000,
+                custom_component_id: data.custom_component_id || '',
                 return_along_with: Array.isArray(data.return_along_with) ? data.return_along_with.join(', ') : data.return_along_with || ''
             });
 
@@ -434,61 +483,83 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
             setPreProcessConfig(data.pre_process);
             setPostProcessConfig(data.post_process);
 
-            // Load contract
+            // Load contract (with backward-compatible migration)
             if (data.contract && JSON.stringify(data.contract) !== JSON.stringify(contract)) {
-                setContract(data.contract);
+                const migratedContract = { ...data.contract };
+                // Auto-migrate legacy OutputSchemaField[] to GeminiJsonSchema
+                if (migratedContract.output) {
+                    const legacySchema = migratedContract.output.schema;
+                    const legacyRootType = migratedContract.output.rootType;
+                    migratedContract.output.schema = ensureGeminiSchema(legacySchema, legacyRootType);
+                    // Clean up legacy rootType field
+                    delete migratedContract.output.rootType;
+                }
+                setContract(migratedContract);
             }
         }
     }, [stage, form, templates, contract]);
 
-    // Update selected template when form value changes
+    // Set selected template when form value changes
     const watchedTemplateId = form.watch('prompt_template_id');
     useEffect(() => {
         if (watchedTemplateId) {
             const found = templates.find(t => t.id === watchedTemplateId);
             setSelectedTemplate(found || null);
-
-            if (found) {
-                // Auto-fill Stage Config from template
-                if (found.stage_config) {
-                    const sc = found.stage_config;
-                    if (sc.task_type) form.setValue('task_type', sc.task_type);
-                    if (sc.cardinality) {
-                        const mapped = (sc.cardinality === 'one_to_many' || sc.cardinality === '1:N') ? '1:N' : '1:1';
-                        form.setValue('cardinality', mapped);
-                    }
-                    if (sc.split_path) form.setValue('split_path', sc.split_path);
-                    if (sc.split_mode) form.setValue('split_mode', sc.split_mode);
-                    if (sc.output_mapping) form.setValue('output_mapping', sc.output_mapping);
-                    if (sc.requires_approval !== undefined) form.setValue('requires_approval', sc.requires_approval);
-                    if (sc.timeout) form.setValue('timeout', sc.timeout);
-                    if (sc.retryConfig) {
-                        if (sc.retryConfig.maxRetries) form.setValue('maxRetries', sc.retryConfig.maxRetries);
-                        if (sc.retryConfig.retryDelay) form.setValue('retryDelay', sc.retryConfig.retryDelay);
-                    }
-                    if (sc.return_along_with && Array.isArray(sc.return_along_with)) {
-                        form.setValue('return_along_with', sc.return_along_with.join(', '));
-                    }
-                }
-
-                // Auto-fill AI settings from template defaults
-                if (found.default_ai_settings) {
-                    const settings = found.default_ai_settings;
-                    if (settings.model_id) {
-                        const modelId = settings.model_id as AIModel;
-                        if (AI_MODELS.some(m => m.value === modelId)) {
-                            form.setValue('model_id', modelId);
-                        }
-                    }
-                    if (settings.temperature !== undefined) {
-                        form.setValue('temperature', settings.temperature);
-                    }
-                }
-            }
         } else {
             setSelectedTemplate(null);
         }
-    }, [watchedTemplateId, templates, form]);
+    }, [watchedTemplateId, templates]);
+
+    // Handle explicit template selection (auto-fill)
+    const handleTemplateSelect = (templateId: string) => {
+        const found = templates.find(t => t.id === templateId);
+        if (found) {
+            // Auto-fill Stage Config from template
+            if (found.stage_config) {
+                const sc = found.stage_config;
+                if (sc.task_type) form.setValue('task_type', sc.task_type);
+                if (sc.cardinality) {
+                    const mapped = (sc.cardinality === 'many_to_one' || sc.cardinality === 'N:1') ? 'many_to_one' : ((sc.cardinality === 'one_to_many' || sc.cardinality === '1:N') ? 'one_to_many' : 'one_to_one');
+                    form.setValue('cardinality', mapped as any);
+                }
+                if (sc.split_path) form.setValue('split_path', sc.split_path);
+                if (sc.split_mode) form.setValue('split_mode', sc.split_mode);
+                if (sc.batch_grouping) form.setValue('batch_grouping', sc.batch_grouping);
+                if (sc.merge_path) form.setValue('merge_path', sc.merge_path);
+                if (sc.output_mapping) form.setValue('output_mapping', sc.output_mapping);
+                if (sc.requires_approval !== undefined) form.setValue('requires_approval', sc.requires_approval);
+                if (sc.timeout) form.setValue('timeout', sc.timeout);
+                if (sc.retryConfig) {
+                    if (sc.retryConfig.maxRetries) form.setValue('maxRetries', sc.retryConfig.maxRetries);
+                    if (sc.retryConfig.retryDelay) form.setValue('retryDelay', sc.retryConfig.retryDelay);
+                }
+                if (sc.return_along_with && Array.isArray(sc.return_along_with)) {
+                    form.setValue('return_along_with', sc.return_along_with.join(', '));
+                }
+            }
+
+            // Auto-fill AI settings from template defaults
+            if (found.default_ai_settings) {
+                const settings = found.default_ai_settings;
+                if (settings.model_id) {
+                    const modelId = settings.model_id as AIModel;
+                    if (AI_MODELS.some(m => m.value === modelId)) {
+                        form.setValue('model_id', modelId);
+                    }
+                }
+                if (settings.temperature !== undefined) {
+                    form.setValue('temperature', settings.temperature);
+                }
+            }
+
+            // Auto-fill Custom Component from template
+            if (found.custom_component_id) {
+                form.setValue('custom_component_id', found.custom_component_id);
+            } else {
+                form.setValue('custom_component_id', '');
+            }
+        }
+    };
 
     // Extract available variables from parent stages
     const availableScope = useMemo(() => {
@@ -501,13 +572,22 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
 
         if (parentIds.length === 0) return null; // Root stage
 
-        const scope: string[] = [];
+        // Always include global system variable
+        const scope: string[] = ['input_data'];
+
+        // Also include variables expected by the current stage's contract
+        if (contract?.input?.fields) {
+            scope.push(...contract.input.fields.map(f => f.name));
+        }
+
         parentIds.forEach(id => {
             const parentNode = nodes.find(n => n.id === id);
             if (parentNode?.data) {
                 const data = parentNode.data as any;
-                // Output Schema fields
-                const outputFields = data.contract?.output?.schema?.map((f: any) => f.name) || [];
+                const schemaObj = data.contract?.output?.schema;
+                const outputFields: string[] = schemaObj?.properties
+                    ? Object.keys(schemaObj.properties)
+                    : (Array.isArray(schemaObj) ? schemaObj.map((f: any) => f.name) : []);
                 // return_along_with fields
                 const returnAlongWith = Array.isArray(data.return_along_with)
                     ? data.return_along_with
@@ -539,12 +619,15 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
         const configToExport = {
             version: 1,
             type: 'stage_config',
+            name: form.getValues('name'),
             stage_key: form.getValues('stage_key'),
             label: form.getValues('label'),
             task_type: form.getValues('task_type'),
             cardinality: form.getValues('cardinality'),
             split_path: form.getValues('split_path'),
             split_mode: form.getValues('split_mode'),
+            batch_grouping: form.getValues('batch_grouping'),
+            merge_path: form.getValues('merge_path'),
             output_mapping: form.getValues('output_mapping'),
             prompt_template_id: form.getValues('prompt_template_id'),
             ai_settings: {
@@ -591,12 +674,15 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
 
                 // Update form
                 form.reset({
+                    name: imported.name || imported.stage_key?.slice(0, 2) || '',
                     stage_key: imported.stage_key || '',
                     label: imported.label || '',
                     task_type: imported.task_type || '',
                     cardinality: imported.cardinality || '1:1',
                     split_path: imported.split_path || '',
                     split_mode: imported.split_mode || 'per_item',
+                    batch_grouping: imported.batch_grouping || 'global',
+                    merge_path: imported.merge_path || 'output_data',
                     output_mapping: imported.output_mapping || '',
                     prompt_template_id: imported.prompt_template_id || '',
                     model_id: imported.ai_settings?.model_id || 'gemini-flash-latest',
@@ -632,12 +718,15 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
     const onSubmit = async (data: StageFormData) => {
         // Update local designer store
         updateStepData(stageId, {
+            name: data.name,
             stage_key: data.stage_key,
             label: data.label,
             task_type: data.task_type,
             cardinality: data.cardinality,
             split_path: data.split_path,
             split_mode: data.split_mode,
+            batch_grouping: data.batch_grouping,
+            merge_path: data.merge_path,
             output_mapping: data.output_mapping,
             prompt_template_id: data.prompt_template_id,
             ai_settings: {
@@ -661,16 +750,30 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
             // Input/Output contract
             contract: contract,
             requires_approval: data.requires_approval,
+            custom_component_id: (data.custom_component_id === '_default' || !data.custom_component_id) ? null : data.custom_component_id,
             return_along_with: data.return_along_with ? data.return_along_with.split(',').map(s => s.trim()).filter(Boolean) : []
         });
 
         // Also persist stage_config to Supabase prompt_templates table
-        if (data.prompt_template_id) {
+        if (data.prompt_template_id && selectedTemplate) {
             try {
+                // Auto-sync prompt with output format section
+                let finalPrompt = selectedTemplate.template;
+                const formatSection = generateOutputFormatSection(contract);
+                if (formatSection) {
+                    finalPrompt = injectOutputFormatIntoPrompt(
+                        finalPrompt,
+                        formatSection,
+                        contract.output.format_injection || 'append'
+                    );
+                }
+
                 const stageConfig = {
-                    cardinality: (data.cardinality === '1:N' || data.cardinality === 'one_to_many') ? 'one_to_many' : 'one_to_one',
+                    cardinality: data.cardinality === 'N:1' ? 'N:1' : ((data.cardinality === '1:N' || data.cardinality === 'one_to_many') ? 'one_to_many' : 'one_to_one'),
                     split_path: data.split_path || '',
                     split_mode: data.split_mode || 'per_item',
+                    batch_grouping: data.batch_grouping || 'global',
+                    merge_path: data.merge_path || 'output_data',
                     output_mapping: data.output_mapping || '',
                     requires_approval: data.requires_approval || false,
                     timeout: data.timeout || 300000,
@@ -681,6 +784,9 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                     return_along_with: data.return_along_with ? data.return_along_with.split(',').map(s => s.trim()).filter(Boolean) : []
                 };
 
+                // Auto-set responseMimeType when schema is defined
+                const hasOutputSchema = contract?.output?.schema && contract.output.schema.type;
+
                 const aiSettings = {
                     model_id: data.model_id,
                     generate_content_api: data.generate_content_api,
@@ -688,17 +794,32 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                         temperature: data.temperature,
                         topP: data.topP,
                         topK: data.topK,
-                        maxOutputTokens: data.maxOutputTokens
+                        maxOutputTokens: data.maxOutputTokens,
+                        ...(hasOutputSchema ? { responseMimeType: 'application/json' } : {})
                     }
                 };
+
+                // Update local state immediately so subsequent re-renders don't read stale data
+                const updatedTemplate = {
+                    ...selectedTemplate,
+                    template: finalPrompt,
+                    stage_config: stageConfig,
+                    default_ai_settings: aiSettings
+                };
+                setSelectedTemplate(updatedTemplate);
+                setTemplates(prev => prev.map(t => t.id === updatedTemplate.id ? updatedTemplate : t));
 
                 console.log('Saving to Supabase - Stage Config:', stageConfig);
 
                 const { error } = await supabase
                     .from('prompt_templates')
                     .update({
+                        template: finalPrompt, // Save the updated prompt
                         stage_config: stageConfig,
-                        default_ai_settings: aiSettings
+                        default_ai_settings: aiSettings,
+                        input_schema: mapContractToInputSchema(contract),
+                        output_schema: mapContractToOutputSchema(contract) as any,
+                        custom_component_id: (data.custom_component_id === '_default' || !data.custom_component_id) ? null : data.custom_component_id
                     })
                     .eq('id', data.prompt_template_id);
 
@@ -726,8 +847,15 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
             <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                     <CardTitle className="text-lg flex items-center gap-2">
-                        <span className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                            {stageData.name || 'S'}
+                        <span className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold overflow-hidden">
+                            {(() => {
+                                const name = stageData.name?.toLowerCase() || 's';
+                                const IconComp = ICONS[name];
+                                if (IconComp) {
+                                    return <IconComp className="w-5 h-5 text-primary-foreground" />;
+                                }
+                                return <span className="truncate px-0.5">{name.slice(0, 3).toUpperCase()}</span>;
+                            })()}
                         </span>
                         Stage Configuration
                     </CardTitle>
@@ -764,6 +892,19 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                                 <Upload className="h-4 w-4" />
                             </Button>
                         </div>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-primary"
+                            onClick={() => {
+                                duplicateStep(stageId);
+                                toast.success('Step duplicated');
+                            }}
+                            type="button"
+                            title="Duplicate Step"
+                        >
+                            <Copy className="h-4 w-4" />
+                        </Button>
                     </div>
                 </div>
             </CardHeader>
@@ -771,44 +912,66 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                         <Tabs value={activeTab} onValueChange={setActiveTab}>
-                            <TabsList className="grid w-full grid-cols-5">
+                            <TabsList className="grid w-full grid-cols-3 h-auto p-1 gap-1">
                                 <TabsTrigger value="basic" className="text-xs">
                                     <Settings className="w-3 h-3 mr-1" />
                                     Basic
-                                </TabsTrigger>
-                                <TabsTrigger value="ai" className="text-xs">
-                                    <Zap className="w-3 h-3 mr-1" />
-                                    AI
                                 </TabsTrigger>
                                 <TabsTrigger value="prompt" className="text-xs">
                                     <FileText className="w-3 h-3 mr-1" />
                                     Prompt
                                 </TabsTrigger>
+                                <TabsTrigger value="contract" className="text-xs">
+                                    <FileInput className="w-3 h-3 mr-1" />
+                                    IO
+                                </TabsTrigger>
+                                <TabsTrigger value="ai" className="text-xs">
+                                    <Zap className="w-3 h-3 mr-1" />
+                                    AI
+                                </TabsTrigger>
                                 <TabsTrigger value="hooks" className="text-xs">
                                     <Webhook className="w-3 h-3 mr-1" />
                                     Hooks
                                 </TabsTrigger>
-                                <TabsTrigger value="contract" className="text-xs">
-                                    <FileInput className="w-3 h-3 mr-1" />
-                                    IO
+                                <TabsTrigger value="visual" className="text-xs">
+                                    <Layout className="w-3 h-3 mr-1" />
+                                    Visual
                                 </TabsTrigger>
                             </TabsList>
 
                             {/* Basic Tab */}
                             <TabsContent value="basic" className="space-y-4 mt-4">
-                                <FormField
-                                    control={form.control}
-                                    name="label"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Display Label</FormLabel>
-                                            <FormControl>
-                                                <Input {...field} placeholder="e.g. Question Generator" />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="name"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Step Icon</FormLabel>
+                                                <FormControl>
+                                                    <IconPicker
+                                                        value={field.value}
+                                                        onChange={field.onChange}
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="label"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Display Label</FormLabel>
+                                                <FormControl>
+                                                    <Input {...field} placeholder="e.g. Question Generator" />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
 
                                 <FormField
                                     control={form.control}
@@ -893,29 +1056,58 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                                     )}
                                 />
 
-                                {form.watch('cardinality') === '1:N' && (
+                                {(form.watch('cardinality') === '1:N' || form.watch('cardinality') === 'one_to_many' || form.watch('cardinality') === 'N:1' || form.watch('cardinality') === 'many_to_one') && (
                                     <div className="space-y-4 pl-4 border-l-2 border-muted">
-                                        <FormField
-                                            control={form.control}
-                                            name="split_path"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Split Path</FormLabel>
-                                                    <FormControl>
-                                                        <Input {...field} placeholder="e.g. result.questions" className="font-mono text-sm" />
-                                                    </FormControl>
-                                                    <FormDescription>JSON path to the array to split</FormDescription>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
+                                        {(form.watch('cardinality') === '1:N' || form.watch('cardinality') === 'one_to_many') && (
+                                            <>
+                                                <FormField
+                                                    control={form.control}
+                                                    name="split_path"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel>Split Path</FormLabel>
+                                                            <FormControl>
+                                                                <Input {...field} placeholder="e.g. result.questions" className="font-mono text-sm" />
+                                                            </FormControl>
+                                                            <FormDescription>JSON path to the array to split</FormDescription>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+
+                                                <FormField
+                                                    control={form.control}
+                                                    name="split_mode"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel>Split Mode</FormLabel>
+                                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                                <FormControl>
+                                                                    <SelectTrigger>
+                                                                        <SelectValue />
+                                                                    </SelectTrigger>
+                                                                </FormControl>
+                                                                <SelectContent>
+                                                                    {SPLIT_MODES.map(mode => (
+                                                                        <SelectItem key={mode.value} value={mode.value}>
+                                                                            {mode.label}
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            </>
+                                        )}
 
                                         <FormField
                                             control={form.control}
-                                            name="split_mode"
+                                            name="batch_grouping"
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <FormLabel>Split Mode</FormLabel>
+                                                    <FormLabel>Batch Grouping</FormLabel>
                                                     <Select onValueChange={field.onChange} value={field.value}>
                                                         <FormControl>
                                                             <SelectTrigger>
@@ -923,13 +1115,32 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                                                             </SelectTrigger>
                                                         </FormControl>
                                                         <SelectContent>
-                                                            {SPLIT_MODES.map(mode => (
-                                                                <SelectItem key={mode.value} value={mode.value}>
-                                                                    {mode.label}
-                                                                </SelectItem>
-                                                            ))}
+                                                            <SelectItem value="global">Global (All items in Launch)</SelectItem>
+                                                            <SelectItem value="isolated">Isolated (Per Parent item)</SelectItem>
                                                         </SelectContent>
                                                     </Select>
+                                                    <FormDescription>
+                                                        How downstream Many to One merges should aggregate tasks.
+                                                    </FormDescription>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
+                                )}
+
+                                {(form.watch('cardinality') === 'N:1' || form.watch('cardinality') === 'many_to_one') && (
+                                    <div className="space-y-4 pl-4 border-l-2 border-orange-500">
+                                        <FormField
+                                            control={form.control}
+                                            name="merge_path"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel className="text-orange-600 dark:text-orange-400">Merge Path</FormLabel>
+                                                    <FormControl>
+                                                        <Input {...field} placeholder="e.g. output_data" className="font-mono text-sm border-orange-200 focus-visible:ring-orange-500" />
+                                                    </FormControl>
+                                                    <FormDescription>JSON path in sibling outputs to aggregate (e.g. "output_data" moves task.output_data[] into one array)</FormDescription>
                                                     <FormMessage />
                                                 </FormItem>
                                             )}
@@ -1171,7 +1382,13 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                                             {loadingTemplates ? (
                                                 <Skeleton className="h-10 w-full" />
                                             ) : (
-                                                <Select onValueChange={field.onChange} value={field.value}>
+                                                <Select
+                                                    onValueChange={(val) => {
+                                                        field.onChange(val);
+                                                        handleTemplateSelect(val);
+                                                    }}
+                                                    value={field.value}
+                                                >
                                                     <FormControl>
                                                         <SelectTrigger>
                                                             <SelectValue placeholder="Select a prompt template..." />
@@ -1214,12 +1431,12 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                                                     Variable Scope Warning
                                                 </AlertTitle>
                                                 <AlertDescription className="text-xs">
-                                                    Các biến sau không có sẵn từ Stage cha:
+                                                    The following variables are not available from parent stages:
                                                     <span className="font-mono ml-1 font-bold">
                                                         {invalidVariables.map(v => `${contract?.input.delimiters?.start || '{{'}${v}${contract?.input.delimiters?.end || '}}'}`).join(', ')}
                                                     </span>
                                                     <br />
-                                                    Phạm vi cho phép:
+                                                    Allowed scope:
                                                     <span className="font-mono ml-1">
                                                         {availableScope?.map(v => `${contract?.input.delimiters?.start || '{{'}${v}${contract?.input.delimiters?.end || '}}'}`).join(', ') || 'none'}
                                                     </span>
@@ -1362,6 +1579,76 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                                     onPromptTemplateChange={handlePromptTemplateUpdate}
                                 />
                             </TabsContent>
+
+                            {/* Visual Tab */}
+                            <TabsContent value="visual" className="space-y-4 mt-4">
+                                <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 mb-4">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className="p-2 rounded-lg bg-primary/20 text-primary">
+                                            <Layout className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-bold">Custom View Registry</h4>
+                                            <p className="text-[11px] text-muted-foreground">Select a UI component to display results for this stage.</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <FormField
+                                    control={form.control}
+                                    name="custom_component_id"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>UI Component</FormLabel>
+                                            <div className="flex gap-2">
+                                                <div className="flex-1">
+                                                    <Select
+                                                        onValueChange={field.onChange}
+                                                        value={field.value || "_default"}
+                                                    >
+                                                        <FormControl>
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder="Select from library..." />
+                                                            </SelectTrigger>
+                                                        </FormControl>
+                                                        <SelectContent>
+                                                            <SelectItem value="_default">Default (Property Table)</SelectItem>
+                                                            {registryComponents.map(comp => (
+                                                                <SelectItem key={comp.id} value={comp.id}>
+                                                                    {comp.name}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon"
+                                                    type="button"
+                                                    onClick={() => navigate('/assets')}
+                                                    title="Manage Registry"
+                                                >
+                                                    <Braces className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                            <FormDescription>
+                                                This component will be used to filter and render output in Batch Progress.
+                                            </FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                {form.watch('custom_component_id') && form.watch('custom_component_id') !== '_default' && (
+                                    <Alert className="bg-emerald-500/5 border-emerald-500/20">
+                                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                                        <AlertTitle className="text-xs font-bold text-emerald-600 uppercase">Registry Component Linked</AlertTitle>
+                                        <AlertDescription className="text-[11px] text-emerald-600/80">
+                                            This stage will use a component from the Registry. Changes at the Registry will automatically apply to this stage.
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
+                            </TabsContent>
                         </Tabs>
 
                         <div className="pt-4 space-y-2 border-t">
@@ -1422,218 +1709,3 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
 
 // Basic token estimator (approx 4 chars per token)
 const estimateTokens = (text: string) => Math.ceil(text.length / 4);
-
-export function PromptEditorDialog({
-    open,
-    onOpenChange,
-    prompt,
-    onPromptChange,
-    onSave,
-    isSaving,
-    title,
-    delimiters,
-    availableScope
-}: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    prompt: string;
-    onPromptChange: (value: string) => void;
-    onSave: () => void;
-    isSaving: boolean;
-    title: string;
-    delimiters?: { start: string; end: string };
-    availableScope?: string[] | null;
-}) {
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const backdropRef = useRef<HTMLDivElement>(null);
-
-    // Regex builder helper (same as schemaUtils, maybe extract to shared hook later)
-    const getRegex = () => {
-        const start = delimiters?.start || '{{';
-        const end = delimiters?.end || '}}';
-        const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        return new RegExp(`${escape(start)}([a-zA-Z0-9_.-]+)${escape(end)}`, 'g');
-    };
-
-    // Sync scroll from textarea to backdrop
-    const handleScroll = () => {
-        if (textareaRef.current && backdropRef.current) {
-            backdropRef.current.scrollTop = textareaRef.current.scrollTop;
-            backdropRef.current.scrollLeft = textareaRef.current.scrollLeft;
-        }
-    };
-
-    // Highlight variables in overlay
-    const renderHighlights = (text: string) => {
-        const regex = getRegex();
-        let lastIndex = 0;
-        let match;
-        const parts = [];
-
-        while ((match = regex.exec(text)) !== null) {
-            // Text before match
-            parts.push(text.substring(lastIndex, match.index));
-
-            // The variable name
-            const varName = match[1];
-            const isInvalid = availableScope !== null && availableScope !== undefined && !availableScope.includes(varName);
-
-            // Highlighted match
-            parts.push(
-                <mark
-                    key={match.index}
-                    className={cn(
-                        "px-0.5 rounded-sm bg-blue-500/20 text-blue-700 dark:text-blue-300 border-b border-blue-500/50",
-                        isInvalid && "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500/50"
-                    )}
-                >
-                    {match[0]}
-                </mark>
-            );
-            lastIndex = regex.lastIndex;
-        }
-        // Text after last match
-        parts.push(text.substring(lastIndex));
-        return parts;
-    };
-
-    const insertVariable = (varName: string) => {
-        if (!textareaRef.current) return;
-        const startAlt = delimiters?.start || '{{';
-        const endAlt = delimiters?.end || '}}';
-        const variable = `${startAlt}${varName}${endAlt}`;
-
-        const start = textareaRef.current.selectionStart;
-        const end = textareaRef.current.selectionEnd;
-        const text = textareaRef.current.value;
-        const before = text.substring(0, start);
-        const after = text.substring(end, text.length);
-
-        onPromptChange(before + variable + after);
-
-        // Return focus and set cursor (next tick)
-        setTimeout(() => {
-            if (textareaRef.current) {
-                textareaRef.current.focus();
-                const newPos = start + variable.length;
-                textareaRef.current.setSelectionRange(newPos, newPos);
-            }
-        }, 0);
-    };
-
-    const tokenCount = Math.ceil(prompt.length / 4);
-
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-0 overflow-hidden">
-                <DialogHeader className="px-6 py-4 border-b flex-row items-center justify-between gap-4 space-y-0">
-                    <div>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Code className="w-5 h-5 text-primary" />
-                            {title}
-                        </DialogTitle>
-                        <DialogDescription className="text-xs">
-                            Sử dụng {delimiters?.start || '{{'}variable{delimiters?.end || '}}'} để chèn biến.
-                        </DialogDescription>
-                    </div>
-                </DialogHeader>
-
-                <div className="flex-1 flex overflow-hidden">
-                    {/* Main Editor Area */}
-                    <div className="flex-1 flex flex-col min-w-0 bg-background">
-                        <div className="flex-1 relative font-mono text-sm group">
-                            {/* Backdrop for highlights */}
-                            <div
-                                ref={backdropRef}
-                                className="absolute inset-0 p-6 pointer-events-none whitespace-pre-wrap break-words overflow-hidden highlight-backdrop"
-                                aria-hidden="true"
-                            >
-                                {renderHighlights(prompt)}
-                            </div>
-
-                            {/* Actual Textarea */}
-                            <textarea
-                                ref={textareaRef}
-                                value={prompt}
-                                onChange={(e) => onPromptChange(e.target.value)}
-                                onScroll={handleScroll}
-                                className="absolute inset-0 w-full h-full p-6 bg-transparent resize-none outline-none caret-primary text-transparent whitespace-pre-wrap break-words overflow-auto"
-                                spellCheck={false}
-                                placeholder="Nhập prompt template tại đây..."
-                            />
-                        </div>
-                    </div>
-
-                    {/* Available Variables Sidebar */}
-                    <div className="w-64 border-l bg-muted/20 flex flex-col overflow-hidden">
-                        <div className="p-3 border-b bg-muted/40 flex items-center gap-2">
-                            <Braces className="w-4 h-4 text-primary" />
-                            <span className="text-xs font-semibold">Available Variables</span>
-                        </div>
-                        <ScrollArea className="flex-1 p-2">
-                            <div className="space-y-1">
-                                {availableScope === null ? (
-                                    <div className="p-3 text-center">
-                                        <Badge variant="outline" className="text-[10px] mb-2">Root Stage</Badge>
-                                        <p className="text-[10px] text-muted-foreground italic leading-relaxed">
-                                            Stage này lấy dữ liệu từ nguồn bên ngoài (File Upload). Bạn có thể gõ tên trường bất kỳ.
-                                        </p>
-                                    </div>
-                                ) : availableScope.length > 0 ? (
-                                    availableScope.map(v => (
-                                        <Button
-                                            key={v}
-                                            variant="ghost"
-                                            size="sm"
-                                            className="w-full justify-start font-mono text-[11px] h-8 px-2 group hover:bg-primary/10 hover:text-primary transition-colors"
-                                            onClick={() => insertVariable(v)}
-                                        >
-                                            <span className="text-muted-foreground mr-1 opacity-50">{delimiters?.start || '{{'}</span>
-                                            {v}
-                                            <span className="text-muted-foreground ml-1 opacity-50">{delimiters?.end || '}}'}</span>
-                                        </Button>
-                                    ))
-                                ) : (
-                                    <div className="p-4 text-center">
-                                        <p className="text-[10px] text-muted-foreground italic">
-                                            Stage cha không có output hoặc return_along_with.
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                        </ScrollArea>
-                        <div className="p-3 border-t bg-muted/40">
-                            <p className="text-[10px] text-muted-foreground leading-relaxed">
-                                Click để chèn biến vào prompt tại vị trí con trỏ chuột.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <DialogFooter className="px-6 py-4 border-t flex items-center justify-between sm:justify-between bg-background">
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1.5">
-                            <Zap className="w-3.5 h-3.5" />
-                            <span>~{tokenCount} tokens</span>
-                        </div>
-                        {tokenCount > 8192 && (
-                            <span className="text-amber-500 font-medium flex items-center gap-1">
-                                <Maximize2 className="w-3 h-3" />
-                                Large prompt
-                            </span>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
-                            Cancel
-                        </Button>
-                        <Button size="sm" onClick={onSave} disabled={isSaving} className="gap-2">
-                            {isSaving && <RefreshCw className="w-3 h-3 animate-spin" />}
-                            Save Template
-                        </Button>
-                    </div>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-}

@@ -8,6 +8,7 @@ export const configService = {
     steps: StepConfig[];
     viewport?: { x: number; y: number; zoom: number };
     n8n_workflow_id?: string;
+    input_mapping?: any;
   }): Promise<OrchestratorConfig> {
     const { data, error } = await supabase
       .from('lab_orchestrator_configs')
@@ -16,7 +17,8 @@ export const configService = {
         description: config.description,
         steps: config.steps,
         viewport: config.viewport, // Save viewport
-        n8n_workflow_id: config.n8n_workflow_id
+        n8n_workflow_id: config.n8n_workflow_id,
+        input_mapping: config.input_mapping
       })
       .select()
       .single();

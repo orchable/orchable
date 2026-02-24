@@ -1,0 +1,436 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -16,
+        -128
+      ],
+      "id": "ff4a29d8-8a31-4abd-b653-3a6eb408df8b",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        80
+      ],
+      "id": "4aa0876e-d119-4433-906f-ff9016871f13",
+      "name": "Manual Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "ai_tasks",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "key": "status",
+              "value": "plan",
+              "operator": "eq"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        240,
+        -16
+      ],
+      "id": "65a00d8b-ad23-4ff8-900d-190e2f956c14",
+      "name": "Get Tasks To Solve",
+      "credentials": {
+        "supabaseApi": {
+          "id": "tOzBo3n0Kkt5Bt41",
+          "name": "Supabase Account Tony"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ========== PHASE 1: GET & PARSE TASK ==========\n// Merged from: Filter A Task + JSON Parse\n\nconst tasks = $input.all().map(item => item.json);\nif (tasks.length === 0) return [];\n\n// Sort by priority: test_mode > batch_priority > sequence > created_at\nconst sortedTasks = tasks.sort((a, b) => {\n  const testModeA = a.test_mode === true || a.test_mode === 'true';\n  const testModeB = b.test_mode === true || b.test_mode === 'true';\n  if (testModeA && !testModeB) return -1;\n  if (!testModeA && testModeB) return 1;\n\n  if (a.batch_priority && b.batch_priority) {\n    const priorityA = new Date(a.batch_priority).getTime();\n    const priorityB = new Date(b.batch_priority).getTime();\n    if (priorityA !== priorityB) return priorityA - priorityB;\n  } else if (a.batch_priority) return -1;\n  else if (b.batch_priority) return 1;\n\n  const seqA = parseInt(a.sequence) || 1;\n  const seqB = parseInt(b.sequence) || 1;\n  if (seqA !== seqB) return seqA - seqB;\n\n  if (a.created_at && b.created_at) {\n    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();\n  }\n  return 0;\n});\n\nconst t = sortedTasks[0];\n\n// Parse JSON string fields safely\nconst safeParse = (val, fallback) => {\n  if (!val) return fallback;\n  if (typeof val === 'object' && val !== null) return val;\n  try { return JSON.parse(val); } catch { return fallback; }\n};\n\nreturn {\n  ...t,\n  task_id: t.task_id || '',\n  supabase_task_id: t.supabase_task_id || t.id,\n  launch_id: t.launch_id || null,\n  user_id: t.user_id || null,\n  batch_id: t.batch_id || '',\n  extra: safeParse(t.extra, {}),\n  data: safeParse(t.data, {}),\n  ai_settings: safeParse(t.ai_settings, {}),\n  hierarchy_path: safeParse(t.hierarchy_path, []),\n  step_number: parseInt(t.step_number) || 1,\n  stage_key: t.stage_key || '',\n  parent_task_id: t.parent_task_id || null,\n  split_group_id: t.split_group_id || null,\n  test_mode: t.test_mode === true || t.test_mode === 'true',\n  requires_approval: t.requires_approval === true || t.requires_approval === 'true',\n  _retry_count: 0\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        -16
+      ],
+      "id": "23606e82-653a-4b02-a50c-27604361797a",
+      "name": "1. Parse Task"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ========== PHASE 2: PRE-PROCESS ==========\n// Merged from: Check Pre-Process + Execute Pre-Process Webhook\n//              + Merge Pre-Process Output + Handle Pre-Process Failure\n\nconst task = $json;\nconst cfg = task.extra?.pre_process;\n\n// Skip if pre-process not enabled or no URL\nif (!cfg?.enabled || !cfg?.webhook_url) {\n  return { ...task, _pre_process_skipped: true };\n}\n\ntry {\n  const method = cfg.webhook_method || 'POST';\n  const res = await this.helpers.httpRequest({\n    method,\n    url: cfg.webhook_url,\n    body: task.data,\n    json: true,\n    timeout: 30000\n  });\n\n  // Merge output based on output_handling config\n  let mergedData = { ...task.data };\n  const outputHandling = cfg.output_handling || 'merge';\n\n  if (outputHandling === 'replace') {\n    mergedData = res;\n  } else if (outputHandling === 'merge') {\n    mergedData = { ...mergedData, ...res };\n  } else if (outputHandling === 'nested') {\n    const fieldName = cfg.nested_field_name || 'pre_output';\n    mergedData[fieldName] = res;\n  }\n\n  return { ...task, data: mergedData, _pre_process_executed: true };\n\n} catch (error) {\n  const onFailure = cfg.on_failure || 'continue';\n\n  if (onFailure === 'abort') {\n    throw new Error('Pre-process webhook failed: ' + error.message);\n  }\n\n  // Continue with original data\n  return {\n    ...task,\n    _pre_process_failed: true,\n    _pre_process_error: error.message\n  };\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        736,
+        -16
+      ],
+      "id": "50b64565-4e45-4fc4-80c7-7996d9121317",
+      "name": "2. Pre-Process"
+    },
+    {
+      "parameters": {
+        "url": "https://n8n.teky.vn/webhook/get-active-key",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        992,
+        -16
+      ],
+      "id": "8ee0446f-7842-4419-9e83-c7affc2505a6",
+      "name": "Get Key",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "e4f8d752-19e0-474d-a2c6-d446927d6323",
+          "name": "N8N Webhook Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "console.log('--- Phase 3: Start Parsing ---');\n// ========== PHASE 3: PARSE AI RESULT & REPORT KEY STATUS ==========\n// Merged from: Convert MarkdownJSON to JSON + Report Success + Report Failure\n//              + Retry Logic + Add AlongWith Attributes\n\n// USE PRE-PROCESS OUTPUT (Phase 2) as source of truth for extra/data/metadata\nconst taskInfo = $('2. Pre-Process').first().json;\nconst keyInfo = $('Get Key').first().json;\nconst apiRes = $json;\n\n// Use static data to persist retry count across Wait node resumes\nconst staticData = $getWorkflowStaticData('global');\nconst retryCount = staticData.retryCount || 0;\nconst maxRetries = 3;\n\n// --- 1. HANDLE API ERROR ---\nif (apiRes.error || !apiRes.candidates) {\n  // Report failure to key rotation manager\n  try {\n    const errorStatus = apiRes.error?.status || 'API_ERROR';\n    const errorMessage = apiRes.error?.message || '';\n    const fullErrorCode = `[${errorStatus}] ${errorMessage}`;\n\n    await this.helpers.httpRequestWithAuthentication.call(this, 'httpBasicAuth', {\n      method: 'POST',\n      url: 'https://n8n.teky.vn/webhook/set-key-state',\n      body: {\n        key_id: keyInfo.key_id,\n        status: 'fail',\n        error_code: fullErrorCode\n      },\n      json: true\n    });\n  } catch (e) { /* ignore reporting error */ }\n\n  if (retryCount < maxRetries - 1) {\n    staticData.retryCount = retryCount + 1;\n    return { _retry: true, _retry_count: retryCount + 1, _err: apiRes.error?.message };\n  }\n\n  // Max retries reached — reset counter and throw\n  staticData.retryCount = 0;\n  throw new Error('Max retries reached. All available keys failed. Last error: ' + (apiRes.error?.message || 'Unknown'));\n}\n\n// --- 2. PARSE JSON FROM AI RESPONSE ---\nfunction convertMarkdownJsonToJsObject(partsArray) {\n  const fullText = partsArray.map(part => part.text).join('');\n  let trimmed = fullText.trim();\n\n  let jsonContent;\n  if (trimmed.startsWith('```json')) {\n    jsonContent = trimmed.slice(7, trimmed.lastIndexOf('```')).trim();\n  } else if (trimmed.startsWith('{') || trimmed.startsWith('[')) {\n    jsonContent = trimmed;\n  } else {\n    throw new Error('Invalid JSON format - response does not start with ```json, { or [');\n  }\n\n  // Remove control chars\n  jsonContent = jsonContent.replace(/[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F]/g, '');\n  return JSON.parse(jsonContent);\n}\n\nlet result;\ntry {\n  const partsArray = apiRes.candidates[0].content.parts;\n  result = convertMarkdownJsonToJsObject(partsArray);\n} catch (parseError) {\n  if (retryCount < maxRetries - 1) {\n    staticData.retryCount = retryCount + 1;\n    return { _retry: true, _retry_count: retryCount + 1, _err: 'JSON Parse Fail: ' + parseError.message };\n  }\n  staticData.retryCount = 0;\n  const rawSnippet = apiRes.candidates[0].content.parts.map(p => p.text).join('').substring(0, 200);\n  console.error('JSON Parse Failed. Raw Snippet:', rawSnippet);\n  throw new Error(`Invalid JSON in AI response: ${parseError.message}. Snippet: ${rawSnippet}`);\n}\n\n// --- 3. REPORT SUCCESS ---\ntry {\n  await this.helpers.httpRequestWithAuthentication.call(this, 'httpBasicAuth', {\n    method: 'POST',\n    url: 'https://n8n.teky.vn/webhook/set-key-state',\n    body: { key_id: keyInfo.key_id, status: 'success' },\n    json: true\n  });\n} catch (e) { /* ignore reporting error */ }\n\n// Reset retry counter on success\nstaticData.retryCount = 0;\n\n// --- 4. ADD RETURN-ALONG-WITH ATTRIBUTES ---\nconst extra = taskInfo.extra || {};\nconst data = taskInfo.data || {};\nconst returnAlongWith = extra['return-along-with'] || [];\nif (returnAlongWith.length > 0) {\n  for (const key of returnAlongWith) {\n    if (data.hasOwnProperty(key)) {\n      result[key] = data[key];\n    }\n  }\n}\n\nreturn {\n  ...taskInfo,\n  task_id: taskInfo.task_id || '',\n  task_type: taskInfo.task_type || '',\n  result: result,\n  extra: extra,\n  data: data,\n  supabase_task_id: taskInfo.supabase_task_id || taskInfo.id,\n  batch_id: taskInfo.batch_id || '',\n  launch_id: taskInfo.launch_id || null,\n  user_id: taskInfo.user_id || null,\n  test_mode: taskInfo.test_mode === true || taskInfo.test_mode === 'true',\n  status: 'generated', // ✅ Mark task as generated for DB update\n  root_task_id: taskInfo.root_task_id || null,\n  hierarchy_path: taskInfo.hierarchy_path || [],\n  step_number: parseInt(taskInfo.step_number) || 1,\n  stage_key: taskInfo.stage_key || '',\n  parent_task_id: taskInfo.parent_task_id || null,\n  split_group_id: taskInfo.split_group_id || null,\n  requires_approval: taskInfo.requires_approval === true || taskInfo.requires_approval === 'true',\n  sequence: taskInfo.sequence || null\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1488,
+        -16
+      ],
+      "id": "b64d34a1-4bce-4333-89b6-9e5f69ca8a60",
+      "name": "3. Parse & Report",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "e4f8d752-19e0-474d-a2c6-d446927d6323",
+          "name": "N8N Webhook Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json._retry === true }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1744,
+        -16
+      ],
+      "id": "d06365df-e6d7-420d-98c0-2ab4b2abde8f",
+      "name": "Check Retry"
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        1984,
+        144
+      ],
+      "id": "c8a81530-97be-4b1e-9181-53056010d269",
+      "name": "Wait Retry",
+      "webhookId": "67d7fd4f-fb31-4cdd-84ee-d3a4f373f1f2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ========== PHASE 4: POST-PROCESS ==========\n// Merged from: Check Post-Process + Execute Post-Process Webhook\n//              + Handle Post-Process Result\n\nconst task = $json;\nconst extra = task.extra || {};\nconst cfg = extra.post_process;\n\n// Skip if post-process not enabled\nif (!cfg?.enabled || !cfg?.webhook_url) {\n  return { ...task, _post_process_skipped: true };\n}\n\nlet requestBody;\nconst inputSource = cfg.input_source || 'output_only';\n\nif (inputSource === 'output_only') {\n  requestBody = task.result;\n} else if (inputSource === 'input_and_output') {\n  requestBody = { input: task.data, output: task.result };\n} else {\n  requestBody = task.result;\n}\n\ntry {\n  const method = cfg.webhook_method || 'POST';\n  const res = await this.helpers.httpRequest({\n    method,\n    url: cfg.webhook_url,\n    body: requestBody,\n    json: true,\n    timeout: 30000\n  });\n\n  return {\n    ...task,\n    _post_process_executed: true,\n    _post_process_response: res\n  };\n\n} catch (error) {\n  const onFailure = cfg.on_failure || 'continue';\n\n  if (onFailure === 'abort') {\n    throw new Error('Post-process webhook failed: ' + error.message);\n  }\n\n  return {\n    ...task,\n    _post_process_failed: true,\n    _post_process_error: error.message\n  };\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1984,
+        -16
+      ],
+      "id": "f4d069ee-11a9-4820-b97e-8e7b462512a8",
+      "name": "4. Post-Process"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "ai_tasks",
+        "updateKey": "id",
+        "columns": "status, result, error"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2240,
+        -16
+      ],
+      "id": "de749905-601f-4128-89ca-3fcea33e85a3",
+      "name": "Update Task Status",
+      "credentials": {
+        "supabaseApi": {
+          "id": "tOzBo3n0Kkt5Bt41",
+          "name": "Supabase Account Tony"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ========== PHASE 5: DETERMINE & CREATE NEXT STAGE TASKS ==========\n\nconst task = $json;\nconst extra = task.extra || {};\nconst currentStageConfig = extra.current_stage_config || null;\n\nlet nextConfigs = extra.next_stage_configs || extra.next_stage_config || [];\nif (!Array.isArray(nextConfigs)) nextConfigs = [nextConfigs];\n\nconst grt = extra.grt || {};\n\nif (!currentStageConfig || nextConfigs.length === 0) {\n  return {\n    action: 'terminate',\n    task_id: task.supabase_task_id,\n    message: 'No next stage configured - final stage reached'\n  };\n}\n\nconst cardinality = currentStageConfig.cardinality || 'one_to_one';\nconst result = task.result;\nconst inputData = task.data || {};\n\nfunction extractStageKey(templateId) {\n  if (!templateId) return 'unknown_stage';\n  const parts = templateId.split('_');\n  if (parts.length < 2) return templateId;\n  return parts.slice(1).join('_');\n}\n\nconst currentStageKey = task.stage_key || (currentStageConfig.template_id ? extractStageKey(currentStageConfig.template_id) : 'unknown_stage');\nconst rootId = task.root_task_id || task.supabase_task_id;\nconst hierarchyPath = [...(task.hierarchy_path || []), task.supabase_task_id];\nconst currentStepNumber = parseInt(task.step_number) || 1;\n\nfunction buildTaskMetadata(nextConfig, index, total, dataForTask) {\n  const nextTplId = nextConfig.template_id || nextConfig.prompt_id;\n  const nextStageKey = extractStageKey(nextTplId);\n  const taskTypeMatch = nextTplId.match(/^[0-9a-f-]+_(.+)$/);\n  const taskType = taskTypeMatch ? taskTypeMatch[1] : nextStageKey;\n  const childRouting = grt[nextTplId] || {};\n  const grandChildIds = childRouting.next_ids || [];\n  const grandChildConfigs = grandChildIds.map(gcId => {\n    const gcInfo = grt[gcId];\n    if (!gcInfo) return null;\n    return {\n      template_id: gcInfo.template_id,\n      prompt_id: gcInfo.prompt_id,\n      cardinality: gcInfo.cardinality,\n      split_mode: gcInfo.split_mode,\n      split_path: gcInfo.split_path,\n      output_mapping: gcInfo.output_mapping\n    };\n  }).filter(Boolean);\n\n  return {\n    prompt_template_id: childRouting.template_id || nextTplId,\n    task_type: taskType,\n    input_data: dataForTask,\n    parent_task_id: task.supabase_task_id,\n    root_task_id: rootId,\n    hierarchy_path: hierarchyPath,\n    batch_id: task.batch_id || null,\n    user_id: task.user_id || null,\n    launch_id: task.launch_id || null,\n    test_mode: task.test_mode || false,\n    sequence: index + 1,\n    total_steps: total,\n    status: 'pending',\n    stage_key: nextStageKey,\n    step_number: currentStepNumber + 1,\n    split_group_id: task.split_group_id,\n    requires_approval: childRouting.requires_approval || task.requires_approval || false,\n    extra: {\n      current_stage_config: {\n        template_id: childRouting.template_id || nextTplId,\n        prompt_id: childRouting.prompt_id || null,\n        cardinality: childRouting.cardinality || 'one_to_one',\n        split_path: childRouting.split_path || null,\n        split_mode: childRouting.split_mode || 'per_item',\n        output_mapping: childRouting.output_mapping || 'result'\n      },\n      next_stage_configs: grandChildConfigs,\n      grt: grt,\n      parent_stage_key: currentStageKey,\n      parent_task_id: task.supabase_task_id\n    }\n  };\n}\n\nlet finalTasks = [];\nif (cardinality === 'one_to_one') {\n  finalTasks = nextConfigs.map((cfg, idx) => buildTaskMetadata(cfg, idx, 1, result));\n} else if (cardinality === 'one_to_many') {\n  const splitPath = currentStageConfig.split_path || 'result';\n  const pathParts = splitPath.split('.');\n  let arrayToSplit = result;\n  for (const part of pathParts) {\n    if (part === 'result') continue;\n    arrayToSplit = arrayToSplit?.[part];\n  }\n  if (Array.isArray(arrayToSplit)) {\n    const splitMode = currentStageConfig.split_mode || 'per_item';\n    for (const nextConfig of nextConfigs) {\n      if (splitMode === 'per_item') {\n        arrayToSplit.forEach((item, idx) => {\n          finalTasks.push(buildTaskMetadata(nextConfig, idx, arrayToSplit.length, {\n            ...inputData,\n            user_id: task.user_id || null,\n            batch_id: task.batch_id || null,\n            launch_id: task.launch_id || null,\n            item: item,\n            _split_index: idx,\n            _split_total: arrayToSplit.length\n          }));\n        });\n      } else if (splitMode === 'per_batch') {\n        const batchSize = currentStageConfig.batch_size || 10;\n        for (let i = 0, bIdx = 0; i < arrayToSplit.length; i += batchSize, bIdx++) {\n          const batchItems = arrayToSplit.slice(i, i + batchSize);\n          finalTasks.push(buildTaskMetadata(nextConfig, bIdx, Math.ceil(arrayToSplit.length / batchSize), {\n            ...inputData,\n            user_id: task.user_id || null,\n            batch_id: task.batch_id || null,\n            launch_id: task.launch_id || null,\n            items: batchItems,\n            _batch_index: bIdx\n          }));\n        }\n      }\n    }\n  }\n}\n\nreturn {\n  action: finalTasks.length > 0 ? 'create_tasks_for_branches' : 'terminate',\n  tasks: finalTasks,\n  total_count: finalTasks.length,\n  task_id: task.supabase_task_id\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2496,
+        -16
+      ],
+      "id": "e5bf5520-b060-4890-83cd-5aac91da19b3",
+      "name": "5. Prepare Next Tasks"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ========== PHASE 6: CREATE NEXT STAGE TASKS ==========\n\nconst config = $json;\n\nif (config.action === 'terminate') return [];\nif (config.action === 'error') throw new Error(config.message);\n\nif (config.action === 'create_tasks_for_branches') {\n  return config.tasks.map(task => ({\n    prompt_template_id: task.prompt_template_id,\n    task_type: task.task_type || '',\n    input_data: task.input_data,\n    parent_task_id: task.parent_task_id,\n    root_task_id: task.root_task_id,\n    hierarchy_path: task.hierarchy_path,\n    batch_id: task.batch_id || null,\n    user_id: task.user_id || null,\n    launch_id: task.launch_id || null,\n    test_mode: task.test_mode,\n    sequence: task.sequence,\n    total_steps: task.total_steps,\n    status: task.status || 'pending',\n    stage_key: task.stage_key,\n    step_number: task.step_number,\n    split_group_id: task.split_group_id,\n    requires_approval: task.requires_approval,\n    extra: task.extra\n  }));\n}\n\nreturn [];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2736,
+        -16
+      ],
+      "id": "71ec22d7-fe5b-49f8-ba52-2c4c803c72ed",
+      "name": "6. Format Tasks"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "ai_tasks",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2992,
+        -16
+      ],
+      "id": "e9d752bb-1a98-476a-a63d-78c74fd28614",
+      "name": "Create Subtasks",
+      "credentials": {
+        "supabaseApi": {
+          "id": "tOzBo3n0Kkt5Bt41",
+          "name": "Supabase Account Tony"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ ($('2. Pre-Process').item.json.ai_settings && $('2. Pre-Process').item.json.ai_settings.model_id) ? $('2. Pre-Process').item.json.ai_settings.model_id : $('1. Parse Task').item.json.ai_settings.model_id }}:{{ ($('2. Pre-Process').item.json.ai_settings && $('2. Pre-Process').item.json.ai_settings.generate_content_api) ? $('2. Pre-Process').item.json.ai_settings.generate_content_api : $('1. Parse Task').item.json.ai_settings.generate_content_api }}?key={{ $json.api_key }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ \n  JSON.stringify({\n    \"generationConfig\": ($('2. Pre-Process').item.json.ai_settings || {}).generationConfig || ($('1. Parse Task').item.json.ai_settings || {}).generationConfig || {},\n    \"contents\": [\n      {\n        \"role\": \"user\",\n        \"parts\": [\n          { \"text\": $('2. Pre-Process').item.json.prompt }\n        ]\n      }\n    ],\n    \"safetySettings\": ($('2. Pre-Process').item.json.ai_settings || {}).safetySettings || ($('1. Parse Task').item.json.ai_settings || {}).safetySettings || [],\n    \"systemInstruction\": ($('2. Pre-Process').item.json.ai_settings || {}).systemInstruction || ($('1. Parse Task').item.json.ai_settings || {}).systemInstruction || undefined\n  })\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1216,
+        -16
+      ],
+      "id": "58783094-9d0b-4a86-8fc5-643f5d532acb",
+      "name": "Gemini API Call",
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Tasks To Solve",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Tasks To Solve",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Tasks To Solve": {
+      "main": [
+        [
+          {
+            "node": "1. Parse Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Parse Task": {
+      "main": [
+        [
+          {
+            "node": "2. Pre-Process",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Pre-Process": {
+      "main": [
+        [
+          {
+            "node": "Get Key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Key": {
+      "main": [
+        [
+          {
+            "node": "Gemini API Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Parse & Report": {
+      "main": [
+        [
+          {
+            "node": "Check Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Retry": {
+      "main": [
+        [
+          {
+            "node": "Wait Retry",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "4. Post-Process",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Retry": {
+      "main": [
+        [
+          {
+            "node": "Get Key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Post-Process": {
+      "main": [
+        [
+          {
+            "node": "Update Task Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Task Status": {
+      "main": [
+        [
+          {
+            "node": "5. Prepare Next Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Prepare Next Tasks": {
+      "main": [
+        [
+          {
+            "node": "6. Format Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. Format Tasks": {
+      "main": [
+        [
+          {
+            "node": "Create Subtasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini API Call": {
+      "main": [
+        [
+          {
+            "node": "3. Parse & Report",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "3c3655861b945e2f23873d293f97337788a318f9e0823cca507f13751bd70fd7"
+  }
+}

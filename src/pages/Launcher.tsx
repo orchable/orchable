@@ -19,8 +19,10 @@ import { TaskSelectionTable } from '@/components/launcher/TaskSelectionTable';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Link } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function LauncherPage() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { data: configs, isLoading: isLoadingConfigs } = useConfigs();
   const createExecutionMutation = useCreateExecution();
@@ -133,13 +135,16 @@ export function LauncherPage() {
     const nextStage = (firstStage as any)?._nextStage;
     const nextStageKey = nextStage?.stage_key;
 
+    const firstStageTemplateId = `${config.id}_${firstStage.stage_key}_${firstStage.id}`;
+    const nextStageTemplateId = nextStage ? `${config.id}_${nextStage.stage_key}_${nextStage.id}` : null;
+
     return {
-      next_stage_config: nextStageKey ? {
-        template_id: `${config.id}_${nextStageKey}`,
-        cardinality: (firstStage.cardinality === '1:N') ? 'one_to_many' : 'one_to_one',
-        split_path: (firstStage as any).split_path || 'result.questions',
-        split_mode: (firstStage as any).split_mode || 'per_item',
-        output_mapping: (firstStage as any).output_mapping || 'result',
+      next_stage_config: nextStageTemplateId ? {
+        template_id: nextStageTemplateId,
+        cardinality: (nextStage?.cardinality === '1:N') ? 'one_to_many' : 'one_to_one',
+        split_path: nextStage?.split_path || null,
+        split_mode: nextStage?.split_mode || 'per_item',
+        output_mapping: nextStage?.output_mapping || 'result',
         delimiters: nextStage?.contract?.input?.delimiters
       } : null,
       pre_process: firstStage.pre_process?.enabled ? firstStage.pre_process : undefined,
@@ -167,7 +172,7 @@ export function LauncherPage() {
           const analysis = analyzeJsonStructure(json);
 
           if (!analysis.taskArrayPath) {
-            throw new Error('Không tìm thấy danh sách task trong file JSON. Vui lòng kiểm tra lại cấu trúc file.');
+            throw new Error('Task list not found in JSON. Please check file structure.');
           }
 
           setJsonAnalysis(analysis);
@@ -210,7 +215,7 @@ export function LauncherPage() {
       }
     };
     reader.onerror = () => {
-      toast.error('Lỗi khi đọc file');
+      toast.error('Error reading file');
       setIsParsing(false);
     };
     reader.readAsText(file);
@@ -222,17 +227,17 @@ export function LauncherPage() {
 
     try {
       if (inputMode === 'json' && jsonData && jsonAnalysis) {
-        // 1. Prepare data for bulk insert into ai_tasks
+        // 1. Prepare common launch session info
+        const launchId = crypto.randomUUID();
         const taskArray = getValueByPath(jsonData, jsonAnalysis.taskArrayPath);
         const selectedTasks = selectedTaskIndices.map(idx => taskArray[idx]);
 
         if (selectedTasks.length === 0) {
-          toast.error('Vui lòng chọn ít nhất một task');
+          toast.error('Please select at least one task');
           setIsLaunching(false);
           return;
         }
 
-        const batchId = crypto.randomUUID();
         const config = configs?.find(c => c.id === selectedConfigId);
         if (!config) {
           toast.error('Configuration not found.');
@@ -240,7 +245,20 @@ export function LauncherPage() {
           return;
         }
 
-        const tasksToInsert = selectedTasks.map((task, idx) => {
+        const firstStage = rootStages[0];
+        const nextStage = (firstStage as any)?._nextStage;
+
+        // Build full template IDs matching stageService format: configId_stageKey_stepId
+        const firstStageTemplateId = `${config.id}_${firstStage.stage_key}_${firstStage.id}`;
+        const nextStageTemplateId = nextStage ? `${config.id}_${nextStage.stage_key}_${nextStage.id}` : null;
+
+        // 2. Process each row into its own batch
+        toast.info(`Preparing ${selectedTasks.length} pipelines...`);
+
+        const allTasksToInsert: any[] = [];
+
+        for (let i = 0; i < selectedTasks.length; i++) {
+          const task = selectedTasks[i];
           const processed = processTaskData(
             task,
             jsonData,
@@ -249,24 +267,44 @@ export function LauncherPage() {
             rootStages[0]?.contract?.input.fields.map(f => f.name) || []
           );
 
-          const firstStage = rootStages[0];
-          const nextStage = (firstStage as any)?._nextStage;
-          const nextStageKey = nextStage?.stage_key;
+          // Create a task_batches record for THIS ROW
+          const { data: batch, error: batchError } = await supabase
+            .from('task_batches')
+            .insert({
+              name: `${config.name} - Row ${selectedTaskIndices[i] + 1}`,
+              total_tasks: 1, // Will be updated by triggers if more tasks are created in stages
+              pending_tasks: 1,
+              status: 'processing',
+              batch_type: 'manual_run',
+              orchestrator_config_id: config.id,
+              launch_id: launchId, // Campaign grouping
+              preset_key: 'manual', // Legacy compatibility
+              grade_code: 'none',    // Legacy compatibility
+              created_by: user?.id
+            })
+            .select('id')
+            .single();
 
-          const taskObj = {
+          if (batchError) throw batchError;
+          const batchId = batch.id;
+
+          allTasksToInsert.push({
             task_type: firstStage?.task_type || 'generic',
             status: 'pending',
             input_data: processed.input_data,
+            launch_id: launchId, // Grouping at Campaign level
+            batch_id: batchId,   // Grouping at Row level
+            user_id: user?.id,
             extra: {
               ...processed.extra,
               launcher_metadata: {
-                original_index: idx,
+                original_index: selectedTaskIndices[i],
                 source_file: fileName,
-                config_id: selectedConfigId
+                config_id: selectedConfigId,
+                launch_id: launchId
               },
-              // L3: Orchestrator Override Logic
               current_stage_config: {
-                template_id: `${config.id}_${firstStage.stage_key}`,
+                template_id: firstStageTemplateId,
                 cardinality: (firstStage.cardinality === '1:N' || firstStage.cardinality === 'one_to_many')
                   ? 'one_to_many'
                   : 'one_to_one',
@@ -275,36 +313,36 @@ export function LauncherPage() {
                 output_mapping: firstStage.output_mapping || 'result',
                 delimiters: firstStage.contract?.input?.delimiters
               },
-              next_stage_config: nextStageKey ? {
-                template_id: `${config.id}_${nextStageKey}`,
-                cardinality: (firstStage.cardinality === '1:N')
+              // next_stage_configs will be populated by Load Batch from prompt_templates.next_stage_template_ids
+              // Setting here as fallback for legacy compatibility
+              next_stage_config: nextStageTemplateId ? {
+                template_id: nextStageTemplateId,
+                cardinality: (nextStage?.cardinality === '1:N' || nextStage?.cardinality === 'one_to_many')
                   ? 'one_to_many'
                   : 'one_to_one',
-                split_path: firstStage.split_path || 'result.questions',
-                split_mode: firstStage.split_mode || 'per_item',
-                output_mapping: firstStage.output_mapping || 'result',
+                split_path: nextStage?.split_path || null,
+                split_mode: nextStage?.split_mode || 'per_item',
+                output_mapping: nextStage?.output_mapping || 'result',
                 delimiters: nextStage?.contract?.input?.delimiters
               } : null,
               pre_process: firstStage.pre_process?.enabled ? firstStage.pre_process : undefined,
               post_process: firstStage.post_process?.enabled ? firstStage.post_process : undefined,
               'return-along-with': firstStage.return_along_with || []
             },
-            batch_id: batchId,
             stage_key: firstStage?.stage_key || 'start',
-            prompt_template_id: firstStage?.stage_key ? `${config.id}_${firstStage.stage_key}` : null,
-            sequence: idx, // sequence should be 0-indexed for the current batch
+            prompt_template_id: firstStageTemplateId,
+            sequence: i,
             test_mode: false
-          };
-          return taskObj;
-        });
+          });
+        }
 
-        // 2. Perform bulk insert
-        const { error } = await supabase.from('ai_tasks').insert(tasksToInsert);
-        if (error) throw error;
+        // 3. Perform bulk insert of all initial tasks (Stage 1)
+        const { error: insertError } = await supabase.from('ai_tasks').insert(allTasksToInsert);
+        if (insertError) throw insertError;
 
-        toast.success(`Successfully queued ${tasksToInsert.length} tasks to ai_tasks`);
+        toast.success(`Successfully launched campaign with ${allTasksToInsert.length} pipelines`);
       } else {
-        // TSV Mode (Legacy / Standard)
+        // TSV Mode (Legacy / Standard) - We should also update this to follow the new semantics
         const dataToProcess = syllabusData.length > 0 ? syllabusData : [{
           lessonId: `manual-${Date.now()}`,
           lessonTitle: 'Manual Execution',
@@ -314,16 +352,30 @@ export function LauncherPage() {
           difficulty: 'N/A'
         } as SyllabusRow];
 
-        for (const row of dataToProcess) {
+        const launchId = crypto.randomUUID();
+        const config = configs?.find(c => c.id === selectedConfigId);
+
+        for (let i = 0; i < dataToProcess.length; i++) {
+          const row = dataToProcess[i];
+
+          // Note: createExecutionMutation creates a lab_execution record.
+          // We should ideally create a task_batch here too if we want it in Monitor.
+          // For now, let's keep legacy standard as is or unify?
+          // Map each CSV/TSV row to its own batch, mirroring JSON behavior
+          // So let's unify it!
+
           const execution = await createExecutionMutation.mutateAsync({
-            configId: selectedConfigId,
+            configId: selectedConfigId!,
             syllabusRow: row
           });
 
           await n8nService.triggerMasterWorkflow({
             executionId: execution.id,
-            configId: selectedConfigId,
-            syllabusRow: row
+            configId: selectedConfigId!,
+            syllabusRow: row,
+            // Pass the new grouping IDs
+            launchId: launchId,
+            batchId: execution.id // Here execution.id (lab_execution) can act as the batch_id
           });
         }
         toast.success(`Successfully launched ${dataToProcess.length} execution(s)`);
@@ -352,7 +404,7 @@ export function LauncherPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold">Execution Launcher</h1>
-            <p className="text-muted-foreground">Khởi chạy batch execution từ dữ liệu syllabus</p>
+            <p className="text-muted-foreground">Launch batch executions from input data</p>
           </div>
         </motion.div>
 
@@ -369,8 +421,8 @@ export function LauncherPage() {
                   1
                 </div>
                 <div>
-                  <CardTitle>Chọn Orchestrator Configuration</CardTitle>
-                  <CardDescription>Chọn một cấu hình đã lưu để sử dụng</CardDescription>
+                  <CardTitle>Select Orchestrator Configuration</CardTitle>
+                  <CardDescription>Choose a saved configuration to use</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -452,7 +504,7 @@ export function LauncherPage() {
                 </div>
                 <div>
                   <CardTitle>Orchestrator Input Data</CardTitle>
-                  <CardDescription>Tải lên file TSV hoặc JSON chứa dữ liệu đầu vào</CardDescription>
+                  <CardDescription>Upload TSV or JSON file containing input data</CardDescription>
                 </div>
               </div>
               <div className="flex bg-muted p-1 rounded-lg self-start mt-2">
@@ -492,13 +544,13 @@ export function LauncherPage() {
                   {isParsing ? (
                     <div className="flex flex-col items-center py-4">
                       <Loader2 className="w-10 h-10 mb-3 text-primary animate-spin" />
-                      <p className="font-medium mb-1">Đang phân tích dữ liệu...</p>
+                      <p className="font-medium mb-1">Analyzing data...</p>
                     </div>
                   ) : (
                     <>
                       <Upload className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
-                      <p className="font-medium mb-1">Click để upload file {inputMode.toUpperCase()}</p>
-                      <p className="text-sm text-muted-foreground">hoặc kéo thả file vào đây</p>
+                      <p className="font-medium mb-1">Click to upload {inputMode.toUpperCase()} file</p>
+                      <p className="text-sm text-muted-foreground">or drag and drop file here</p>
                     </>
                   )}
                 </motion.div>
@@ -519,7 +571,7 @@ export function LauncherPage() {
                         {inputMode === 'json' ? `${jsonAnalysis?.sampleTasks?.length || 0} tasks` : `${syllabusData.length} rows`} detected
                       </p>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => { setFileName(null); setSyllabusData([]); setJsonData(null); setJsonAnalysis(null); }}>Xóa</Button>
+                    <Button variant="ghost" size="sm" onClick={() => { setFileName(null); setSyllabusData([]); setJsonData(null); setJsonAnalysis(null); }}>Remove</Button>
                   </div>
                 </motion.div>
               )}
@@ -539,12 +591,12 @@ export function LauncherPage() {
                   {rootStages.length > 0 && !validation.isValid && (
                     <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 mt-4">
                       <AlertCircle className="h-4 w-4" />
-                      <AlertTitle className="text-sm font-semibold">Cảnh báo: Thiếu thông tin yêu cầu</AlertTitle>
+                      <AlertTitle className="text-sm font-semibold">Warning: Missing Required Information</AlertTitle>
                       <AlertDescription className="text-xs space-y-3">
                         {validation.problems.map((problem, i) => (
                           <div key={i} className="pb-2 border-b border-destructive/10 last:border-0 last:pb-0">
                             <p className="font-semibold text-destructive mb-1">Stage "{problem.stageName}":</p>
-                            <p>Yêu cầu các trường:
+                            <p>Required fields:
                               <span className="font-mono ml-1 font-bold">
                                 {problem.missing.map(m => `${problem.delimiters.start}${m}${problem.delimiters.end}`).join(', ')}
                               </span>
@@ -554,12 +606,12 @@ export function LauncherPage() {
                         <div className="flex gap-2 pt-2">
                           <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => setIsMappingDialogOpen(true)}>
                             <LinkIcon className="w-3 h-3 mr-1" />
-                            Khớp nối thủ công (Mapping)
+                            Manual Mapping
                           </Button>
                           <Link to={`/designer?configId=${selectedConfigId}`}>
                             <Button size="sm" variant="ghost" className="h-7 text-[10px]">
                               <Settings2 className="w-3 h-3 mr-1" />
-                              Sửa Contract của Stage
+                              Edit Stage Contract
                             </Button>
                           </Link>
                         </div>
@@ -570,7 +622,7 @@ export function LauncherPage() {
                   {rootStages.length > 0 && validation.isValid && (
                     <div className="flex items-center gap-2 p-3 rounded-lg bg-success/10 border border-success/20 text-success text-xs mt-4">
                       <CheckCircle2 className="w-4 h-4" />
-                      Dữ liệu đã khớp với contract của các stage đầu tiên.
+                      Data matches initial stage contracts.
                     </div>
                   )}
                 </div>
@@ -608,7 +660,7 @@ export function LauncherPage() {
                   </div>
                   <div>
                     <CardTitle>Preview & Launch</CardTitle>
-                    <CardDescription>{syllabusData.length > 0 ? 'Xem trước dữ liệu và khởi chạy batch execution' : 'Khởi chạy execution (Single Run)'}</CardDescription>
+                    <CardDescription>{syllabusData.length > 0 ? 'Preview data and launch batch execution' : 'Launch execution (Single Run)'}</CardDescription>
                   </div>
                 </div>
               </CardHeader>
@@ -661,20 +713,20 @@ export function LauncherPage() {
 
                 {inputMode === 'tsv' && syllabusData.length === 0 && (
                   <div className="p-4 rounded-lg bg-muted/30 text-center text-muted-foreground text-sm">
-                    Không có dữ liệu input. Hệ thống sẽ khởi chạy 1 execution test.
+                    No input data. A single test execution will be launched.
                   </div>
                 )}
 
                 {inputMode === 'json' && (!jsonData || selectedTaskIndices.length === 0) && (
                   <div className="p-4 rounded-lg bg-muted/30 text-center text-muted-foreground text-sm">
-                    {!jsonData ? 'Vui lòng upload file JSON ở Bước 2.' : 'Vui lòng chọn ít nhất 1 task để khởi chạy.'}
+                    {!jsonData ? 'Please upload a JSON file in Step 2.' : 'Please select at least one task to launch.'}
                   </div>
                 )}
 
                 {/* Summary */}
                 <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
                   <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Tổng số {inputMode === 'json' ? 'tasks' : 'executions'}:</p>
+                    <p className="text-sm text-muted-foreground">Total {inputMode === 'json' ? 'tasks' : 'executions'}:</p>
                     <p className="text-2xl font-bold">
                       {inputMode === 'json' ? selectedTaskIndices.length : (syllabusData.length || 1)}
                     </p>
@@ -682,7 +734,7 @@ export function LauncherPage() {
                   {(inputMode === 'json' ? selectedTaskIndices.length > 0 : syllabusData.length > 0) && (
                     <div className="space-y-1 text-right">
                       <p className="text-sm text-muted-foreground">Estimated time:</p>
-                      <p className="text-2xl font-bold">~{(inputMode === 'json' ? selectedTaskIndices.length : syllabusData.length) * 5} phút</p>
+                      <p className="text-2xl font-bold">~{(inputMode === 'json' ? selectedTaskIndices.length : syllabusData.length) * 5} minutes</p>
                     </div>
                   )}
                 </div>
@@ -706,7 +758,7 @@ export function LauncherPage() {
                     ) : (
                       <>
                         <Rocket className="w-5 h-5 mr-2" />
-                        Khởi chạy {inputMode === 'json' ? selectedTaskIndices.length : (syllabusData.length || 1)} Execution{(inputMode === 'json' ? selectedTaskIndices.length : (syllabusData.length || 1)) !== 1 ? 's' : ''}
+                        Launch {inputMode === 'json' ? selectedTaskIndices.length : (syllabusData.length || 1)} Execution{(inputMode === 'json' ? selectedTaskIndices.length : (syllabusData.length || 1)) !== 1 ? 's' : ''}
                         <ChevronRight className="w-5 h-5 ml-2" />
                       </>
                     )}

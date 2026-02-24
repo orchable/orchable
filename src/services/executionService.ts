@@ -1,114 +1,75 @@
-import { supabase } from '@/lib/supabase';
-import { Execution, StepExecution, SyllabusRow } from '@/lib/types';
+import { storage } from "@/lib/storage";
+import { Execution, StepExecution, SyllabusRow } from "@/lib/types";
 
 export const executionService = {
-  async createExecution(data: {
-    configId: string;
-    syllabusRow: SyllabusRow;
-  }): Promise<Execution> {
-    // Đầu tiên, lấy config để biết total_steps
-    const { data: config } = await supabase
-      .from('lab_orchestrator_configs')
-      .select('steps')
-      .eq('id', data.configId)
-      .single();
-    
-    // cast config.steps explicit
-    const steps = (config?.steps || []) as any[];
-    const totalSteps = steps.length;
-    
-    // Tạo execution record
-    const { data: execution, error } = await supabase
-      .from('lab_executions')
-      .insert({
-        config_id: data.configId,
-        syllabus_row: data.syllabusRow,
-        status: 'pending',
-        total_steps: totalSteps,
-        completed_steps: 0,
-        failed_steps: 0
-      })
-      .select()
-      .single();
-    
-    if (error) throw error;
-    
-    // Tạo step_execution records cho tất cả các steps
-    const stepExecutions = steps.map((step: any) => ({
-      execution_id: execution.id,
-      step_id: step.id,
-      step_name: step.name,
-      status: 'pending',
-      max_retries: step.retryConfig?.maxRetries || 3,
-      retry_count: 0
-    }));
-    
-    if (stepExecutions.length > 0) {
-        await supabase
-        .from('lab_step_executions')
-        .insert(stepExecutions);
-    }
-    
-    return execution;
-  },
-  
-  async listExecutions(): Promise<Execution[]> {
-    const { data, error } = await supabase
-      .from('lab_executions')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (error) throw error;
-    return data;
-  },
-  
-  async getExecution(id: string): Promise<Execution> {
-    const { data, error } = await supabase
-      .from('lab_executions')
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (error) throw error;
-    return data;
-  },
-  
-  async updateExecutionStatus(
-    id: string, 
-    status: Execution['status'],
-    additionalData?: Partial<Execution>
-  ): Promise<void> {
-    const { error } = await supabase
-      .from('lab_executions')
-      .update({
-        status,
-        ...additionalData,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id);
-    
-    if (error) throw error;
-  },
+	async createExecution(data: {
+		configId: string;
+		syllabusRow: SyllabusRow;
+	}): Promise<Execution> {
+		const adapter = storage.adapter;
+		return adapter.createBatch({
+			name: data.syllabusRow.lessonTitle || "Untitled Execution",
+			orchestrator_config_id: data.configId,
+			syllabus_row: data.syllabusRow as any,
+			status: "pending",
+			total_tasks: 0,
+			completed_tasks: 0,
+			failed_tasks: 0,
+		}) as unknown as Promise<Execution>;
+	},
 
-  async getStepExecutions(executionId: string) {
-      const { data, error } = await supabase
-        .from('lab_step_executions')
-        .select('*')
-        .eq('execution_id', executionId)
-        .order('step_name', { ascending: true }); // A, B, C...
+	async listExecutions(): Promise<Execution[]> {
+		return storage.adapter.listBatches() as unknown as Promise<Execution[]>;
+	},
 
-      if (error) throw error;
-      return data as StepExecution[];
-  },
+	async getExecution(id: string): Promise<Execution> {
+		const batch = await storage.adapter.getBatch(id);
+		if (!batch) throw new Error("Execution not found");
+		return batch as unknown as Execution;
+	},
 
-  async listAiTasks(): Promise<any[]> {
-    const { data, error } = await supabase
-      .from('ai_tasks')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(50);
-    
-    if (error) throw error;
-    return data;
-  }
+	async updateExecutionStatus(
+		id: string,
+		status: Execution["status"],
+		additionalData?: Partial<Execution>,
+	): Promise<void> {
+		await storage.adapter.updateBatch(id, {
+			status: status as any,
+			...additionalData,
+		});
+	},
+
+	async getStepExecutions(executionId: string) {
+		// Map to tasks
+		const tasks = await storage.adapter.listTasks(executionId);
+		return tasks.map((t) => ({
+			id: t.id,
+			execution_id: t.batch_id,
+			step_id: t.stage_key,
+			step_name: t.stage_key,
+			status: t.status as any,
+			retry_count: 0,
+			max_retries: 3,
+			created_at: t.created_at || new Date().toISOString(),
+			updated_at: t.updated_at || new Date().toISOString(),
+			result: t.output_data
+				? { summary: JSON.stringify(t.output_data) }
+				: undefined,
+			error_message: t.error_message,
+		})) as StepExecution[];
+	},
+
+	async listAiTasks(): Promise<any[]> {
+		const adapter = storage.adapter;
+		// For Lite users, we can list all tasks from IndexedDB.
+		// For Premium, this is usually handled by Supabase views or specific queries,
+		// but we'll provide a local fallback if using IndexedDBAdapter.
+		if (adapter.constructor.name === "IndexedDBAdapter") {
+			const db = await import("@/lib/storage/IndexedDBAdapter").then(
+				(m) => m.db,
+			);
+			return db.ai_tasks.toArray();
+		}
+		return [];
+	},
 };

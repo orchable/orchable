@@ -1,0 +1,630 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "prompt_templates",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -592,
+        -240
+      ],
+      "id": "bdc623bd-144d-45e3-8148-f77f7c945829",
+      "name": "Get all row(s) from prompt-template",
+      "executeOnce": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "tOzBo3n0Kkt5Bt41",
+          "name": "Supabase Account Tony"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "ai_tasks",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Transform for n8n Table').item.json.supabase_task_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "processing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        512,
+        -240
+      ],
+      "id": "96a2411e-6307-427c-8590-3b0a4ced50d3",
+      "name": "Mark Processing in Supabase",
+      "credentials": {
+        "supabaseApi": {
+          "id": "tOzBo3n0Kkt5Bt41",
+          "name": "Supabase Account Tony"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-1",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -160,
+        -240
+      ],
+      "id": "6f314c3e-62d7-4d8f-a814-e139f2b78a8c",
+      "name": "Has Pending Tasks?"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        80,
+        -48
+      ],
+      "id": "0f529fae-ce79-430c-9b96-f8e68cc6c166",
+      "name": "No Tasks"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM v_runnable_tasks LIMIT 20",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -384,
+        -240
+      ],
+      "id": "ebcef534-7745-4866-8edd-be0fdb007254",
+      "name": "Get task from v_runnable_tasks",
+      "executeOnce": true,
+      "credentials": {
+        "postgres": {
+          "id": "ojfbhm5YXboBqlko",
+          "name": "Postgres Supabase Tony"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -800,
+        -240
+      ],
+      "id": "7916a6fd-4271-4dff-b47b-fdb922ce0e22",
+      "name": "Schedule Trigger1"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "LT77b3PENHxZuRwj",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "test_mode": "={{ $json.test_mode  }}",
+            "requires_approval": "={{ $json.requires_approval  }}",
+            "extra": "={{ $json.extra }}",
+            "ai_settings": "={{ $json.ai_settings }}",
+            "status": "={{ $json.status }}",
+            "task_type": "={{ $json.task_type }}",
+            "agent_id": "={{ $json.agent_id }}",
+            "supabase_task_id": "={{ $json.supabase_task_id }}",
+            "batch_id": "={{ $json.batch_id }}",
+            "batch_priority": "={{ $json.batch_priority }}",
+            "user_id": "={{ $json.user_id }}",
+            "sequence": "={{ $json.sequence }}",
+            "prompt": "={{ $json.prompt }}",
+            "task_id": "={{ $json.supabase_task_id }}",
+            "data": "={{ $json.data }}",
+            "next_stage_template_id": "={{ $json.next_stage_template_id }}",
+            "prompt_template_id": "={{ $json.prompt_template_id }}",
+            "hierarchy_path": "={{ (typeof $json.hierarchy_path === 'string') ? $json.hierarchy_path : JSON.stringify($json.hierarchy_path) }}",
+            "stage_key": "={{ $json.stage_key }}",
+            "parent_task_id": "={{ $json.parent_task_id }}",
+            "root_task_id": "={{ $json.root_task_id }}",
+            "launch_id": "={{ $json.launch_id }}",
+            "step_number": "={{ $json.step_number }}",
+            "total_steps": "={{ $json.total_steps }}",
+            "split_group_id": "={{ $json.split_group_id }}",
+            "orchestrator_execution_id": "={{ $json.orchestrator_execution_id }}",
+            "step_execution_id": "={{ $json.step_execution_id }}",
+            "step_id": "={{ $json.step_number }}",
+            "phase_code": "={{ $json.phase_code }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "prompt",
+              "displayName": "prompt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "task_id",
+              "displayName": "task_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "data",
+              "displayName": "data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "extra",
+              "displayName": "extra",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "ai_settings",
+              "displayName": "ai_settings",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "task_type",
+              "displayName": "task_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "agent_id",
+              "displayName": "agent_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "result",
+              "displayName": "result",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "related_task_id",
+              "displayName": "related_task_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "supabase_task_id",
+              "displayName": "supabase_task_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "batch_id",
+              "displayName": "batch_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "batch_priority",
+              "displayName": "batch_priority",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "sequence",
+              "displayName": "sequence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "test_mode",
+              "displayName": "test_mode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "requires_approval",
+              "displayName": "requires_approval",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "split_group_id",
+              "displayName": "split_group_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "next_stage_template_id",
+              "displayName": "next_stage_template_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "prompt_template_id",
+              "displayName": "prompt_template_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "step_execution_id",
+              "displayName": "step_execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "orchestrator_execution_id",
+              "displayName": "orchestrator_execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "next_task_config",
+              "displayName": "next_task_config",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "total_steps",
+              "displayName": "total_steps",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "step_number",
+              "displayName": "step_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "stage_key",
+              "displayName": "stage_key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "hierarchy_path",
+              "displayName": "hierarchy_path",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "root_task_id",
+              "displayName": "root_task_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "parent_task_id",
+              "displayName": "parent_task_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "step_id",
+              "displayName": "step_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "phase_code",
+              "displayName": "phase_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "lo_code",
+              "displayName": "lo_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "launch_id",
+              "displayName": "launch_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        304,
+        -240
+      ],
+      "id": "1883e7fd-3813-4eda-a369-24725e653507",
+      "name": "Insert into n8n Table"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Transform Supabase task to n8n Data Table format\n// FIXED VERSION: Handles variable replacement + stage routing for ALL tasks\n\nconst task = $input.item.json;\nconst templates = $('Get all row(s) from prompt-template').all();\n\n// --- Helper: Safe parse JSONB fields ---\nconst parseSafe = (val, fallback) => {\n    if (val === null || val === undefined) return fallback;\n    if (typeof val === 'object') return val;\n    try {\n        let parsed = JSON.parse(val);\n        if (typeof parsed === 'string') parsed = JSON.parse(parsed);\n        return parsed;\n    } catch (e) { return fallback; }\n};\n\n// --- 1. PREPARE DATA SOURCES ---\nlet taskExtra = parseSafe(task.extra, {});\nconst inputData = parseSafe(task.input_data, {});  // parseSafe: handles JSONB string or object\n\nconst enrichmentData = {\n    ...task,\n    ...taskExtra,\n    ...inputData\n};\n\n// --- 2. IDENTIFY TEMPLATE & CONFIG ---\nconst templateId = task.prompt_template_id;\nconst templateItem = templates.find(t => t.json.id === templateId || t.json.prompt_id === templateId);\nconst cachedTemplate = templateItem ? templateItem.json : null;\n\nlet delimiters = { start: '%%', end: '%%' };\nif (cachedTemplate && cachedTemplate.prompt_input_schema) {\n    try {\n        const schema = parseSafe(cachedTemplate.prompt_input_schema, {});\n        if (schema.delimiters) delimiters = schema.delimiters;\n    } catch (e) { /* use defaults */ }\n}\n\n// --- 3. PROCESS PROMPT (VARIABLE REPLACEMENT) ---\nlet rawPrompt = task.prompt;\nif ((!rawPrompt || rawPrompt.trim() === '') && cachedTemplate) {\n    rawPrompt = cachedTemplate.template || '';\n}\nif (!rawPrompt) rawPrompt = '';\n\nconst escapeRegex = (s) => s.replace(/[.*+?^${}()|[\\\\]\\\\]/g, '\\\\$&');\nconst regex = new RegExp(escapeRegex(delimiters.start) + '\\\\s*([\\\\w_]+)\\\\s*' + escapeRegex(delimiters.end), 'g');\n\nconst finalPrompt = rawPrompt.replace(regex, (match, key) => {\n    if (enrichmentData.hasOwnProperty(key)) {\n        const value = enrichmentData[key];\n        if (typeof value === 'object' && value !== null) {\n            return JSON.stringify(value, null, 2);\n        }\n        return String(value);\n    }\n    return match;\n});\n\n// --- 4. PROCESS AI SETTINGS ---\nlet aiSettingsRaw = task.ai_settings;\nif (!aiSettingsRaw && cachedTemplate) {\n    aiSettingsRaw = cachedTemplate.default_ai_settings || cachedTemplate.ai_settings;\n}\n\nlet finalAiSettings = {};\nconst fallbackGenConfig = {\n    temperature: 1.0,\n    topP: 0.95,\n    topK: 40,\n    maxOutputTokens: 8192,\n    thinkingConfig: { includeThoughts: false, thinkingBudget: -1 }\n};\n\ntry {\n    const parsed = parseSafe(aiSettingsRaw, {});\n    finalAiSettings = {\n        model_id: parsed.model_id || 'gemini-1.5-flash',\n        generate_content_api: parsed.generate_content_api || 'generateContent',\n        generationConfig: {\n            ...fallbackGenConfig,\n            ...(parsed.generationConfig || {})\n        },\n        safetySettings: parsed.safetySettings || [],\n        systemInstruction: parsed.systemInstruction || undefined,\n        tools: parsed.tools || undefined\n    };\n} catch (e) {\n    console.error('Failed to parse AI settings, using safe defaults', e);\n    finalAiSettings = { \n        model_id: 'gemini-1.5-flash', \n        generationConfig: fallbackGenConfig \n    };\n}\n\n// --- 5. PROCESS STAGE CONFIG & NEXT STAGE CONFIGS ---\nlet currentStageConfig = null;\nlet nextStageConfigs = [];\n\nif (cachedTemplate) {\n    // 5a. Current stage config from template's stage_config\n    if (cachedTemplate.stage_config) {\n        currentStageConfig = parseSafe(cachedTemplate.stage_config, null);\n        // Inject template_id into current config for reference\n        if (currentStageConfig) {\n            currentStageConfig.template_id = cachedTemplate.id;\n        }\n    }\n\n    // 5b. Build next_stage_configs from next_stage_template_ids\n    let nextIdsStr = (cachedTemplate && cachedTemplate.next_stage_template_ids) || task.next_stage_template_ids || [];\n    let nextIds = parseSafe(nextIdsStr, []);\n    if (!Array.isArray(nextIds)) nextIds = nextIds ? [nextIds] : [];\n\n    nextStageConfigs = nextIds.map(nextId => {\n        const nextTpl = templates.find(t => t.json.id === nextId || t.json.prompt_id === nextId);\n        if (!nextTpl) return null;\n        const nextSc = parseSafe(nextTpl.json.stage_config, {});\n        return {\n            template_id: nextId,\n            cardinality: nextSc.cardinality || 'one_to_one',\n            split_path: nextSc.split_path || null,\n            split_mode: nextSc.split_mode || 'per_item',\n            merge_path: nextSc.merge_path || null,\n            output_mapping: nextSc.output_mapping || 'result',\n            batch_grouping: nextSc.batch_grouping || null,\n            requires_approval: nextSc.requires_approval || false\n        };\n    }).filter(Boolean);\n}\n\n// Build stageConfig object for merging into extra\nconst stageConfigObj = {};\nif (currentStageConfig) stageConfigObj.current_stage_config = currentStageConfig;\nif (nextStageConfigs.length > 0) stageConfigObj.next_stage_configs = nextStageConfigs;\n\n// Merge extra data for output\nconst mergedExtra = { ...taskExtra, ...(inputData.extra || {}), ...stageConfigObj };\n\n// --- 6. FINAL OUTPUT ---\nreturn {\n  json: {\n    // Preserve original task data\n    ...task,\n    \n    // --- TRANSFORMED FIELDS ---\n    task_id: '',\n    extra: JSON.stringify(mergedExtra),\n    data: JSON.stringify(inputData),\n    prompt: finalPrompt,\n    ai_settings: JSON.stringify(finalAiSettings),\n    status: 'plan',\n    result: '',\n    \n    // --- MAPPED METADATA ---\n    supabase_task_id: task.id,\n    task_type: task.task_type,\n    agent_id: task.agent_id || 'agent_1',\n    batch_id: task.batch_id || '',\n    launch_id: task.launch_id || '',\n    batch_priority: task.batch_priority || '',\n    user_id: task.user_id || '',\n    test_mode: task.test_mode || false,\n    sequence: task.sequence || 1,\n    requires_approval: task.requires_approval || false,\n    prompt_template_id: task.prompt_template_id || '',\n    next_stage_template_id: task.next_stage_template_id || '',\n    \n    // Hierarchy & Metadata\n    parent_task_id: task.parent_task_id || '',\n    split_group_id: task.split_group_id || '',\n    stage_key: task.stage_key || '',\n    root_task_id: task.root_task_id || '',\n    hierarchy_path: task.hierarchy_path,\n    created_at: task.created_at || '',\n    started_at: task.started_at || '',\n    completed_at: task.completed_at || '',\n    batch_status: task.batch_status || '',\n    batch_name: task.batch_name || ''\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        -240
+      ],
+      "id": "4b62620a-3269-4fd3-a12b-2e3d6b8a5f9b",
+      "name": "Transform for n8n Table"
+    }
+  ],
+  "connections": {
+    "Get all row(s) from prompt-template": {
+      "main": [
+        [
+          {
+            "node": "Get task from v_runnable_tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Pending Tasks?": {
+      "main": [
+        [
+          {
+            "node": "Transform for n8n Table",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get task from v_runnable_tasks": {
+      "main": [
+        [
+          {
+            "node": "Has Pending Tasks?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Get all row(s) from prompt-template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert into n8n Table": {
+      "main": [
+        [
+          {
+            "node": "Mark Processing in Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform for n8n Table": {
+      "main": [
+        [
+          {
+            "node": "Insert into n8n Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3c3655861b945e2f23873d293f97337788a318f9e0823cca507f13751bd70fd7"
+  }
+}

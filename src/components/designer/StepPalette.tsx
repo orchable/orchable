@@ -1,45 +1,30 @@
-import { StepBadge } from '@/components/common/StepBadge';
 import { useDesignerStore } from '@/stores/designerStore';
-import { Plus, GitBranch } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Plus, History, Settings2, FileText } from 'lucide-react';
+import { useConfigs } from '@/hooks/useConfigs';
+import { formatDistanceToNow } from 'date-fns';
 
 export function StepPalette() {
-    const { addStep } = useDesignerStore();
-    const stepTypes = ['A', 'B', 'C', 'D', 'E'];
+    const { addStep, loadConfig, config: currentConfig } = useDesignerStore();
+    const { data: savedConfigs } = useConfigs();
+
+    // Sort by updated_at Desc and take top 5
+    const recentConfigs = savedConfigs
+        ? [...savedConfigs].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 5)
+        : [];
 
     return (
-        <div className="h-full border-r bg-muted/30 p-4 space-y-6">
-            <div>
+        <div className="h-full border-r bg-muted/30 flex flex-col">
+            {/* Top section: Add Step */}
+            <div className="p-4 border-b">
                 <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
                     <Plus className="w-4 h-4" />
-                    Thêm Step
+                    Add Node
                 </h3>
-                <div className="space-y-2">
-                    {stepTypes.map((step) => (
-                        <div
-                            key={step}
-                            className="p-3 rounded-lg border bg-card cursor-pointer hover:shadow-md transition-all flex items-center gap-3 hover:border-primary/50 group"
-                            onClick={() => addStep(step)}
-                        >
-                            <StepBadge name={step} size="sm" />
-                            <span className="text-sm font-medium group-hover:text-primary transition-colors">
-                                Step {step}
-                            </span>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            <div className="pt-4 border-t">
-                <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                    <Plus className="w-4 h-4" />
-                    Custom Step
-                </h3>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2">
                     <input
                         type="text"
-                        placeholder="Name (e.g. F)"
-                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        placeholder="Node Name (e.g. A, qgen)"
+                        className="flex h-9 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                                 const target = e.target as HTMLInputElement;
@@ -50,23 +35,52 @@ export function StepPalette() {
                             }
                         }}
                     />
+                    <p className="text-[10px] text-muted-foreground mt-1">Press Enter to add to canvas</p>
                 </div>
-                <p className="text-[10px] text-muted-foreground mt-1">Press Enter to add</p>
             </div>
 
-            <div className="pt-4 border-t">
+            {/* Bottom Section: Recent Configs */}
+            <div className="p-4 flex-1 overflow-y-auto">
                 <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                    <GitBranch className="w-4 h-4" />
-                    Templates
+                    <History className="w-4 h-4" />
+                    Recent Configs
                 </h3>
-                <div className="space-y-2">
-                    <Button variant="outline" size="sm" className="w-full justify-start bg-card hover:border-primary/50 hover:text-primary transition-colors">
-                        Standard Course
-                    </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-start bg-card hover:border-primary/50 hover:text-primary transition-colors">
-                        Quick Lesson
-                    </Button>
-                </div>
+
+                {recentConfigs.length === 0 ? (
+                    <div className="text-sm text-muted-foreground text-center py-4 bg-muted/30 rounded-lg">
+                        <FileText className="w-6 h-6 mx-auto mb-2 opacity-20" />
+                        No recent configs
+                    </div>
+                ) : (
+                    <div className="space-y-2">
+                        {recentConfigs.map(config => (
+                            <div
+                                key={config.id}
+                                onClick={() => loadConfig(config)}
+                                className={`p-3 rounded-lg border cursor-pointer hover:shadow-md transition-all flex flex-col gap-2 group ${currentConfig?.id === config.id ? 'bg-primary/5 border-primary shadow-sm' : 'bg-card hover:border-primary/50'}`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-8 h-8 rounded shrink-0 flex items-center justify-center ${currentConfig?.id === config.id ? 'bg-primary/20 text-primary' : 'bg-muted/50 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors'}`}>
+                                        <Settings2 className="w-4 h-4" />
+                                    </div>
+                                    <div className="flex flex-col min-w-0 flex-1">
+                                        <span className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+                                            {config.name}
+                                        </span>
+                                        <div className="flex items-center justify-between mt-0.5">
+                                            <span className="text-[10px] text-muted-foreground">
+                                                {config.steps.length} nodes
+                                            </span>
+                                            <span className="text-[9px] text-muted-foreground/70 line-clamp-1 truncate block">
+                                                {formatDistanceToNow(new Date(config.updated_at), { addSuffix: true })}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );

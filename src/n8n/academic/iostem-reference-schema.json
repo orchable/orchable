@@ -1,0 +1,315 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://iostem.edu.vn/schemas/iostem-reference-data.json",
+  "title": "iOStem Reference Data Schema",
+  "description": "JSON Schema for iOStem question generation system validation",
+  "version": "1.0.0",
+  "lastUpdated": "2025-12-12",
+
+  "definitions": {
+    "courseCode": {
+      "type": "string",
+      "enum": ["TOAN", "TNXH", "KHOA_HOC", "KHTN", "VAT_LY", "HOA_HOC", "SINH_HOC", "CONG_NGHE", "TIN_HOC"],
+      "description": "Course/Subject code"
+    },
+
+    "gradeCode": {
+      "type": "string",
+      "enum": ["G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9", "G10", "G11", "G12"],
+      "description": "Grade level code (G1=Grade 1, etc.)"
+    },
+
+    "gradeBand": {
+      "type": "string",
+      "enum": ["PRIMARY", "SECONDARY", "HIGH_SCHOOL"],
+      "description": "Grade band grouping"
+    },
+
+    "bloomCode": {
+      "type": "string",
+      "enum": ["REMEMBER", "UNDERSTAND", "APPLY", "ANALYZE", "EVALUATE", "CREATE"],
+      "description": "Bloom's Taxonomy cognitive level"
+    },
+
+    "difficultyCode": {
+      "type": "string",
+      "enum": ["VERY_EASY", "EASY", "MEDIUM", "HARD", "VERY_HARD"],
+      "description": "Question difficulty level"
+    },
+
+    "knowledgeTypeCode": {
+      "type": "string",
+      "enum": ["FACTUAL", "CONCEPT", "PROCEDURAL", "META_COGNITIVE"],
+      "description": "Knowledge dimension type"
+    },
+
+    "stemElementCode": {
+      "type": "string",
+      "enum": ["S", "T", "E", "M", "DA"],
+      "description": "STEM element code (S=Science, T=Technology, E=Engineering, M=Math, DA=Digital Ability)"
+    },
+
+    "examRoundCode": {
+      "type": "string",
+      "enum": ["VONG_TU_LUYEN", "VONG_TRAI_NGHIEM", "VONG_TRUONG", "VONG_TINH", "VONG_QUOC_GIA"],
+      "description": "Exam round code"
+    },
+
+    "sectionCode": {
+      "type": "string",
+      "enum": ["STEM_DA", "CT"],
+      "description": "Exam section code (STEM_DA=STEM & Digital Ability, CT=Computational Thinking)"
+    },
+
+    "questionTypeCode": {
+      "type": "string",
+      "enum": [
+        "MULTIPLE_CHOICE",
+        "MULTIPLE_RESPONSE",
+        "TRUE_FALSE",
+        "FILL_IN_THE_BLANKS",
+        "DRAG_AND_DROP",
+        "SHORT_ANSWER",
+        "NUMERIC",
+        "SEQUENCE",
+        "MATCHING"
+      ],
+      "description": "Question format type"
+    },
+
+    "contextCode": {
+      "type": "string",
+      "enum": [
+        "THEO_ABS",
+        "SPEC_CASE",
+        "NAT_OBS",
+        "TECH_ENG",
+        "EXP_INV",
+        "REAL_PROB",
+        "DATA_MOD",
+        "HIST_SCI",
+        "INTERDISC",
+        "HYPO_COMP"
+      ],
+      "description": "Question context type"
+    },
+
+    "weekCode": {
+      "type": "string",
+      "pattern": "^W([1-9]|[12][0-9]|3[0-5])$",
+      "description": "Curriculum week code (W1-W35)"
+    }
+  },
+
+  "coefficients": {
+    "description": "Coefficient values for difficulty calculation",
+    "bloom": {
+      "REMEMBER": 1.0,
+      "UNDERSTAND": 1.5,
+      "APPLY": 2.0,
+      "ANALYZE": 2.5,
+      "EVALUATE": 3.0,
+      "CREATE": 3.5
+    },
+    "knowledge": {
+      "FACTUAL": 1.0,
+      "CONCEPT": 1.5,
+      "PROCEDURAL": 2.0,
+      "META_COGNITIVE": 2.5
+    },
+    "format": {
+      "MULTIPLE_CHOICE": 1.2,
+      "MULTIPLE_RESPONSE": 1.3,
+      "TRUE_FALSE": 1.1,
+      "FILL_IN_THE_BLANKS": 1.7,
+      "DRAG_AND_DROP": 1.5,
+      "SHORT_ANSWER": 1.8,
+      "NUMERIC": 1.6,
+      "SEQUENCE": 1.3,
+      "MATCHING": 1.4
+    }
+  },
+
+  "difficultyRanges": {
+    "description": "D score ranges for difficulty classification",
+    "VERY_EASY": { "min": 1.0, "max": 2.0, "points": 1 },
+    "EASY": { "min": 2.1, "max": 4.0, "points": 2 },
+    "MEDIUM": { "min": 4.1, "max": 6.0, "points": 3 },
+    "HARD": { "min": 6.1, "max": 8.0, "points": 4 },
+    "VERY_HARD": { "min": 8.1, "max": 999, "points": 5 }
+  },
+
+  "examBlueprint": {
+    "description": "Exam structure and difficulty distribution",
+    "rounds": {
+      "VONG_TU_LUYEN": {
+        "totalQuestions": { "STEM_DA": 15, "CT": 5 },
+        "duration": { "STEM_DA": 20, "CT": 10 },
+        "multiplier": 3,
+        "difficultyDistribution": {
+          "VERY_EASY": { "ratio": 0.25, "count": 4 },
+          "EASY": { "ratio": 0.25, "count": 4 },
+          "MEDIUM": { "ratio": 0.30, "count": 5 },
+          "HARD": { "ratio": 0.15, "count": 2 },
+          "VERY_HARD": { "ratio": 0.05, "count": 0 }
+        }
+      },
+      "VONG_TRAI_NGHIEM": {
+        "totalQuestions": { "STEM_DA": 30, "CT": 10 },
+        "duration": { "STEM_DA": 25, "CT": 25 },
+        "multiplier": 2,
+        "difficultyDistribution": {
+          "VERY_EASY": { "ratio": 0.25, "count": 8 },
+          "EASY": { "ratio": 0.25, "count": 8 },
+          "MEDIUM": { "ratio": 0.20, "count": 6 },
+          "HARD": { "ratio": 0.15, "count": 5 },
+          "VERY_HARD": { "ratio": 0.15, "count": 3 }
+        }
+      },
+      "VONG_TRUONG": {
+        "totalQuestions": { "STEM_DA": 30, "CT": 10 },
+        "duration": { "STEM_DA": 25, "CT": 25 },
+        "multiplier": 2,
+        "difficultyDistribution": {
+          "VERY_EASY": { "ratio": 0.10, "count": 3 },
+          "EASY": { "ratio": 0.20, "count": 6 },
+          "MEDIUM": { "ratio": 0.30, "count": 9 },
+          "HARD": { "ratio": 0.25, "count": 8 },
+          "VERY_HARD": { "ratio": 0.15, "count": 4 }
+        },
+        "bloomRequirements": {
+          "ANALYZE": { "min": 10 },
+          "EVALUATE": { "min": 5 },
+          "CREATE": { "min": 2 }
+        }
+      },
+      "VONG_QUOC_GIA": {
+        "totalQuestions": { "STEM_DA": 30, "CT": 10 },
+        "duration": { "STEM_DA": 25, "CT": 25 },
+        "multiplier": 2,
+        "difficultyDistribution": {
+          "VERY_EASY": { "ratio": 0.00, "count": 0 },
+          "EASY": { "ratio": 0.20, "count": 6 },
+          "MEDIUM": { "ratio": 0.30, "count": 9 },
+          "HARD": { "ratio": 0.35, "count": 11 },
+          "VERY_HARD": { "ratio": 0.15, "count": 4 }
+        },
+        "bloomRequirements": {
+          "REMEMBER": { "max": 0 },
+          "UNDERSTAND": { "max": 0 },
+          "APPLY": { "min": 6 },
+          "ANALYZE": { "min": 12 },
+          "EVALUATE": { "min": 8 },
+          "CREATE": { "min": 4 }
+        },
+        "contextRequirements": {
+          "TECH_ENG": { "ratio": 0.60 },
+          "REAL_PROB": { "ratio": 0.30 },
+          "EXP_INV": { "ratio": 0.10 }
+        },
+        "specialRequirements": {
+          "realDataRequired": true,
+          "industryProblemsRatio": 0.40,
+          "researchBasedRatio": 0.20,
+          "hybridQuestionsMin": 0.30,
+          "hybridQualityMin": 0.7
+        }
+      }
+    },
+    "contentMix": {
+      "description": "Equal distribution of STEM elements",
+      "15questions": { "S": 3, "T": 3, "E": 3, "M": 3, "DA": 3 },
+      "30questions": { "S": 6, "T": 6, "E": 6, "M": 6, "DA": 6 }
+    }
+  },
+
+  "lookupTables": {
+    "courses": [
+      { "code": "TOAN", "name": "Môn Toán", "gradeBands": ["PRIMARY", "SECONDARY", "HIGH_SCHOOL"] },
+      { "code": "TNXH", "name": "Môn Tự nhiên Xã hội", "gradeBands": ["PRIMARY"] },
+      { "code": "KHOA_HOC", "name": "Môn Khoa học", "gradeBands": ["PRIMARY"] },
+      { "code": "KHTN", "name": "Môn Khoa học tự nhiên", "gradeBands": ["SECONDARY"] },
+      { "code": "VAT_LY", "name": "Môn Vật lý", "gradeBands": ["HIGH_SCHOOL"] },
+      { "code": "HOA_HOC", "name": "Môn Hóa học", "gradeBands": ["HIGH_SCHOOL"] },
+      { "code": "SINH_HOC", "name": "Môn Sinh học", "gradeBands": ["SECONDARY", "HIGH_SCHOOL"] },
+      { "code": "CONG_NGHE", "name": "Môn Công nghệ", "gradeBands": ["PRIMARY", "SECONDARY", "HIGH_SCHOOL"] },
+      { "code": "TIN_HOC", "name": "Môn Tin học", "gradeBands": ["PRIMARY", "SECONDARY", "HIGH_SCHOOL"] }
+    ],
+    "grades": [
+      { "code": "G1", "name": "Lớp 1", "band": "PRIMARY", "ageRange": [6, 7] },
+      { "code": "G2", "name": "Lớp 2", "band": "PRIMARY", "ageRange": [7, 8] },
+      { "code": "G3", "name": "Lớp 3", "band": "PRIMARY", "ageRange": [8, 9] },
+      { "code": "G4", "name": "Lớp 4", "band": "PRIMARY", "ageRange": [9, 10] },
+      { "code": "G5", "name": "Lớp 5", "band": "PRIMARY", "ageRange": [10, 11] },
+      { "code": "G6", "name": "Lớp 6", "band": "SECONDARY", "ageRange": [11, 12] },
+      { "code": "G7", "name": "Lớp 7", "band": "SECONDARY", "ageRange": [12, 13] },
+      { "code": "G8", "name": "Lớp 8", "band": "SECONDARY", "ageRange": [13, 14] },
+      { "code": "G9", "name": "Lớp 9", "band": "SECONDARY", "ageRange": [14, 15] },
+      { "code": "G10", "name": "Lớp 10", "band": "HIGH_SCHOOL", "ageRange": [15, 16] },
+      { "code": "G11", "name": "Lớp 11", "band": "HIGH_SCHOOL", "ageRange": [16, 17] },
+      { "code": "G12", "name": "Lớp 12", "band": "HIGH_SCHOOL", "ageRange": [17, 18] }
+    ],
+    "blooms": [
+      { "code": "REMEMBER", "name": "Nhớ", "coefficient": 1.0, "verbs": ["Kể lại", "Liệt kê", "Nhận biết", "Nêu", "Xác định"] },
+      { "code": "UNDERSTAND", "name": "Hiểu", "coefficient": 1.5, "verbs": ["Giải thích", "Mô tả", "So sánh", "Diễn giải"] },
+      { "code": "APPLY", "name": "Vận dụng", "coefficient": 2.0, "verbs": ["Tính", "Áp dụng", "Xác định", "Giải quyết", "Triển khai"] },
+      { "code": "ANALYZE", "name": "Phân tích", "coefficient": 2.5, "verbs": ["Phân tích", "So sánh và đối chiếu", "Tìm mối quan hệ"] },
+      { "code": "EVALUATE", "name": "Đánh giá", "coefficient": 3.0, "verbs": ["Nhận xét", "Đánh giá", "Lựa chọn và biện minh", "Phê phán"] },
+      { "code": "CREATE", "name": "Chế tạo", "coefficient": 3.5, "verbs": ["Thiết kế", "Đề xuất", "Tạo ra", "Xây dựng"] }
+    ],
+    "difficulties": [
+      { "code": "VERY_EASY", "name": "Rất dễ", "points": 1, "scoreRange": [1.0, 2.0] },
+      { "code": "EASY", "name": "Dễ", "points": 2, "scoreRange": [2.1, 4.0] },
+      { "code": "MEDIUM", "name": "Trung bình", "points": 3, "scoreRange": [4.1, 6.0] },
+      { "code": "HARD", "name": "Khó", "points": 4, "scoreRange": [6.1, 8.0] },
+      { "code": "VERY_HARD", "name": "Rất khó", "points": 5, "scoreRange": [8.1, 999] }
+    ],
+    "knowledgeTypes": [
+      { "code": "FACTUAL", "name": "Tri thức Thực tế", "coefficient": 1.0 },
+      { "code": "CONCEPT", "name": "Tri thức Khái niệm", "coefficient": 1.5 },
+      { "code": "PROCEDURAL", "name": "Tri thức Quy trình", "coefficient": 2.0 },
+      { "code": "META_COGNITIVE", "name": "Tri thức Siêu nhận thức", "coefficient": 2.5 }
+    ],
+    "stemElements": [
+      { "code": "S", "name": "Khoa học", "english": "Science" },
+      { "code": "T", "name": "Công nghệ", "english": "Technology" },
+      { "code": "E", "name": "Kỹ thuật", "english": "Engineering" },
+      { "code": "M", "name": "Toán học", "english": "Mathematics" },
+      { "code": "DA", "name": "Năng Lực Số", "english": "Digital Ability" }
+    ],
+    "examRounds": [
+      { "code": "VONG_TU_LUYEN", "name": "Vòng Tự luyện", "level": "Practice" },
+      { "code": "VONG_TRAI_NGHIEM", "name": "Vòng Trải nghiệm", "level": "Experience" },
+      { "code": "VONG_TRUONG", "name": "Vòng thi Trường", "level": "School" },
+      { "code": "VONG_TINH", "name": "Vòng thi Tỉnh", "level": "Province" },
+      { "code": "VONG_QUOC_GIA", "name": "Vòng thi Quốc gia", "level": "National" }
+    ],
+    "sections": [
+      { "code": "STEM_DA", "name": "STEM & Năng lực số" },
+      { "code": "CT", "name": "Tư duy máy tính" }
+    ],
+    "questionTypes": [
+      { "code": "MULTIPLE_CHOICE", "name": "Trắc nghiệm chọn một đáp án", "formatFactor": 1.2 },
+      { "code": "MULTIPLE_RESPONSE", "name": "Trắc nghiệm chọn nhiều đáp án", "formatFactor": 1.3 },
+      { "code": "TRUE_FALSE", "name": "Đúng / Sai", "formatFactor": 1.1 },
+      { "code": "FILL_IN_THE_BLANKS", "name": "Điền vào chỗ trống", "formatFactor": 1.7 },
+      { "code": "DRAG_AND_DROP", "name": "Kéo vào chỗ trống", "formatFactor": 1.5 },
+      { "code": "SHORT_ANSWER", "name": "Trả lời ngắn", "formatFactor": 1.8 },
+      { "code": "NUMERIC", "name": "Điền số", "formatFactor": 1.6 },
+      { "code": "SEQUENCE", "name": "Sắp xếp thứ tự", "formatFactor": 1.3 },
+      { "code": "MATCHING", "name": "Ghép cặp", "formatFactor": 1.4 }
+    ],
+    "contexts": [
+      { "code": "THEO_ABS", "name": "Abstract Theory", "description": "Pure theoretical concepts" },
+      { "code": "SPEC_CASE", "name": "Specific Case", "description": "Academic examples" },
+      { "code": "NAT_OBS", "name": "Natural Observation", "description": "Observable phenomena" },
+      { "code": "TECH_ENG", "name": "Technical/Engineering", "description": "Applied technology" },
+      { "code": "EXP_INV", "name": "Experiment/Investigation", "description": "Lab work" },
+      { "code": "REAL_PROB", "name": "Real-world Problem", "description": "Social/environmental issues" },
+      { "code": "DATA_MOD", "name": "Data Interpretation", "description": "Charts, tables, trends" },
+      { "code": "HIST_SCI", "name": "History of Science", "description": "Discovery contexts" },
+      { "code": "INTERDISC", "name": "Interdisciplinary", "description": "Cross-subject integration" },
+      { "code": "HYPO_COMP", "name": "Hypothetical Comparison", "description": "Theoretical scenarios" }
+    ]
+  }
+}

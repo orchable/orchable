@@ -3,10 +3,14 @@ import { useBatchProgress } from '@/hooks/useBatchProgress';
 import { BatchProgressCard } from '@/components/batch/BatchProgressCard';
 import { TaskHierarchyTree } from '@/components/batch/TaskHierarchyTree';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, RefreshCcw, LayoutDashboard, Activity } from 'lucide-react';
+import { ChevronLeft, RefreshCcw, LayoutDashboard, Activity, Download, RotateCcw, Trash2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useState } from 'react';
 import { getBatchTasks, TaskSummary } from '@/services/executionTrackingService';
+import { StageProgressSection } from '@/components/batch/StageProgressSection';
+import { taskActionService } from '@/services/taskActionService';
+import { toast } from 'sonner';
+import { exportToCsv } from '@/lib/csvExport';
 
 export function BatchProgress() {
     const { batchId } = useParams<{ batchId: string }>();
@@ -25,6 +29,59 @@ export function BatchProgress() {
             console.error('Failed to fetch tasks:', error);
         } finally {
             setTasksLoading(false);
+        }
+    };
+
+    const handleDeleteBatch = async () => {
+        if (!batchId) return;
+        if (window.confirm('Are you sure you want to delete this batch and all its tasks? This action cannot be undone.')) {
+            try {
+                await taskActionService.deleteBatch(batchId);
+                toast.success('Batch deleted successfully');
+                navigate('/monitor');
+            } catch (error) {
+                toast.error('Failed to delete batch');
+            }
+        }
+    };
+
+    const handleExportAll = () => {
+        const exportData: Record<string, unknown>[] = [];
+        tasks.forEach(t => {
+            if (t.status === 'completed' && t.output_data) {
+                if (Array.isArray(t.output_data)) {
+                    exportData.push(...t.output_data as Record<string, unknown>[]);
+                } else {
+                    exportData.push(t.output_data as Record<string, unknown>);
+                }
+            }
+        });
+
+        if (exportData.length === 0) {
+            toast.info('No completed tasks with data to export');
+            return;
+        }
+
+        exportToCsv(exportData, `batch_${batchId}_all_completed.csv`);
+    };
+
+    const handleRetryAllFailed = async () => {
+        if (!batchId) return;
+        const failedCount = tasks.filter(t => t.status === 'failed').length;
+        if (failedCount === 0) {
+            toast.info('No failed tasks to retry');
+            return;
+        }
+
+        if (window.confirm(`Are you sure you want to retry ${failedCount} failed task(s)?`)) {
+            try {
+                await taskActionService.retryAllFailedInBatch(batchId);
+                toast.success(`Successfully queued ${failedCount} task(s) for retry`);
+                fetchTasks();
+                refresh();
+            } catch (error) {
+                toast.error('Failed to retry tasks');
+            }
         }
     };
 
@@ -92,6 +149,31 @@ export function BatchProgress() {
                 <div className="flex items-center gap-2">
                     <Button
                         variant="outline"
+                        className="rounded-xl border-primary/20 text-primary hover:bg-primary/5"
+                        onClick={handleExportAll}
+                    >
+                        <Download className="w-4 h-4 mr-2" />
+                        Export All
+                    </Button>
+                    <Button
+                        variant="outline"
+                        className="rounded-xl border-amber-500/20 text-amber-500 hover:bg-amber-500/10"
+                        onClick={handleRetryAllFailed}
+                        disabled={!tasks.some(t => t.status === 'failed')}
+                    >
+                        <RotateCcw className="w-4 h-4 mr-2" />
+                        Retry Failed
+                    </Button>
+                    <Button
+                        variant="outline"
+                        className="rounded-xl border-destructive/20 text-destructive hover:bg-destructive/10"
+                        onClick={handleDeleteBatch}
+                    >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete
+                    </Button>
+                    <Button
+                        variant="outline"
                         className="rounded-xl border-primary/20 hover:bg-primary/5"
                         onClick={() => {
                             refresh();
@@ -106,6 +188,17 @@ export function BatchProgress() {
 
             {/* Hero Stats */}
             {progress && <BatchProgressCard progress={progress} />}
+
+            {/* Stage Progress Section */}
+            {progress && (
+                <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-primary" />
+                        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Stage Breakdown</h3>
+                    </div>
+                    <StageProgressSection progress={progress} />
+                </div>
+            )}
 
             {/* Task List / Tree */}
             <div className="space-y-4">

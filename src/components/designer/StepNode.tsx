@@ -8,7 +8,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import type { Cardinality, StageContract } from '@/lib/types';
+import type { Cardinality, StageContract, JsonSchemaProperty } from '@/lib/types';
 import { summarizeInputFields, summarizeOutputSchema, extractInputFields } from '@/lib/schemaUtils';
 
 interface StepNodeProps {
@@ -26,36 +26,41 @@ interface StepNodeProps {
     selected: boolean;
 }
 
-const SchemaField = ({ field, depth = 0 }: { field: import('@/lib/types').OutputSchemaField; depth?: number }) => {
+/** Renders a single [name, JsonSchemaProperty] pair and its nested children */
+const JsonSchemaNode = ({ name, prop, depth = 0 }: { name: string; prop: JsonSchemaProperty; depth?: number }) => {
     return (
         <div className="space-y-0.5">
             <div className={cn(
-                "text-[10px] grid grid-cols-[1fr_auto] gap-2 items-center hover:bg-muted/50 px-1 rounded cursor-default group/field",
+                "text-[10px] grid grid-cols-[1fr_auto] gap-2 items-center hover:bg-muted/50 px-1 rounded cursor-default",
                 depth > 0 && "ml-3 border-l pl-2"
             )}>
                 <div className="flex items-center gap-1 min-w-0">
-                    <code className="bg-muted/50 px-1 rounded text-green-600 truncate font-mono" title={field.name}>
-                        {field.name}
+                    <code className="bg-muted/50 px-1 rounded text-green-600 truncate font-mono" title={name}>
+                        {name}
                     </code>
-                    {field.description && (
-                        <span className="text-muted-foreground truncate opacity-70 max-w-[80px]" title={field.description}>
-                            - {field.description}
+                    {prop.description && (
+                        <span className="text-muted-foreground truncate opacity-70 max-w-[80px]" title={prop.description}>
+                            - {prop.description}
                         </span>
                     )}
                 </div>
-                <span className="text-muted-foreground font-mono opacity-70">{field.type}</span>
+                <span className="text-muted-foreground font-mono opacity-70">
+                    {prop.type}{prop.type === 'array' && prop.items ? `<${prop.items.type}>` : ''}
+                </span>
             </div>
 
             {/* Recursive render for Object properties */}
-            {field.type === 'object' && field.properties?.map((subField, i) => (
-                <SchemaField key={i} field={subField} depth={depth + 1} />
+            {prop.type === 'object' && prop.properties && Object.entries(prop.properties).map(([childName, childProp]) => (
+                <JsonSchemaNode key={childName} name={childName} prop={childProp} depth={depth + 1} />
             ))}
 
-            {/* Recursive render for Array items */}
-            {field.type === 'array' && field.items && (
-                <div className={cn("ml-3 border-l pl-2")}>
-                    <div className="text-[9px] text-muted-foreground italic px-1">Array Item:</div>
-                    <SchemaField field={{ ...field.items, name: 'item' }} depth={depth + 1} />
+            {/* Recursive render for Array<object> items */}
+            {prop.type === 'array' && prop.items?.type === 'object' && prop.items.properties && (
+                <div className="ml-3 border-l pl-2">
+                    <div className="text-[9px] text-muted-foreground italic px-1">Item properties:</div>
+                    {Object.entries(prop.items.properties).map(([childName, childProp]) => (
+                        <JsonSchemaNode key={childName} name={childName} prop={childProp} depth={depth + 1} />
+                    ))}
                 </div>
             )}
         </div>
@@ -82,7 +87,8 @@ export function StepNode({ data, selected }: StepNodeProps) {
 
         // Get output summary from contract
         let outputSummary = '—';
-        if (data.contract?.output.schema?.length) {
+        const outputSchema = data.contract?.output.schema;
+        if (outputSchema?.type) {
             outputSummary = summarizeOutputSchema(data.contract);
         }
 
@@ -198,21 +204,27 @@ export function StepNode({ data, selected }: StepNodeProps) {
                                     <div className="flex items-center justify-between px-1 mb-1">
                                         <Badge variant="outline" className="text-[10px] h-4 px-1 border-green-200 bg-green-50 text-green-700">OUTPUT</Badge>
                                         <span className="text-[10px] text-muted-foreground font-mono">
-                                            Root: {data.contract.output.rootType || 'object'}
+                                            {data.contract.output.schema?.type || 'object'}
                                         </span>
                                     </div>
                                     <div className="space-y-0.5">
-                                        {data.contract.output.schema && data.contract.output.schema.length > 0 ? (
-                                            data.contract.output.schema.map((field, i) => (
-                                                <SchemaField key={i} field={field} />
-                                            ))
-                                        ) : (
-                                            <div className="text-[10px] text-muted-foreground italic px-1">
-                                                {data.contract.output.format_injection === 'none'
-                                                    ? 'No output schema'
-                                                    : 'Auto-generated'}
-                                            </div>
-                                        )}
+                                        {(() => {
+                                            const schema = data.contract.output.schema;
+                                            if (!schema?.type) {
+                                                return <div className="text-[10px] text-muted-foreground italic px-1">No output schema</div>;
+                                            }
+                                            // Object root: render each property
+                                            if (schema.type === 'object' && schema.properties) {
+                                                return Object.entries(schema.properties).map(([name, prop]) => (
+                                                    <JsonSchemaNode key={name} name={name} prop={prop} />
+                                                ));
+                                            }
+                                            // Array root: show item schema
+                                            if (schema.type === 'array' && schema.items) {
+                                                return <JsonSchemaNode name="[ ]" prop={schema.items} />;
+                                            }
+                                            return <div className="text-[10px] text-muted-foreground italic px-1">Empty schema</div>;
+                                        })()}
                                     </div>
                                 </div>
                             </div>

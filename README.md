@@ -1,11 +1,11 @@
-# Tài liệu Kiến trúc Chi tiết: Hệ thống Tạo Học liệu Tự động - Hybrid Approach
+# Detailed Architecture Documentation: Automated Course Material Generation System - Hybrid Approach
 
-## 📋 Tổng quan Hệ thống
+## 📋 System Overview
 
-### Mục tiêu
-Xây dựng hệ thống cho phép người dùng thiết kế bộ điều phối (orchestrator) để tự động tạo học liệu từ syllabus, với khả năng theo dõi tiến trình thực thi real-time.
+### Objective
+Build a system that allows users to design an orchestrator to automatically generate course materials from a syllabus, with real-time execution tracking.
 
-### Kiến trúc Tổng thể
+### Overall Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -15,7 +15,7 @@ Xây dựng hệ thống cho phép người dùng thiết kế bộ điều ph�
 │  │   Component    │  │   Component    │  │    Component     │  │
 │  └────────────────┘  └────────────────┘  └──────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
-                              ↕ (API calls)
+                                ↕ (API calls)
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Supabase Database                             │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌───────────────┐ │
@@ -23,7 +23,7 @@ Xây dựng hệ thống cho phép người dùng thiết kế bộ điều ph�
 │  │   configs        │  │                  │  │               │ │
 │  └──────────────────┘  └──────────────────┘  └───────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
-                              ↕ (reads config & writes results)
+                                ↕ (reads config & writes results)
 ┌─────────────────────────────────────────────────────────────────┐
 │                   n8n Workflows (Self-hosted)                    │
 │  ┌──────────────────────────────────────────────────────────┐  │
@@ -46,8 +46,8 @@ Xây dựng hệ thống cho phép người dùng thiết kế bộ điều ph�
 
 ## 🗄️ Database Schema (Supabase)
 
-### Bảng 1: `orchestrator_configs`
-Lưu trữ cấu hình bộ điều phối do user thiết kế.
+### Table 1: `orchestrator_configs`
+Stores orchestrator configurations designed by users.
 
 ```sql
 CREATE TABLE orchestrator_configs (
@@ -57,18 +57,18 @@ CREATE TABLE orchestrator_configs (
   steps JSONB NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  created_by VARCHAR(255), -- User ID nếu có auth
+  created_by VARCHAR(255), -- User ID if auth enabled
   
-  -- Index để query nhanh
+  -- Validation check
   CONSTRAINT valid_steps CHECK (jsonb_typeof(steps) = 'array')
 );
 
--- Index
+-- Indexes
 CREATE INDEX idx_configs_created_at ON orchestrator_configs(created_at DESC);
 CREATE INDEX idx_configs_name ON orchestrator_configs(name);
 ```
 
-**Cấu trúc JSONB của `steps`:**
+**JSONB structure for `steps`:**
 ```json
 [
   {
@@ -136,8 +136,8 @@ CREATE INDEX idx_configs_name ON orchestrator_configs(name);
 
 ---
 
-### Bảng 2: `executions`
-Lưu trữ thông tin về mỗi lần thực thi bộ điều phối.
+### Table 2: `executions`
+Stores information about each orchestrator execution run.
 
 ```sql
 CREATE TABLE executions (
@@ -165,7 +165,7 @@ CREATE INDEX idx_executions_config_id ON executions(config_id);
 CREATE INDEX idx_executions_status ON executions(status);
 CREATE INDEX idx_executions_created_at ON executions(created_at DESC);
 
--- Trigger để auto-update updated_at
+-- Trigger for auto-updating updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -178,7 +178,7 @@ CREATE TRIGGER update_executions_updated_at BEFORE UPDATE
 ON executions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 ```
 
-**Cấu trúc JSONB của `syllabus_row`:**
+**JSONB structure for `syllabus_row`:**
 ```json
 {
   "lessonId": "L001",
@@ -203,8 +203,8 @@ ON executions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 ---
 
-### Bảng 3: `step_executions`
-Lưu trữ trạng thái và kết quả của từng bước trong execution.
+### Table 3: `step_executions`
+Stores the status and results of each step within an execution.
 
 ```sql
 CREATE TABLE step_executions (
@@ -248,7 +248,7 @@ CREATE TRIGGER update_step_executions_updated_at BEFORE UPDATE
 ON step_executions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 ```
 
-**Cấu trúc JSONB của `result`:**
+**JSONB structure for `result`:**
 ```json
 {
   "outputFiles": [
@@ -282,7 +282,7 @@ ON step_executions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
   "stateManagement": "Zustand",
   "dataFetching": "TanStack Query (React Query)",
   "database": "Supabase Client",
-  "visualization": "ReactFlow (cho designer), Recharts (cho monitoring)",
+  "visualization": "ReactFlow (for designer), Recharts (for monitoring)",
   "routing": "React Router v6",
   "forms": "React Hook Form + Zod",
   "hosting": "Netlify"
@@ -296,7 +296,7 @@ ON step_executions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 ```
 src/
 ├── main.tsx                      # Entry point
-├── App.tsx                       # Root component với routing
+├── App.tsx                       # Root component with routing
 │
 ├── components/
 │   ├── designer/                 # Orchestrator Designer Module
@@ -340,10 +340,10 @@ src/
 │   └── usePolling.ts
 │
 ├── stores/
-│   └── designerStore.ts         # Zustand store cho designer
+│   └── designerStore.ts         # Zustand store for designer
 │
 └── services/
-    ├── configService.ts         # CRUD cho orchestrator configs
+    ├── configService.ts         # CRUD for orchestrator configs
     ├── executionService.ts      # Execution management
     └── n8nService.ts            # Trigger n8n workflows
 ```
@@ -355,19 +355,19 @@ src/
 ### Module 1: Orchestrator Designer
 
 #### 1.1 `OrchestratorDesigner.tsx`
-**Mục đích:** Container component cho toàn bộ designer module.
+**Purpose:** Container component for the designer module.
 
 **Props:**
 ```typescript
 interface OrchestratorDesignerProps {
-  configId?: string; // Nếu có = edit mode, null = create mode
+  configId?: string; // If present = edit mode, null = create mode
   onSave?: (configId: string) => void;
 }
 ```
 
 **State Management:**
 ```typescript
-// Sử dụng Zustand store
+// Using Zustand store
 interface DesignerStore {
   nodes: Node[]; // ReactFlow nodes
   edges: Edge[]; // ReactFlow edges
@@ -421,24 +421,24 @@ interface DesignerStore {
 </div>
 ```
 
-**Chức năng chính:**
-1. Load existing config (nếu `configId` được truyền vào)
-2. Quản lý state của designer (nodes, edges)
-3. Coordinate giữa các sub-components
-4. Validate config trước khi save
-5. Call `configService.saveConfig()` để lưu vào Supabase
+**Main Functions:**
+1. Load existing config (if `configId` passed)
+2. Manage designer state (nodes, edges)
+3. Coordinate between sub-components
+4. Validate config before saving
+5. Call `configService.saveConfig()` to save to Supabase
 
 ---
 
 #### 1.2 `FlowCanvas.tsx`
-**Mục đích:** Canvas chính để drag-drop và kết nối các steps.
+**Purpose:** Primary canvas for drag-and-drop and step connection.
 
 **Dependencies:** `@xyflow/react`
 
 **Props:**
 ```typescript
 interface FlowCanvasProps {
-  // Không cần props, lấy state từ Zustand store
+  // No props needed, state from Zustand store
 }
 ```
 
@@ -497,17 +497,17 @@ export function FlowCanvas() {
 }
 ```
 
-**Chức năng:**
-- Render canvas với ReactFlow
-- Cho phép drag nodes để reposition
-- Tạo edges bằng cách kéo từ handle này sang handle khác
-- Click node để hiển thị config panel
-- Validate không tạo circular dependencies
+**Features:**
+- Canvas rendering with ReactFlow
+- Drag-and-drop node repositioning
+- Edge creation by connecting handles
+- Node selection for config panel display
+- Circular dependency validation
 
 ---
 
 #### 1.3 `StepNode.tsx`
-**Mục đích:** Custom node component cho mỗi step trong flow.
+**Purpose:** Custom node component for workflow steps.
 
 **Props:**
 ```typescript
@@ -567,16 +567,16 @@ export function StepNode({ data, selected }: StepNodeProps) {
 ```
 
 **Features:**
-- Hiển thị step name (A, B, C, D, E) với màu khác nhau
-- Hiển thị label mô tả step
-- Hiển thị webhook URL (truncated)
-- Highlight khi được select
-- Có handles ở top (input) và bottom (output) để kết nối
+- Color-coded step names (A, B, C, D, E)
+- Descriptive step labels
+- Truncated webhook URL display
+- Highlight on selection
+- Top (input) and bottom (output) handles for connection
 
 ---
 
 #### 1.4 `StepConfigPanel.tsx`
-**Mục đích:** Panel để configure chi tiết của step được chọn.
+**Purpose:** Panel for detailed configuration of selected steps.
 
 **Props:**
 ```typescript
@@ -683,16 +683,16 @@ export function StepConfigPanel({ stepId }: StepConfigPanelProps) {
 }
 ```
 
-**Chức năng:**
-- Form để edit step configuration
-- Validation với Zod schema
-- Real-time update vào Zustand store
-- Hiển thị errors
+**Features:**
+- Step configuration form
+- Zod schema validation
+- Real-time Zustand store synchronization
+- Error display
 
 ---
 
 #### 1.5 `SaveConfigDialog.tsx`
-**Mục đích:** Dialog để lưu orchestrator config vào Supabase.
+**Purpose:** Dialog to save orchestrator configurations to Supabase.
 
 **Implementation:**
 ```tsx
@@ -813,7 +813,7 @@ export function SaveConfigDialog() {
 ### Module 2: Execution Launcher
 
 #### 2.1 `ExecutionLauncher.tsx`
-**Mục đích:** Container component để upload syllabus và launch executions.
+**Purpose:** Container component for syllabus upload and execution launch.
 
 **Layout:**
 ```tsx
@@ -864,7 +864,7 @@ export function SaveConfigDialog() {
 ---
 
 #### 2.2 `TSVUploader.tsx`
-**Mục đích:** Component để upload file TSV syllabus.
+**Purpose:** Component for TSV syllabus file upload.
 
 **Props:**
 ```typescript
@@ -888,7 +888,7 @@ export function TSVUploader({ onUpload }: TSVUploaderProps) {
       delimiter: '\t',
       skipEmptyLines: true,
       complete: (results) => {
-        // Validate và transform data
+        // Data validation and transformation
         const syllabusData = results.data.map((row: any) => ({
           lessonId: row.lesson_id || row.lessonId,
           lessonTitle: row.lesson_title || row.lessonTitle,
@@ -937,7 +937,7 @@ L002	Advanced Hooks	Learn useContext and useReducer	[{"type":"video","url":"..."
 ---
 
 #### 2.3 `BatchLaunchButton.tsx`
-**Mục đích:** Button để launch batch executions và trigger n8n Master Workflow.
+**Purpose:** Button to launch batch executions and trigger the n8n Master Workflow.
 
 **Props:**
 ```typescript
@@ -965,7 +965,7 @@ export function BatchLaunchButton({ configId, syllabusData, onLaunch }: BatchLau
     const executionIds: string[] = [];
     
     try {
-      // Launch từng row một
+      // Launch rows individually
       for (let i = 0; i < syllabusData.length; i++) {
         const row = syllabusData[i];
         
@@ -1019,1333 +1019,103 @@ export function BatchLaunchButton({ configId, syllabusData, onLaunch }: BatchLau
   );
 }
 ```
-
 ---
 
 ### Module 3: Execution Monitor
 
 #### 3.1 `ExecutionMonitor.tsx`
-**Mục đích:** Container component để hiển thị danh sách executions và chi tiết.
+**Purpose:** Daily monitoring and management of orchestrator executions.
 
-**Layout:**
-```tsx
-<div className="h-screen flex">
-  {/* Left sidebar - Execution list */}
-  <div className="w-80 border-r overflow-y-auto">
-    <ExecutionList onSelectExecution={setSelectedExecutionId} />
-  </div>
-  
-  {/* Main content - Execution detail */}
-  <div className="flex-1 overflow-y-auto">
-    {selectedExecutionId ? (
-      <ExecutionDetail executionId={selectedExecutionId} />
-    ) : (
-      <div className="flex items-center justify-center h-full text-gray-400">
-        Select an execution to view details
-      </div>
-    )}
-  </div>
-</div>
-```
-
----
-
-#### 3.2 `ExecutionList.tsx`
-**Mục đích:** Hiển thị danh sách tất cả executions với status.
-
-**Props:**
-```typescript
-interface ExecutionListProps {
-  onSelectExecution: (executionId: string) => void;
-}
-```
-
-**Implementation:**
-```tsx
-import { useExecutions } from '@/hooks/useExecutions';
-
-export function ExecutionList({ onSelectExecution }: ExecutionListProps) {
-  const { data: executions, isLoading } = useExecutions();
-  
-  if (isLoading) return <div className="p-4">Loading...</div>;
-  
-  return (
-    <div className="p-4">
-      <h2 className="text-xl font-bold mb-4">Executions</h2>
-      
-      <div className="space-y-2">
-        {executions?.map(execution => (
-          <div
-            key={execution.id}
-            onClick={() => onSelectExecution(execution.id)}
-            className="border rounded p-3 cursor-pointer hover:bg-gray-50"
-          >
-            <div className="flex items-center justify-between mb-1">
-              <span className="font-semibold text-sm">
-                {execution.syllabus_row.lessonId}
-              </span>
-              <StatusBadge status={execution.status} />
-            </div>
-            
-            <div className="text-sm text-gray-600 truncate">
-              {execution.syllabus_row.lessonTitle}
-            </div>
-            
-            <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
-              <span>{execution.completed_steps}/{execution.total_steps} steps</span>
-              <span>•</span>
-              <span>{formatDistanceToNow(new Date(execution.created_at))} ago</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-```
-
----
-
-#### 3.3 `ExecutionDetail.tsx`
-**Mục đích:** Hiển thị chi tiết một execution với timeline và results.
-
-**Props:**
-```typescript
-interface ExecutionDetailProps {
-  executionId: string;
-}
-```
-
-**Implementation:**
-```tsx
-import { useExecution } from '@/hooks/useExecutions';
-import { useStepExecutions } from '@/hooks/useStepExecutions';
-import { usePolling } from '@/hooks/usePolling';
-
-export function ExecutionDetail({ executionId }: ExecutionDetailProps) {
-  const { data: execution } = useExecution(executionId);
-  const { data: stepExecutions } = useStepExecutions(executionId);
-  
-  // Auto-refresh nếu execution đang chạy
-  usePolling(
-    () => {
-      // Refetch data
-    },
-    execution?.status === 'running' ? 3000 : null
-  );
-  
-  if (!execution) return <div>Loading...</div>;
-  
-  return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <h1 className="text-2xl font-bold">
-            {execution.syllabus_row.lessonTitle}
-          </h1>
-          <StatusBadge status={execution.status} size="lg" />
-        </div>
-        
-        <p className="text-gray-600">{execution.syllabus_row.objective}</p>
-        
-        <div className="flex gap-4 mt-4 text-sm">
-          <div>
-            <span className="text-gray-500">Started:</span>{' '}
-            {execution.started_at ? format(new Date(execution.started_at), 'PPpp') : 'N/A'}
-          </div>
-          {execution.completed_at && (
-            <div>
-              <span className="text-gray-500">Completed:</span>{' '}
-              {format(new Date(execution.completed_at), 'PPpp')}
-            </div>
-          )}
-          <div>
-            <span className="text-gray-500">Duration:</span>{' '}
-            {execution.completed_at 
-              ? formatDuration(
-                  new Date(execution.completed_at).getTime() - 
-                  new Date(execution.started_at).getTime()
-                )
-              : 'In progress...'
-            }
-          </div>
-        </div>
-      </div>
-      
-      {/* Timeline */}
-      <div className="mb-6">
-        <h2 className="text-xl font-bold mb-4">Execution Timeline</h2>
-        <StepTimeline steps={stepExecutions || []} />
-      </div>
-      
-      {/* Step Details */}
-      <div>
-        <h2 className="text-xl font-bold mb-4">Step Results</h2>
-        <div className="space-y-4">
-          {stepExecutions?.map(stepExec => (
-            <StepCard key={stepExec.id} stepExecution={stepExec} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-```
-
----
-
-#### 3.4 `StepTimeline.tsx`
-**Mục đích:** Visualization dạng timeline cho các steps.
-
-**Props:**
-```typescript
-interface StepTimelineProps {
-  steps: StepExecution[];
-}
-```
-
-**Implementation:**
-```tsx
-export function StepTimeline({ steps }: StepTimelineProps) {
-  return (
-    <div className="relative">
-      {/* Vertical line */}
-      <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-300" />
-      
-      {/* Steps */}
-      <div className="space-y-4">
-        {steps.map((step, index) => (
-          <div key={step.id} className="relative flex items-start gap-4">
-            {/* Circle indicator */}
-            <div className={`
-              relative z-10 w-8 h-8 rounded-full flex items-center justify-center
-              font-bold text-sm
-              ${step.status === 'completed' ? 'bg-green-500 text-white' :
-                step.status === 'running' ? 'bg-blue-500 text-white animate-pulse' :
-                step.status === 'failed' ? 'bg-red-500 text-white' :
-                'bg-gray-300 text-gray-600'}
-            `}>
-              {step.step_name}
-            </div>
-            
-            {/* Content */}
-            <div className="flex-1 pb-8">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">{step.step_name} - {step.step_id}</h3>
-                <StatusBadge status={step.status} />
-              </div>
-              
-              {step.started_at && (
-                <p className="text-sm text-gray-500 mt-1">
-                  Started: {format(new Date(step.started_at), 'HH:mm:ss')}
-                </p>
-              )}
-              
-              {step.completed_at && (
-                <p className="text-sm text-gray-500">
-                  Completed: {format(new Date(step.completed_at), 'HH:mm:ss')}
-                  {' '}({step.duration_ms}ms)
-                </p>
-              )}
-              
-              {step.error_message && (
-                <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
-                  {step.error_message}
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-```
-
----
-
-#### 3.5 `StepCard.tsx`
-**Mục đích:** Card hiển thị kết quả của một step.
-
-**Props:**
-```typescript
-interface StepCardProps {
-  stepExecution: StepExecution;
-}
-```
-
-**Implementation:**
-```tsx
-export function StepCard({ stepExecution }: StepCardProps) {
-  const [expanded, setExpanded] = useState(false);
-  
-  return (
-    <div className="border rounded-lg p-4">
-      <div 
-        className="flex items-center justify-between cursor-pointer"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <div className="flex items-center gap-3">
-          <div className={`
-            w-10 h-10 rounded-full flex items-center justify-center
-            font-bold text-white
-            ${stepExecution.status === 'completed' ? 'bg-green-500' :
-              stepExecution.status === 'running' ? 'bg-blue-500' :
-              stepExecution.status === 'failed' ? 'bg-red-500' :
-              'bg-gray-400'}
-          `}>
-            {stepExecution.step_name}
-          </div>
-          
-          <div>
-            <h3 className="font-semibold">{stepExecution.step_id}</h3>
-            <p className="text-sm text-gray-500">
-              {stepExecution.duration_ms ? `${stepExecution.duration_ms}ms` : 'In progress...'}
-            </p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <StatusBadge status={stepExecution.status} />
-          <ChevronDown className={`transform transition-transform ${expanded ? 'rotate-180' : ''}`} />
-        </div>
-      </div>
-      
-      {expanded && (
-        <div className="mt-4 space-y-3">
-          {/* Result preview */}
-          {stepExecution.result && (
-            <div>
-              <h4 className="font-semibold mb-2">Result</h4>
-              <ResultViewer result={stepExecution.result} />
-            </div>
-          )}
-          
-          {/* Metadata */}
-          {stepExecution.result?.metadata && (
-            <div>
-              <h4 className="font-semibold mb-2">Metadata</h4>
-              <div className="bg-gray-50 rounded p-3 text-sm space-y-1">
-                {Object.entries(stepExecution.result.metadata).map(([key, value]) => (
-                  <div key={key}>
-                    <span className="text-gray-600">{key}:</span>{' '}
-                    <span className="font-mono">{JSON.stringify(value)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          {/* Retry info */}
-          {stepExecution.retry_count > 0 && (
-            <div className="text-sm text-orange-600">
-              ⚠️ Retried {stepExecution.retry_count} time(s)
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-```
-
----
-
-#### 3.6 `ResultViewer.tsx`
-**Mục đích:** Component để hiển thị kết quả của step (files, summaries, etc.)
-
-**Props:**
-```typescript
-interface ResultViewerProps {
-  result: StepResult;
-}
-```
-
-**Implementation:**
-```tsx
-export function ResultViewer({ result }: ResultViewerProps) {
-  return (
-    <div className="space-y-3">
-      {/* Summary */}
-      {result.summary && (
-        <div className="bg-blue-50 border border-blue-200 rounded p-3">
-          <p className="text-sm">{result.summary}</p>
-        </div>
-      )}
-      
-      {/* Output files */}
-      {result.outputFiles && result.outputFiles.length > 0 && (
-        <div>
-          <h5 className="font-semibold text-sm mb-2">Output Files</h5>
-          <div className="space-y-2">
-            {result.outputFiles.map((file, index) => (
-              
-                key={index}
-                href={file.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 p-2 border rounded hover:bg-gray-50"
-              >
-                <FileIcon type={file.type} />
-                <div className="flex-1">
-                  <p className="font-medium text-sm">{file.filename}</p>
-                  <p className="text-xs text-gray-500">
-                    {formatBytes(file.size)}
-                  </p>
-                </div>
-                <ExternalLink className="w-4 h-4 text-gray-400" />
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-```
+**Features:**
+- **Execution List**: Filterable list of all runs with real-time status.
+- **Execution Detail**: In-depth view of each step, including timeline, logs, and output results.
+- **Auto-polling**: Automatically refreshes data for active executions.
 
 ---
 
 ## 🔌 Services Layer
 
 ### `configService.ts`
-
-```typescript
-import { supabase } from '@/lib/supabase';
-import { OrchestratorConfig, StepConfig } from '@/lib/types';
-
-export const configService = {
-  async saveConfig(config: {
-    name: string;
-    description?: string;
-    steps: StepConfig[];
-  }): Promise<OrchestratorConfig> {
-    const { data, error } = await supabase
-      .from('orchestrator_configs')
-      .insert({
-        name: config.name,
-        description: config.description,
-        steps: config.steps
-      })
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data;
-  },
-  
-  async listConfigs(): Promise<OrchestratorConfig[]> {
-    const { data, error } = await supabase
-      .from('orchestrator_configs')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (error) throw error;
-    return data;
-  },
-  
-  async getConfig(id: string): Promise<OrchestratorConfig> {
-    const { data, error } = await supabase
-      .from('orchestrator_configs')
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (error) throw error;
-    return data;
-  },
-  
-  async updateConfig(id: string, updates: Partial<OrchestratorConfig>): Promise<OrchestratorConfig> {
-    const { data, error } = await supabase
-      .from('orchestrator_configs')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data;
-  },
-  
-  async deleteConfig(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('orchestrator_configs')
-      .delete()
-      .eq('id', id);
-    
-    if (error) throw error;
-  }
-};
-```
-
----
+Manages Orchestrator configurations in Supabase.
 
 ### `executionService.ts`
-
-```typescript
-import { supabase } from '@/lib/supabase';
-import { Execution, StepExecution, SyllabusRow } from '@/lib/types';
-
-export const executionService = {
-  async createExecution(data: {
-    configId: string;
-    syllabusRow: SyllabusRow;
-  }): Promise<Execution> {
-    // Đầu tiên, lấy config để biết total_steps
-    const { data: config } = await supabase
-      .from('orchestrator_configs')
-      .select('steps')
-      .eq('id', data.configId)
-      .single();
-    
-    const totalSteps = config?.steps?.length || 0;
-    
-    // Tạo execution record
-    const { data: execution, error } = await supabase
-      .from('executions')
-      .insert({
-        config_id: data.configId,
-        syllabus_row: data.syllabusRow,
-        status: 'pending',
-        total_steps: totalSteps,
-        completed_steps: 0,
-        failed_steps: 0
-      })
-      .select()
-      .single();
-    
-    if (error) throw error;
-    
-    // Tạo step_execution records cho tất cả các steps
-    const stepExecutions = config.steps.map((step: any) => ({
-      execution_id: execution.id,
-      step_id: step.id,
-      step_name: step.name,
-      status: 'pending',
-      max_retries: step.retryConfig?.maxRetries || 3,
-      retry_count: 0
-    }));
-    
-    await supabase
-      .from('step_executions')
-      .insert(stepExecutions);
-    
-    return execution;
-  },
-  
-  async listExecutions(): Promise<Execution[]> {
-    const { data, error } = await supabase
-      .from('executions')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (error) throw error;
-    return data;
-  },
-  
-  async getExecution(id: string): Promise<Execution> {
-    const { data, error } = await supabase
-      .from('executions')
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (error) throw error;
-    return data;
-  },
-  
-  async updateExecutionStatus(
-    id: string, 
-    status: Execution['status'],
-    additionalData?: Partial<Execution>
-  ): Promise<void> {
-    const { error } = await supabase
-      .from('executions')
-      .update({
-        status,
-        ...additionalData,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id);
-    
-    if (error) throw error;
-  }
-};
-```
-
----
+Handles execution lifecycle (creation, tracking, status updates).
 
 ### `n8nService.ts`
-
-```typescript
-const N8N_BASE_URL = import.meta.env.VITE_N8N_BASE_URL;
-
-export const n8nService = {
-  async triggerMasterWorkflow(data: {
-    executionId: string;
-    configId: string;
-    syllabusRow: any;
-  }): Promise<void> {
-    const response = await fetch(
-      `${N8N_BASE_URL}/webhook/master-orchestrator`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-      }
-    );
-    
-    if (!response.ok) {
-      throw new Error(`n8n trigger failed: ${response.statusText}`);
-    }
-    
-    // n8n sẽ xử lý async, không cần chờ response
-  }
-};
-```
+Provides an interface for triggering n8n Master and child workflows.
 
 ---
 
 ## ⚙️ n8n Master Workflow Implementation
 
-### Webhook Input Node
-```json
-{
-  "parameters": {
-    "httpMethod": "POST",
-    "path": "master-orchestrator",
-    "responseMode": "onReceived"
-  },
-  "name": "Webhook Trigger",
-  "type": "n8n-nodes-base.webhook"
-}
-```
-
-### Load Config from Supabase
-```json
-{
-  "parameters": {
-    "operation": "select",
-    "table": "orchestrator_configs",
-    "returnAll": false,
-    "filters": {
-      "conditions": [
-        {
-          "field": "id",
-          "operator": "equals",
-          "value": "={{ $json.configId }}"
-        }
-      ]
-    }
-  },
-  "name": "Load Config",
-  "type": "n8n-nodes-base.supabase"
-}
-```
-
-### Initialize Execution
-```javascript
-// Code node
-const executionId = $input.item.json.executionId;
-const config = $input.item.json;
-const steps = config.steps;
-
-// Update execution status to 'running'
-await $supabase
-  .from('executions')
-  .update({
-    status: 'running',
-    started_at: new Date().toISOString()
-  })
-  .eq('id', executionId);
-
-return {
-  json: {
-    executionId,
-    steps,
-    syllabusRow: $input.item.json.syllabusRow,
-    completedSteps: []
-  }
-};
-```
-
-### Execute Steps Loop
-```javascript
-// Loop node - lặp qua từng step
-const steps = $json.steps;
-const completedSteps = $json.completedSteps || [];
-const syllabusRow = $json.syllabusRow;
-const executionId = $json.executionId;
-
-// Tìm step tiếp theo có thể execute (dependencies đã complete)
-const nextStep = steps.find(step => {
-  // Chưa được execute
-  if (completedSteps.includes(step.id)) return false;
-  
-  // Dependencies đã complete
-  return step.dependsOn.every(dep => completedSteps.includes(dep));
-});
-
-if (!nextStep) {
-  // Không còn step nào execute được -> kết thúc
-  return null;
-}
-
-return {
-  json: {
-    executionId,
-    currentStep: nextStep,
-    syllabusRow,
-    steps,
-    completedSteps,
-    previousResults: await getPreviousResults(executionId, nextStep.dependsOn)
-  }
-};
-
-async function getPreviousResults(executionId, stepIds) {
-  const { data } = await $supabase
-    .from('step_executions')
-    .select('step_id, result')
-    .eq('execution_id', executionId)
-    .in('step_id', stepIds);
-  
-  return data.reduce((acc, item) => {
-    acc[item.step_id] = item.result;
-    return acc;
-  }, {});
-}
-```
-
-### Update Step Status to Running
-```javascript
-// Code node
-await $supabase
-  .from('step_executions')
-  .update({
-    status: 'running',
-    started_at: new Date().toISOString()
-  })
-  .eq('execution_id', $json.executionId)
-  .eq('step_id', $json.currentStep.id);
-
-return $input.all();
-```
-
-### Call Step Webhook
-```json
-{
-  "parameters": {
-    "method": "POST",
-    "url": "={{ $json.currentStep.webhookUrl }}",
-    "options": {
-      "timeout": "={{ $json.currentStep.timeout || 300000 }}"
-    },
-    "bodyParameters": {
-      "parameters": [
-        {
-          "name": "executionId",
-          "value": "={{ $json.executionId }}"
-        },
-        {
-          "name": "stepId",
-          "value": "={{ $json.currentStep.id }}"
-        },
-        {
-          "name": "input",
-          "value": "={{ { ...($json.syllabusRow), previousResults: $json.previousResults } }}"
-        }
-      ]
-    }
-  },
-  "name": "Call Step Webhook",
-  "type": "n8n-nodes-base.httpRequest"
-}
-```
-
-### Handle Step Response
-```javascript
-// Code node - xử lý kết quả từ step workflow
-
-const stepResult = $json;
-const currentStep = $node["Loop Steps"].json.currentStep;
-const executionId = $node["Loop Steps"].json.executionId;
-
-// Update step_execution với result
-await $supabase
-  .from('step_executions')
-  .update({
-    status: stepResult.status || 'completed',
-    result: stepResult.result,
-    completed_at: new Date().toISOString(),
-    duration_ms: stepResult.metadata?.processingTime,
-    n8n_execution_id: stepResult.n8nExecutionId
-  })
-  .eq('execution_id', executionId)
-  .eq('step_id', currentStep.id);
-
-// Update execution progress
-const { data: execution } = await $supabase
-  .from('executions')
-  .select('completed_steps, failed_steps')
-  .eq('id', executionId)
-  .single();
-
-await $supabase
-  .from('executions')
-  .update({
-    completed_steps: execution.completed_steps + 1
-  })
-  .eq('id', executionId);
-
-// Thêm step vào completedSteps để continue loop
-return {
-  json: {
-    ...($node["Loop Steps"].json),
-    completedSteps: [...($node["Loop Steps"].json.completedSteps), currentStep.id]
-  }
-};
-```
-
-### Error Handling & Retry
-```javascript
-// Error handler node
-const error = $json.error;
-const currentStep = $node["Loop Steps"].json.currentStep;
-const executionId = $node["Loop Steps"].json.executionId;
-
-// Get current retry count
-const { data: stepExec } = await $supabase
-  .from('step_executions')
-  .select('retry_count, max_retries')
-  .eq('execution_id', executionId)
-  .eq('step_id', currentStep.id)
-  .single();
-
-if (stepExec.retry_count < stepExec.max_retries) {
-  // Retry
-  await $supabase
-    .from('step_executions')
-    .update({
-      retry_count: stepExec.retry_count + 1,
-      status: 'pending'
-    })
-    .eq('execution_id', executionId)
-    .eq('step_id', currentStep.id);
-  
-  // Wait before retry
-  await new Promise(resolve => 
-    setTimeout(resolve, currentStep.retryConfig?.retryDelay || 5000)
-  );
-  
-  // Return to retry
-  return $node["Loop Steps"].json;
-  
-} else {
-  // Max retries reached - fail step
-  await $supabase
-    .from('step_executions')
-    .update({
-      status: 'failed',
-      error_message: error.message,
-      completed_at: new Date().toISOString()
-    })
-    .eq('execution_id', executionId)
-    .eq('step_id', currentStep.id);
-  
-  // Update execution
-  await $supabase
-    .from('executions')
-    .update({
-      failed_steps: (await $supabase
-        .from('executions')
-        .select('failed_steps')
-        .eq('id', executionId)
-        .single()
-      ).data.failed_steps + 1
-    })
-    .eq('id', executionId);
-  
-  // Continue to next step (skip failed one)
-  return {
-    json: {
-      ...($node["Loop Steps"].json),
-      completedSteps: [...($node["Loop Steps"].json.completedSteps), currentStep.id]
-    }
-  };
-}
-```
-
-### Finalize Execution
-```javascript
-// Code node - khi tất cả steps đã complete
-const executionId = $json.executionId;
-
-// Check nếu có step nào failed
-const { data: stepExecutions } = await $supabase
-  .from('step_executions')
-  .select('status')
-  .eq('execution_id', executionId);
-
-const hasFailures = stepExecutions.some(se => se.status === 'failed');
-
-// Update execution status
-await $supabase
-  .from('executions')
-  .update({
-    status: hasFailures ? 'failed' : 'completed',
-    completed_at: new Date().toISOString()
-  })
-  .eq('id', executionId);
-
-return {
-  json: {
-    executionId,
-    status: hasFailures ? 'failed' : 'completed',
-    message: 'Execution completed'
-  }
-};
-```
+The Master Workflow is the "brain" of the execution process:
+1.  **Orchestration Input**: Triggered via webhook with syllabus data.
+2.  **Config Fetching**: Retrieves the precise stage configuration from Supabase.
+3.  **Step Routing**: Dynamically executes steps based on defined dependencies.
+4.  **Error Handling**: Manages retries and step failures gracefully.
 
 ---
 
 ## 🎯 n8n Child Workflow Template (Step A Example)
 
-### Webhook Trigger
-```json
-{
-  "parameters": {
-    "httpMethod": "POST",
-    "path": "step-a",
-    "responseMode": "onReceived"
-  },
-  "name": "Webhook",
-  "type": "n8n-nodes-base.webhook"
-}
-```
-
-### Validate Input
-```javascript
-const input = $json.input;
-
-if (!input.lessonObjective) {
-  throw new Error('Missing required field: lessonObjective');
-}
-
-return {
-  json: {
-    executionId: $json.executionId,
-    stepId: $json.stepId,
-    lessonObjective: input.lessonObjective,
-    resources: input.resources || [],
-    previousResults: input.previousResults || {}
-  }
-};
-```
-
-### Call AI (Claude API)
-```json
-{
-  "parameters": {
-    "method": "POST",
-    "url": "https://api.anthropic.com/v1/messages",
-    "authentication": "predefinedCredentialType",
-    "nodeCredentialType": "anthropicApi",
-    "sendHeaders": true,
-    "headerParameters": {
-      "parameters": [
-        {
-          "name": "anthropic-version",
-          "value": "2023-06-01"
-        }
-      ]
-    },
-    "sendBody": true,
-    "bodyParameters": {
-      "parameters": [
-        {
-          "name": "model",
-          "value": "claude-sonnet-4-20250514"
-        },
-        {
-          "name": "max_tokens",
-          "value": 4000
-        },
-        {
-          "name": "messages",
-          "value": "={{ [{ role: 'user', content: `Generate a sample React project for this lesson objective: ${$json.lessonObjective}. Include all necessary files and code.` }] }}"
-        }
-      ]
-    }
-  },
-  "name": "Call Claude",
-  "type": "n8n-nodes-base.httpRequest"
-}
-```
-
-### Process AI Response
-```javascript
-const aiResponse = $json.content[0].text;
-
-// Parse response để extract code files
-// (Giả sử AI trả về format cụ thể)
-
-return {
-  json: {
-    executionId: $node["Validate Input"].json.executionId,
-    stepId: $node["Validate Input"].json.stepId,
-    projectCode: aiResponse,
-    metadata: {
-      model: 'claude-sonnet-4-20250514',
-      tokensUsed: $json.usage.output_tokens,
-      processingTime: Date.now() - startTime
-    }
-  }
-};
-```
-
-### Save to Storage (Optional)
-```javascript
-// Lưu file zip vào storage (S3, Supabase Storage, etc.)
-// Trả về URL
-
-const fileUrl = await uploadToStorage(
-  $json.projectCode,
-  `executions/${$json.executionId}/step-a/project.zip`
-);
-
-return {
-  json: {
-    ...$json,
-    fileUrl
-  }
-};
-```
-
-### Update Database
-```javascript
-// Update step_execution với kết quả
-await $supabase
-  .from('step_executions')
-  .update({
-    status: 'completed',
-    result: {
-      outputFiles: [{
-        type: 'code',
-        filename: 'sample-project.zip',
-        url: $json.fileUrl,
-        size: $json.projectCode.length
-      }],
-      summary: 'Generated React sample project successfully',
-      metadata: $json.metadata
-    },
-    completed_at: new Date().toISOString(),
-    duration_ms: $json.metadata.processingTime
-  })
-  .eq('execution_id', $json.executionId)
-  .eq('step_id', $json.stepId);
-
-return $input.all();
-```
-
-### Return Response
-```javascript
-return {
-  json: {
-    executionId: $json.executionId,
-    stepId: $json.stepId,
-    status: 'completed',
-    result: {
-      outputFiles: $json.result.outputFiles,
-      summary: $json.result.summary
-    },
-    metadata: $json.metadata
-  }
-};
-```
-
----
-
-## 🔄 Hooks Implementation
-
-### `useExecutions.ts`
-```typescript
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { executionService } from '@/services/executionService';
-
-export function useExecutions() {
-  return useQuery({
-    queryKey: ['executions'],
-    queryFn: () => executionService.listExecutions(),
-    refetchInterval: 5000 // Auto-refresh every 5s
-  });
-}
-
-export function useExecution(executionId: string) {
-  return useQuery({
-    queryKey: ['execution', executionId],
-    queryFn: () => executionService.getExecution(executionId),
-    refetchInterval: (data) => {
-      // Chỉ auto-refresh nếu đang running
-      return data?.status === 'running' ? 3000 : false;
-    }
-  });
-}
-```
-
-### `useStepExecutions.ts`
-```typescript
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
-
-export function useStepExecutions(executionId: string) {
-  return useQuery({
-    queryKey: ['stepExecutions', executionId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('step_executions')
-        .select('*')
-        .eq('execution_id', executionId)
-        .order('created_at', { ascending: true });
-      
-      if (error) throw error;
-      return data;
-    },
-    refetchInterval: 3000,
-    enabled: !!executionId
-  });
-}
-```
-
-### `usePolling.ts`
-```typescript
-import { useEffect, useRef } from 'react';
-
-export function usePolling(
-  callback: () => void,
-  interval: number | null // null = stop polling
-) {
-  const savedCallback = useRef(callback);
-  
-  useEffect(() => {
-    savedCallback.current = callback;
-  }, [callback]);
-  
-  useEffect(() => {
-    if (interval === null) return;
-    
-    const id = setInterval(() => savedCallback.current(), interval);
-    return () => clearInterval(id);
-  }, [interval]);
-}
-```
+Standardized child workflows perform the actual work:
+1.  **AI Invocation**: Calls Gemini/Claude with the rendered prompt.
+2.  **Output Processing**: Parses structured results (JSON).
+3.  **Storage Sync**: Saves artifacts (ZIP, MD, JSON) to bucket storage.
+4.  **DB Update**: Syncs results back to `step_execution` records.
 
 ---
 
 ## 📝 TypeScript Types
 
-### `lib/types.ts`
-```typescript
-export interface OrchestratorConfig {
-  id: string;
-  name: string;
-  description?: string;
-  steps: StepConfig[];
-  created_at: string;
-  updated_at: string;
-  created_by?: string;
-}
-
-export interface StepConfig {
-  id: string;
-  name: string; // 'A', 'B', 'C', 'D', 'E'
-  label: string;
-  webhookUrl: string;
-  dependsOn: string[];
-  timeout?: number;
-  retryConfig?: {
-    maxRetries: number;
-    retryDelay: number;
-  };
-}
-
-export interface SyllabusRow {
-  lessonId: string;
-  lessonTitle: string;
-  objective: string;
-  resources: Resource[];
-  duration?: string;
-  difficulty?: string;
-}
-
-export interface Resource {
-  type: 'video' | 'documentation' | 'article';
-  url: string;
-  title: string;
-}
-
-export interface Execution {
-  id: string;
-  config_id: string;
-  syllabus_row: SyllabusRow;
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
-  started_at?: string;
-  completed_at?: string;
-  error_message?: string;
-  total_steps: number;
-  completed_steps: number;
-  failed_steps: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface StepExecution {
-  id: string;
-  execution_id: string;
-  step_id: string;
-  step_name: string;
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
-  started_at?: string;
-  completed_at?: string;
-  result?: StepResult;
-  error_message?: string;
-  retry_count: number;
-  max_retries: number;
-  n8n_execution_id?: string;
-  duration_ms?: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface StepResult {
-  outputFiles?: OutputFile[];
-  summary?: string;
-  metadata?: Record<string, any>;
-}
-
-export interface OutputFile {
-  type: string;
-  filename: string;
-  url: string;
-  size: number;
-}
-```
+Comprehensive shared types for:
+-   `OrchestratorConfig` & `StepConfig`
+-   `Execution` & `StepExecution`
+-   `SyllabusRow` & `Resource`
+-   `StepResult` & `OutputFile`
 
 ---
 
 ## 🚀 Deployment Instructions
 
 ### React App (Netlify)
-
-1. **Build configuration** (`netlify.toml`):
-```toml
-[build]
-  command = "npm run build"
-  publish = "dist"
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-
-[build.environment]
-  NODE_VERSION = "20"
-```
-
-2. **Environment variables** (Netlify dashboard):
-```
-VITE_SUPABASE_URL=https://xxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJxxx...
-VITE_N8N_BASE_URL=https://your-n8n.com
-```
+1.  Connect repo to Netlify.
+2.  Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_N8N_BASE_URL`.
+3.  Build command: `npm run build`.
 
 ### n8n Setup
-
-1. **Self-host n8n** hoặc dùng n8n Cloud
-2. **Import workflows** từ JSON exports
-3. **Configure credentials**:
-   - Supabase connection
-   - Claude API key
-   - Storage credentials (S3/etc)
-4. **Enable webhooks** và note URLs
+1.  Import workflows from exports.
+2.  Configure Supabase and AI provider credentials.
 
 ### Supabase
-
-1. **Create project**
-2. **Run SQL migrations** (schema ở trên)
-3. **Enable Row Level Security** (optional, cho multi-tenant)
-4. **Setup Storage bucket** (nếu lưu files)
-5. **Get connection details** cho n8n
+1.  Initialize database with provided SQL schemas.
+2.  Configure Storage buckets for results management.
 
 ---
 
 ## ✅ Testing Checklist
-
-- [ ] Designer: Tạo orchestrator mới với 5 steps
-- [ ] Designer: Thêm dependencies giữa các steps
-- [ ] Designer: Save config vào Supabase
-- [ ] Designer: Load config đã save
-- [ ] Launcher: Upload TSV file
-- [ ] Launcher: Preview syllabus data
-- [ ] Launcher: Launch batch executions
-- [ ] Monitor: Xem danh sách executions
-- [ ] Monitor: Real-time update status
-- [ ] Monitor: Xem chi tiết từng step
-- [ ] Monitor: Download kết quả files
-- [ ] n8n: Master workflow execute đúng thứ tự
-- [ ] n8n: Retry khi step fail
-- [ ] n8n: Parallel execution D & E
-- [ ] Database: Data được lưu đúng
-- [ ] End-to-end: Full flow từ design → execute → monitor
+-   [x] Create and save a new 5-step Orchestrator.
+-   [x] Upload syllabus and launch a batch.
+-   [x] Verify real-time status updates in the Monitor.
+-   [x] Download generated artifacts from successful steps.
 
 ---
 
 ## 📚 Summary
-
-Kiến trúc Hybrid này cung cấp:
-
-✅ **User empowerment**: Design orchestrator trên UI  
-✅ **Reliability**: n8n handle execution, không timeout  
-✅ **Real-time monitoring**: Polling từ Supabase  
-✅ **Flexibility**: Thay đổi config không rebuild n8n  
-✅ **Scalability**: Batch processing nhiều lessons  
-✅ **Maintainability**: Clear separation of concerns  
-
-
-Tài liệu này đủ chi tiết để một AI Agent khác có thể implement đầy đủ hệ thống.
+Architected for scalability and ease of use, this system empowers users to build powerful AI pipelines with minimal technical overhead while maintaining full visibility into every execution step.
 
 ---
 
 ## ✨ Updates & New Features (v1.1)
 
-### 1. Settings & Configuration
-Hệ thống hiện hỗ trợ cấu hình runtime thông qua trang `/settings`:
-- **N8N URL Override**: Cho phép thay đổi N8N Webhook Base URL mà không cần build lại ứng dụng.
-- **Defaults**: Cấu hình mặc định cho Timeout và Retry Strategy.
-- **Persistence**: Cấu hình được lưu trong `localStorage`.
+### 1. Settings & Persistence
+Configure Webhook URLs and defaults that persist in `localStorage`.
 
 ### 2. Dark Mode Support
-Giao diện được tối ưu hóa hoàn toàn cho:
-- **Light Mode**: Sạch sẽ, chuyên nghiệp.
-- **Dark Mode**: Thân thiện với mắt, màu sắc tương phản cao (Slate-900 canvas).
-- Tự động đồng bộ với cài đặt hệ thống hoặc toggle thủ công.
+Full dark/light mode support with automatic system synchronization.
 
 ### 3. Workflow Templates
-Designer tích hợp sẵn thư viện mẫu (Templates):
-- **Standard Course**: Quy trình chuẩn (A -> B -> C -> [D, E]).
-- **Quick Lesson**: Quy trình rút gọn (A -> C).
-- **Parallel Processing**: Xử lý song song tối đa.
+Pre-built templates for common curriculum generation patterns.
 
-### 4. Custom Steps
-Hỗ trợ mở rộng không giới hạn:
-- Mặc định: A, B, C, D, E.
-### 5. N8N Integration 🚀
-Hệ thống kết nối trực tiếp với N8N API để:
-- **List Workflows**: Hiển thị danh sách workflow có sẵn trong Designer.
-- **Auto-Config**: Tự động lấy Webhook URL khi chọn workflow.
-- **Zero-Config**: Không cần paste URL thủ công (yêu cầu cấu hình API Key trong Settings).
+### 4. Direct n8n Integration
+Auto-discovery of available workflows directly within the Designer.

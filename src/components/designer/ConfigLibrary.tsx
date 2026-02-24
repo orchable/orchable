@@ -7,13 +7,27 @@ import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FolderOpen, Search, LayoutTemplate, FileText } from 'lucide-react';
+import { FolderOpen, Search, LayoutTemplate, FileText, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
+import { useDeleteConfig } from '@/hooks/useConfigs';
+import { toast } from 'sonner';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export function ConfigLibrary() {
     const { loadConfig } = useDesignerStore();
     const { data: savedConfigs } = useConfigs();
+    const deleteConfig = useDeleteConfig();
     const [open, setOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -68,6 +82,17 @@ export function ConfigLibrary() {
         setOpen(false);
     };
 
+    const handleDelete = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        try {
+            await deleteConfig.mutateAsync(id);
+            toast.success("Configuration deleted successfully");
+        } catch (error) {
+            console.error("Failed to delete config:", error);
+            toast.error("Failed to delete configuration");
+        }
+    };
+
     const filteredConfigs = savedConfigs?.filter(c =>
         c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.description?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -118,11 +143,11 @@ export function ConfigLibrary() {
                                 {filteredConfigs?.map((config) => (
                                     <div
                                         key={config.id}
-                                        className="flex flex-col gap-2 p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
+                                        className="flex flex-col gap-2 p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group relative"
                                         onClick={() => handleLoadConfig(config)}
                                     >
                                         <div className="flex items-start justify-between">
-                                            <div className="flex items-center gap-2 font-medium">
+                                            <div className="flex items-center gap-2 font-medium pr-8">
                                                 <FileText className="w-4 h-4 text-primary" />
                                                 {config.name}
                                             </div>
@@ -130,6 +155,39 @@ export function ConfigLibrary() {
                                                 {formatDistanceToNow(new Date(config.updated_at), { addSuffix: true })}
                                             </Badge>
                                         </div>
+
+                                        {/* Delete Button */}
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="absolute top-2 right-2 h-7 w-7 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        This will permanently delete the "{config.name}" configuration.
+                                                        This action cannot be undone.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction
+                                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                                        onClick={(e) => handleDelete(config.id, e)}
+                                                    >
+                                                        Delete
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+
                                         {config.description && (
                                             <p className="text-sm text-muted-foreground line-clamp-2">
                                                 {config.description}

@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { ICONS } from '@/lib/icons';
 
 interface StepBadgeProps {
   name: string;
@@ -33,12 +34,14 @@ export function StepBadge({ name, size = 'md', className }: StepBadgeProps) {
 
     // Simple hash
     let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    for (let i = 0; i < (name || '').length; i++) {
+      hash = (name || '').charCodeAt(i) + ((hash << 5) - hash);
     }
     const index = Math.abs(hash) % dynamicColors.length;
     colorClass = dynamicColors[index];
   }
+
+  const Icon = ICONS[name || ''];
 
   return (
     <div
@@ -48,8 +51,9 @@ export function StepBadge({ name, size = 'md', className }: StepBadgeProps) {
         sizeClasses[size],
         className
       )}
+      title={name}
     >
-      {name}
+      {Icon ? <Icon className={size === 'sm' ? "w-3 h-3" : size === 'lg' ? "w-5 h-5" : "w-4 h-4"} /> : (name || '').substring(0, 4)}
     </div>
   );
 }

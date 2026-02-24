@@ -1,0 +1,232 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "8a9bbf41-553f-4a2e-8210-3a045fad6ea6",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "prompt_templates",
+        "returnAll": true,
+        "filterType": "none"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        208,
+        0
+      ],
+      "id": "25277baf-2671-4494-99b3-f2bafa91d53c",
+      "name": "Get many rows",
+      "credentials": {
+        "supabaseApi": {
+          "id": "tOzBo3n0Kkt5Bt41",
+          "name": "Supabase Account Tony"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "5xMUAUfqF9IN6GPG",
+          "mode": "list",
+          "cachedResultName": "prompt-template",
+          "cachedResultUrl": "/projects/B8LPf0gekMWp8vZq/datatables/5xMUAUfqF9IN6GPG"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "prompt_id",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "prompt_id": "={{ $json.id }}",
+            "prompt_name": "={{ $json.name }}",
+            "template": "={{ $json.template }}",
+            "ai_settings": "={{ JSON.stringify($json.default_ai_settings) }}",
+            "prompt_input_schema": "={{ JSON.stringify($json.input_schema) }}",
+            "prompt_output_schema": "={{ JSON.stringify($json.output_schema) }}",
+            "requires_approval": "={{ $json.requires_approval }}",
+            "stage_config": "={{ JSON.stringify($json.stage_config) }}",
+            "is_active": "={{ $json.is_active }}",
+            "next_stage_template_ids": "={{ JSON.stringify($json.next_stage_template_ids) }}",
+            "next_stage_template_id": "={{ JSON.stringify($json.next_stage_template_id) }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "prompt_id",
+              "displayName": "prompt_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "prompt_name",
+              "displayName": "prompt_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "template",
+              "displayName": "template",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "ai_settings",
+              "displayName": "ai_settings",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "prompt_output_schema",
+              "displayName": "prompt_output_schema",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "prompt_input_schema",
+              "displayName": "prompt_input_schema",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "requires_approval",
+              "displayName": "requires_approval",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "next_stage_template_ids",
+              "displayName": "next_stage_template_ids",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "next_stage_template_id",
+              "displayName": "next_stage_template_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "is_active",
+              "displayName": "is_active",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "stage_config",
+              "displayName": "stage_config",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        448,
+        0
+      ],
+      "id": "da6231a4-884e-4321-aa55-2029ff465412",
+      "name": "Upsert row(s) in prompt-template table"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get many rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows": {
+      "main": [
+        [
+          {
+            "node": "Upsert row(s) in prompt-template table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3c3655861b945e2f23873d293f97337788a318f9e0823cca507f13751bd70fd7"
+  }
+}

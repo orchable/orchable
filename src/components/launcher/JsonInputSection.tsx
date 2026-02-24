@@ -17,6 +17,7 @@ interface JsonInputSectionProps {
     sampleJson: any;
     contract?: StageContract | null;
     orchestrationMetadata?: any;
+    compact?: boolean;
 }
 
 export const JsonInputSection: React.FC<JsonInputSectionProps> = ({
@@ -26,7 +27,8 @@ export const JsonInputSection: React.FC<JsonInputSectionProps> = ({
     onSelectionChange,
     sampleJson,
     contract,
-    orchestrationMetadata
+    orchestrationMetadata,
+    compact = false
 }) => {
     const [copied, setCopied] = React.useState(false);
 
@@ -128,13 +130,13 @@ export const JsonInputSection: React.FC<JsonInputSectionProps> = ({
     }, [selection, mapping, analysis, sampleJson, contract, orchestrationMetadata]);
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500 mt-6">
+        <div className={`${compact ? 'space-y-3 mt-2' : 'space-y-6 mt-6'} animate-in fade-in duration-500`}>
             {/* Contract Fields Section */}
             {contract && (
-                <div className="p-4 rounded-xl border bg-primary/5 border-primary/20 space-y-3">
+                <div className={`${compact ? 'p-2' : 'p-4'} rounded-xl border bg-primary/5 border-primary/20 space-y-3`}>
                     <div className="flex items-center gap-2 text-xs font-semibold text-primary">
                         <Braces className="w-4 h-4" />
-                        Trường thông tin theo Contract ({contract.input.fields.length})
+                        Contract Fields ({contract.input.fields.length})
                     </div>
                     <div className="flex flex-wrap gap-2">
                         {contract.input.fields.map(field => (
@@ -143,19 +145,21 @@ export const JsonInputSection: React.FC<JsonInputSectionProps> = ({
                             </Badge>
                         ))}
                     </div>
-                    <p className="text-[10px] text-muted-foreground italic">
-                        Các trường trùng tên bên dưới sẽ được tự động highlight và chọn.
-                    </p>
+                    {!compact && (
+                        <p className="text-[10px] text-muted-foreground italic">
+                            Matching field names below will be automatically highlighted and selected.
+                        </p>
+                    )}
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className={`grid grid-cols-1 ${compact ? '' : 'md:grid-cols-2'} gap-4`}>
                 {/* Shared Fields */}
                 <Card className="border-muted/40 shadow-sm">
                     <CardHeader className="pb-3 px-4">
                         <div className="flex items-center justify-between">
                             <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                                Thông tin chung (Shared)
+                                Shared Info (Shared)
                                 <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-mono">root.field</Badge>
                             </CardTitle>
                             <div className="flex gap-1">
@@ -164,8 +168,8 @@ export const JsonInputSection: React.FC<JsonInputSectionProps> = ({
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent className="px-4 pb-4">
-                        <ScrollArea className="h-48 pr-3">
+                    <CardContent className={`${compact ? 'px-2 pb-2' : 'px-4 pb-4'}`}>
+                        <ScrollArea className={`${compact ? 'h-32' : 'h-48'} pr-3`}>
                             <div className="space-y-1.5">
                                 {analysis.sharedFields.map((field: FieldInfo) => {
                                     const fieldName = field.path.split('.').pop();
@@ -211,7 +215,7 @@ export const JsonInputSection: React.FC<JsonInputSectionProps> = ({
                     <CardHeader className="pb-3 px-4">
                         <div className="flex items-center justify-between">
                             <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                                Thông tin riêng (Per-Task)
+                                Per-Task Info (Per-Task)
                                 <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-primary/10 text-primary border-0 font-mono">
                                     {analysis.taskArrayPath}[*]
                                 </Badge>
@@ -222,8 +226,8 @@ export const JsonInputSection: React.FC<JsonInputSectionProps> = ({
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent className="px-4 pb-4">
-                        <ScrollArea className="h-48 pr-3">
+                    <CardContent className={`${compact ? 'px-2 pb-2' : 'px-4 pb-4'}`}>
+                        <ScrollArea className={`${compact ? 'h-32' : 'h-48'} pr-3`}>
                             <div className="space-y-1.5">
                                 {analysis.perTaskFields.map((field: FieldInfo) => {
                                     const fieldName = field.path.split('.').pop();
@@ -267,11 +271,11 @@ export const JsonInputSection: React.FC<JsonInputSectionProps> = ({
                 <CardHeader className="pb-2 px-4 pt-4">
                     <CardTitle className="text-xs font-semibold flex items-center gap-2 text-muted-foreground animate-in fade-in">
                         <Eye className="w-3.5 h-3.5" />
-                        Xem trước dữ liệu 1 task (First Item)
+                        Preview Data for 1 Task (First Item)
                     </CardTitle>
                     <div className="flex items-center justify-between">
                         <CardDescription className="text-[10px] italic">
-                            Dữ liệu sẽ được truyền vào orchestrator dựa trên các trường bạn đã chọn ở trên.
+                            Data will be passed to the orchestrator based on the fields selected above.
                         </CardDescription>
                         <Button
                             variant="ghost"
@@ -288,7 +292,7 @@ export const JsonInputSection: React.FC<JsonInputSectionProps> = ({
                         </Button>
                     </div>
                 </CardHeader>
-                <CardContent className="px-4 pb-4">
+                <CardContent className={`${compact ? 'px-2 pb-2' : 'px-4 pb-4'}`}>
                     <pre className="text-[10px] font-mono bg-background/50 p-3 rounded-lg border border-muted/50 max-h-40 overflow-auto whitespace-pre-wrap custom-scrollbar">
                         {JSON.stringify(previewData, null, 2)}
                     </pre>

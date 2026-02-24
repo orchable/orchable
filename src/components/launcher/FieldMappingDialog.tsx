@@ -79,9 +79,9 @@ export const FieldMappingDialog: React.FC<FieldMappingDialogProps> = ({
                 <div className="flex-1 overflow-y-auto py-4 space-y-6">
                     <Alert className="bg-primary/5 border-primary/20">
                         <AlertCircle className="h-4 w-4 text-primary" />
-                        <AlertTitle className="text-sm font-semibold">Cấu hình đầu vào cho Stage đầu tiên</AlertTitle>
+                        <AlertTitle className="text-sm font-semibold">Input Configuration for First Stage</AlertTitle>
                         <AlertDescription className="text-xs">
-                            Mỗi task cần có các thông tin sau để khớp với contract của Orchestrator. Hãy chọn trường tương ứng từ JSON của bạn.
+                            Each task needs the following information to match the Orchestrator contract. Please select the corresponding fields from your JSON.
                         </AlertDescription>
                     </Alert>
 
@@ -134,7 +134,7 @@ export const FieldMappingDialog: React.FC<FieldMappingDialogProps> = ({
                                                 <Input
                                                     value={staticValue}
                                                     onChange={(e) => handleStaticValue(field.name, e.target.value)}
-                                                    placeholder="Nhập giá trị cố định..."
+                                                    placeholder="Enter static value..."
                                                     className="h-9 text-xs"
                                                 />
                                             ) : (
@@ -143,7 +143,7 @@ export const FieldMappingDialog: React.FC<FieldMappingDialogProps> = ({
                                                     onValueChange={(value) => handleMapField(field.name, value)}
                                                 >
                                                     <SelectTrigger className={`h-9 text-xs font-mono ${!sourcePath && field.required ? 'border-destructive/50 ring-destructive/20' : ''}`}>
-                                                        <SelectValue placeholder="Chọn trường từ JSON..." />
+                                                        <SelectValue placeholder="Select field from JSON..." />
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         {availableFields.map(f => (
@@ -169,9 +169,9 @@ export const FieldMappingDialog: React.FC<FieldMappingDialogProps> = ({
                             Auto Map by Name
                         </Button>
                         <div className="flex gap-2">
-                            <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>Hủy</Button>
+                            <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>Cancel</Button>
                             <Button size="sm" onClick={onConfirm} disabled={!isComplete}>
-                                Xác nhận Mapping
+                                Confirm Mapping
                             </Button>
                         </div>
                     </div>

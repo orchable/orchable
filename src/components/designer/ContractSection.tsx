@@ -3,6 +3,7 @@
  * 
  * Shows auto-extracted input variables and output schema definition.
  * Allows editing output schema via OutputSchemaEditor dialog.
+ * Output schema is stored as Gemini-compatible JSON Schema.
  */
 
 import { useState, useMemo, useEffect } from 'react';
@@ -14,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import type { StageContract, InputField, OutputSchemaField } from '@/lib/types';
+import type { StageContract, InputField, GeminiJsonSchema, JsonSchemaProperty } from '@/lib/types';
 import { extractInputFields, generateOutputFormatSection, createDefaultContract } from '@/lib/schemaUtils';
 import { OutputSchemaEditor } from '@/components/designer/OutputSchemaEditor';
 
@@ -30,6 +31,7 @@ export function ContractSection({ promptTemplate, contract, availableScope, onCo
     const [isInputOpen, setIsInputOpen] = useState(true);
     const [isOutputOpen, setIsOutputOpen] = useState(true);
     const [showFormatPreview, setShowFormatPreview] = useState(false);
+    const [showRawSchema, setShowRawSchema] = useState(false);
     const [isEditorOpen, setIsEditorOpen] = useState(false);
 
     // Get current contract or create default (memoized to prevent reference changes)
@@ -47,7 +49,6 @@ export function ContractSection({ promptTemplate, contract, availableScope, onCo
         : extractedInputs;
 
     // Sync extracted inputs to contract state if auto_extracted is true
-    // This ensures the fields are persisted when the stage is saved
     useEffect(() => {
         if (!currentContract.input.auto_extracted) return;
 
@@ -65,25 +66,36 @@ export function ContractSection({ promptTemplate, contract, availableScope, onCo
         }
     }, [extractedInputs, currentContract.input.auto_extracted, currentContract.input.fields, onContractChange]);
 
-
-
     // Generate format section preview
     const formatSection = useMemo(() => {
         return generateOutputFormatSection(currentContract);
     }, [currentContract]);
+
+    // Check if schema has content
+    const hasSchema = useMemo(() => {
+        const schema = currentContract.output.schema;
+        if (!schema) return false;
+        if (schema.type === 'object') return !!schema.properties && Object.keys(schema.properties).length > 0;
+        if (schema.type === 'array') return !!schema.items;
+        return false;
+    }, [currentContract.output.schema]);
 
     const handleCopyFormatSection = () => {
         navigator.clipboard.writeText(formatSection);
         toast.success('Format section copied to clipboard');
     };
 
-    const handleSchemaChange = (schema: OutputSchemaField[], rootType: 'object' | 'array') => {
+    const handleCopyRawSchema = () => {
+        navigator.clipboard.writeText(JSON.stringify(currentContract.output.schema, null, 2));
+        toast.success('JSON Schema copied to clipboard');
+    };
+
+    const handleSchemaChange = (schema: GeminiJsonSchema) => {
         onContractChange({
             ...currentContract,
             output: {
                 ...currentContract.output,
                 schema,
-                rootType,
             },
         });
     };
@@ -101,7 +113,6 @@ export function ContractSection({ promptTemplate, contract, availableScope, onCo
     const handleSyncFields = () => {
         if (!promptTemplate) return;
 
-        // Force extraction with current delimiters and update contract
         const newFields = extractInputFields(promptTemplate, currentContract.input.delimiters);
 
         onContractChange({
@@ -109,7 +120,7 @@ export function ContractSection({ promptTemplate, contract, availableScope, onCo
             input: {
                 ...currentContract.input,
                 fields: newFields,
-                auto_extracted: true // Re-enable auto-extract if it was manually disabled
+                auto_extracted: true
             }
         });
 
@@ -200,7 +211,7 @@ export function ContractSection({ promptTemplate, contract, availableScope, onCo
             <Collapsible open={isOutputOpen} onOpenChange={setIsOutputOpen}>
                 <div className={cn(
                     "border rounded-lg transition-colors",
-                    currentContract.output.schema?.length ? "border-primary/30 bg-primary/5" : "bg-muted/20"
+                    hasSchema ? "border-primary/30 bg-primary/5" : "bg-muted/20"
                 )}>
                     <CollapsibleTrigger asChild>
                         <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 rounded-t-lg">
@@ -208,7 +219,7 @@ export function ContractSection({ promptTemplate, contract, availableScope, onCo
                                 {isOutputOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                                 <FileOutput className="w-4 h-4 text-green-500" />
                                 <span className="font-medium text-sm">OUTPUT</span>
-                                {currentContract.output.schema?.length ? (
+                                {hasSchema ? (
                                     <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-green-600">
                                         defined
                                     </Badge>
@@ -235,62 +246,75 @@ export function ContractSection({ promptTemplate, contract, availableScope, onCo
 
                     <CollapsibleContent>
                         <div className="p-3 pt-0 border-t space-y-3">
-                            {currentContract.output.schema?.length ? (
+                            {hasSchema && currentContract.output.schema ? (
                                 <>
                                     {/* Schema Tree View */}
                                     <div className="bg-background rounded-md p-2 border">
                                         <div className="text-xs font-mono">
-                                            <span className="text-muted-foreground">
-                                                {currentContract.output.rootType === 'array' ? '[' : '{'}
-                                            </span>
-                                            <div className="pl-3">
-                                                {currentContract.output.schema.map((field, i) => (
-                                                    <SchemaFieldRow
-                                                        key={field.name}
-                                                        field={field}
-                                                        isLast={i === currentContract.output.schema!.length - 1}
-                                                    />
-                                                ))}
-                                            </div>
-                                            <span className="text-muted-foreground">
-                                                {currentContract.output.rootType === 'array' ? ']' : '}'}
-                                            </span>
+                                            <SchemaTreeView schema={currentContract.output.schema} />
                                         </div>
                                     </div>
 
-                                    {/* Format Preview Toggle */}
-                                    <div>
+                                    {/* Action buttons - stacked, full width */}
+                                    <div className="flex flex-col gap-1">
                                         <Button
                                             variant="ghost"
                                             size="sm"
                                             className="h-7 text-xs w-full justify-start"
-                                            onClick={() => setShowFormatPreview(!showFormatPreview)}
+                                            onClick={() => { setShowRawSchema(!showRawSchema); setShowFormatPreview(false); }}
                                         >
                                             <Eye className="w-3 h-3 mr-1" />
-                                            {showFormatPreview ? 'Hide' : 'Show'} Generated Format Section
+                                            {showRawSchema ? 'Hide' : 'Show'} JSON Schema
                                         </Button>
-
-                                        {showFormatPreview && formatSection && (
-                                            <div className="mt-2 relative">
-                                                <pre className="bg-background border rounded-md p-3 text-xs font-mono whitespace-pre-wrap overflow-auto max-h-[200px]">
-                                                    {formatSection}
-                                                </pre>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="absolute top-1 right-1 h-6 w-6"
-                                                    onClick={handleCopyFormatSection}
-                                                >
-                                                    <Copy className="w-3 h-3" />
-                                                </Button>
-                                            </div>
-                                        )}
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 text-xs w-full justify-start"
+                                            onClick={() => { setShowFormatPreview(!showFormatPreview); setShowRawSchema(false); }}
+                                        >
+                                            <Eye className="w-3 h-3 mr-1" />
+                                            {showFormatPreview ? 'Hide' : 'Show'} Format Preview
+                                        </Button>
                                     </div>
+
+                                    {/* Raw JSON Schema */}
+                                    {showRawSchema && (
+                                        <div className="relative">
+                                            <pre className="bg-background border rounded-md p-3 text-xs font-mono whitespace-pre-wrap overflow-auto max-h-[200px]">
+                                                {JSON.stringify(currentContract.output.schema, null, 2)}
+                                            </pre>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="absolute top-1 right-1 h-6 w-6"
+                                                onClick={handleCopyRawSchema}
+                                            >
+                                                <Copy className="w-3 h-3" />
+                                            </Button>
+                                        </div>
+                                    )}
+
+                                    {/* Format Preview */}
+                                    {showFormatPreview && formatSection && (
+                                        <div className="relative">
+                                            <pre className="bg-background border rounded-md p-3 text-xs font-mono whitespace-pre-wrap overflow-auto max-h-[200px]">
+                                                {formatSection}
+                                            </pre>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="absolute top-1 right-1 h-6 w-6"
+                                                onClick={handleCopyFormatSection}
+                                            >
+                                                <Copy className="w-3 h-3" />
+                                            </Button>
+                                        </div>
+                                    )}
                                 </>
                             ) : (
                                 <div className="text-center py-4">
                                     <p className="text-xs text-muted-foreground mb-2">
-                                        Define output schema to auto-inject format section into prompt
+                                        Define output schema for Gemini structured output
                                     </p>
                                     <Button
                                         variant="outline"
@@ -311,10 +335,97 @@ export function ContractSection({ promptTemplate, contract, availableScope, onCo
             <OutputSchemaEditor
                 open={isEditorOpen}
                 onOpenChange={setIsEditorOpen}
-                schema={currentContract.output.schema || []}
-                rootType={currentContract.output.rootType || 'object'}
+                schema={currentContract.output.schema}
                 onSave={handleSchemaChange}
             />
+        </div>
+    );
+}
+
+// ============================================================
+// Schema Tree View (renders GeminiJsonSchema as a tree)
+// ============================================================
+
+function SchemaTreeView({ schema }: { schema: GeminiJsonSchema }) {
+    if (schema.type === 'array') {
+        return (
+            <>
+                <span className="text-muted-foreground">{'['}</span>
+                <div className="pl-3">
+                    {schema.items && (
+                        <PropertyTreeNode name="items" prop={schema.items} isLast />
+                    )}
+                </div>
+                <span className="text-muted-foreground">{']'}</span>
+            </>
+        );
+    }
+
+    const entries = Object.entries(schema.properties || {});
+    return (
+        <>
+            <span className="text-muted-foreground">{'{'}</span>
+            <div className="pl-3">
+                {entries.map(([name, prop], i) => (
+                    <PropertyTreeNode
+                        key={name}
+                        name={name}
+                        prop={prop}
+                        isLast={i === entries.length - 1}
+                        isRequired={schema.required?.includes(name)}
+                    />
+                ))}
+            </div>
+            <span className="text-muted-foreground">{'}'}</span>
+        </>
+    );
+}
+
+function PropertyTreeNode({ name, prop, isLast, isRequired, depth = 0 }: {
+    name: string;
+    prop: JsonSchemaProperty;
+    isLast: boolean;
+    isRequired?: boolean;
+    depth?: number;
+}) {
+    const typeColor = {
+        string: 'text-green-600',
+        number: 'text-blue-600',
+        integer: 'text-blue-600',
+        boolean: 'text-purple-600',
+        array: 'text-amber-600',
+        object: 'text-pink-600',
+    }[prop.type];
+
+    return (
+        <div className="overflow-hidden">
+            <div className="flex items-center gap-1 min-w-0 overflow-hidden">
+                <span className="text-foreground truncate shrink-0 max-w-[40%]">{name}</span>
+                <span className="text-muted-foreground shrink-0">:</span>
+                <span className={cn(typeColor, 'shrink-0')}>{prop.type}</span>
+                {prop.type === 'array' && prop.items && (
+                    <span className="text-muted-foreground shrink-0">{`<${prop.items.type}>`}</span>
+                )}
+                {prop.enum && (
+                    <span className="text-muted-foreground text-[10px] truncate">[{prop.enum.join('|')}]</span>
+                )}
+                {isRequired && <span className="text-amber-600 text-[10px] shrink-0">•required</span>}
+                {!isLast && <span className="text-muted-foreground shrink-0">,</span>}
+            </div>
+            {prop.type === 'object' && prop.properties && (
+                <div className="pl-3 border-l border-dashed border-muted-foreground/30 ml-1">
+                    {Object.entries(prop.properties).map(([childName, childProp], i, arr) => (
+                        <PropertyTreeNode
+                            key={childName}
+                            name={childName}
+                            prop={childProp}
+                            isLast={i === arr.length - 1}
+                            isRequired={prop.required?.includes(childName)}
+                            depth={depth + 1}
+                        />
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
@@ -353,43 +464,6 @@ function InputFieldRow({
                 <span>{field.type}</span>
                 {field.required && <span className="text-amber-600">•required</span>}
             </div>
-        </div>
-    );
-}
-
-// Schema field row component (recursive for nested)
-function SchemaFieldRow({ field, isLast, depth = 0 }: { field: OutputSchemaField; isLast: boolean; depth?: number }) {
-    const typeColor = {
-        string: 'text-green-600',
-        number: 'text-blue-600',
-        boolean: 'text-purple-600',
-        array: 'text-amber-600',
-        object: 'text-pink-600',
-    }[field.type];
-
-    return (
-        <div>
-            <div className="flex items-center gap-1">
-                <span className="text-foreground">{field.name}</span>
-                <span className="text-muted-foreground">:</span>
-                <span className={cn(typeColor)}>{field.type}</span>
-                {field.type === 'array' && field.items && (
-                    <span className="text-muted-foreground">{`<${field.items.type}>`}</span>
-                )}
-                {!isLast && <span className="text-muted-foreground">,</span>}
-            </div>
-            {field.type === 'object' && field.properties && (
-                <div className="pl-3 border-l border-dashed border-muted-foreground/30 ml-1">
-                    {field.properties.map((prop, i) => (
-                        <SchemaFieldRow
-                            key={prop.name}
-                            field={prop}
-                            isLast={i === field.properties!.length - 1}
-                            depth={depth + 1}
-                        />
-                    ))}
-                </div>
-            )}
         </div>
     );
 }

@@ -1,0 +1,735 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// 1. TEXT ONLY - Cấu hình cơ bản cho text generation\n// ============================================================\nconst textOnlyConfig = {\n  \"data\": {\n    \"lo_id\": \"LO-MATH-04-AREA\",\n    \"subject\": \"Mathematics\",\n    \"topic\": \"Geometry\",\n    \"target_age\": \"9-11\",\n    \"content\": \"Học sinh có thể áp dụng công thức tính diện tích và chu vi hình chữ nhật\",\n    \"keywords\": [\"diện tích\", \"chu vi\", \"hình chữ nhật\"]\n  },\n  \"prompt\": \"Bạn là chuyên gia xây dựng câu hỏi...\",\n  \"model_id\": \"gemini-2.0-flash\",\n  \"generate_content_api\": \"generateContent\",\n  \"request_settings\": {\n    \"contents\": [\n      {\n        \"role\": \"user\",\n        \"parts\": [\n          {\n            \"text\": \"INSERT_INPUT_HERE\"\n          }\n        ]\n      }\n    ],\n    \"generationConfig\": {\n      \"temperature\": 1.0,\n      \"topP\": 0.95,\n      \"topK\": 40,\n      \"maxOutputTokens\": 2048,\n      \"candidateCount\": 1,\n      \"stopSequences\": [],\n      \"responseMimeType\": \"text/plain\"\n    },\n    \"safetySettings\": [\n      {\n        \"category\": \"HARM_CATEGORY_HARASSMENT\",\n        \"threshold\": \"BLOCK_MEDIUM_AND_ABOVE\"\n      },\n      {\n        \"category\": \"HARM_CATEGORY_HATE_SPEECH\",\n        \"threshold\": \"BLOCK_MEDIUM_AND_ABOVE\"\n      },\n      {\n        \"category\": \"HARM_CATEGORY_SEXUALLY_EXPLICIT\",\n        \"threshold\": \"BLOCK_MEDIUM_AND_ABOVE\"\n      },\n      {\n        \"category\": \"HARM_CATEGORY_DANGEROUS_CONTENT\",\n        \"threshold\": \"BLOCK_MEDIUM_AND_ABOVE\"\n      }\n    ]\n  }\n};\n\n// ============================================================\n// 2. TEXT WITH IMAGE - Sử dụng File API để upload ảnh\n// ============================================================\nconst textWithImageConfig = {\n  \"data\": {\n    \"lo_id\": \"LO-MATH-05-SHAPES\",\n    \"subject\": \"Mathematics\",\n    \"topic\": \"Geometry\",\n    \"target_age\": \"10-12\",\n    \"content\": \"Nhận diện và phân loại các hình học cơ bản\",\n    \"keywords\": [\"hình học\", \"nhận diện\", \"phân loại\"],\n    \"image_path\": \"path/to/image.jpg\", // Đường dẫn ảnh local\n    \"image_uri\": \"https://generativelanguage.googleapis.com/v1beta/files/...\" // URI sau khi upload\n  },\n  \"prompt\": \"Dựa vào hình ảnh, hãy tạo câu hỏi về hình học...\",\n  \"model_id\": \"gemini-2.0-flash\",\n  \"generate_content_api\": \"generateContent\",\n  \"request_settings\": {\n    \"contents\": [\n      {\n        \"role\": \"user\",\n        \"parts\": [\n          {\n            \"text\": \"INSERT_INPUT_HERE\"\n          },\n          {\n            \"fileData\": {\n              \"mimeType\": \"image/jpeg\",\n              \"fileUri\": \"INSERT_IMAGE_URI_HERE\" // Sẽ được thay thế sau khi upload\n            }\n          }\n        ]\n      }\n    ],\n    \"generationConfig\": {\n      \"temperature\": 0.8,\n      \"topP\": 0.95,\n      \"topK\": 40,\n      \"maxOutputTokens\": 2048,\n      \"mediaResolution\": \"MEDIA_RESOLUTION_MEDIUM\"\n    },\n    \"safetySettings\": [\n      {\n        \"category\": \"HARM_CATEGORY_HARASSMENT\",\n        \"threshold\": \"BLOCK_MEDIUM_AND_ABOVE\"\n      },\n      {\n        \"category\": \"HARM_CATEGORY_HATE_SPEECH\",\n        \"threshold\": \"BLOCK_MEDIUM_AND_ABOVE\"\n      }\n    ]\n  }\n};\n\n// Lưu ý: Để sử dụng image, bạn cần:\n// 1. Upload file trước bằng File API\n// 2. Lấy URI từ response\n// 3. Thay thế INSERT_IMAGE_URI_HERE bằng URI đó\n\n// ============================================================\n// 3. LONG CONTEXT - Sử dụng với tài liệu dài, PDF, hoặc cache\n// ============================================================\nconst longContextConfig = {\n  \"data\": {\n    \"lo_id\": \"LO-LITERATURE-08-ANALYSIS\",\n    \"subject\": \"Literature\",\n    \"topic\": \"Text Analysis\",\n    \"target_age\": \"13-15\",\n    \"content\": \"Phân tích và hiểu sâu văn bản dài\",\n    \"keywords\": [\"phân tích\", \"văn bản\", \"đọc hiểu\"],\n    \"document_uri\": \"https://generativelanguage.googleapis.com/v1beta/files/...\", // URI của PDF/document\n    \"cached_content_name\": \"cachedContents/xyz123\" // Tùy chọn: sử dụng cache\n  },\n  \"prompt\": \"Dựa trên tài liệu, hãy tạo câu hỏi phân tích...\",\n  \"model_id\": \"gemini-1.5-flash-001\", // Gemini 1.5 hỗ trợ long context tốt hơn\n  \"generate_content_api\": \"generateContent\",\n  \"request_settings\": {\n    // OPTION A: Sử dụng document trực tiếp\n    \"contents\": [\n      {\n        \"role\": \"user\",\n        \"parts\": [\n          {\n            \"text\": \"INSERT_INPUT_HERE\"\n          },\n          {\n            \"fileData\": {\n              \"mimeType\": \"application/pdf\",\n              \"fileUri\": \"INSERT_DOCUMENT_URI_HERE\"\n            }\n          }\n        ]\n      }\n    ],\n    \n    // OPTION B: Sử dụng cached content (nếu có)\n    // \"cachedContent\": \"INSERT_CACHED_CONTENT_NAME_HERE\",\n    // \"contents\": [\n    //   {\n    //     \"role\": \"user\",\n    //     \"parts\": [\n    //       {\n    //         \"text\": \"INSERT_INPUT_HERE\"\n    //       }\n    //     ]\n    //   }\n    // ],\n    \n    \"generationConfig\": {\n      \"temperature\": 0.7,\n      \"topP\": 0.95,\n      \"topK\": 40,\n      \"maxOutputTokens\": 8192, // Tăng token output cho context dài\n      \"candidateCount\": 1\n    },\n    \"safetySettings\": [\n      {\n        \"category\": \"HARM_CATEGORY_HARASSMENT\",\n        \"threshold\": \"BLOCK_ONLY_HIGH\"\n      },\n      {\n        \"category\": \"HARM_CATEGORY_HATE_SPEECH\",\n        \"threshold\": \"BLOCK_ONLY_HIGH\"\n      },\n      {\n        \"category\": \"HARM_CATEGORY_SEXUALLY_EXPLICIT\",\n        \"threshold\": \"BLOCK_MEDIUM_AND_ABOVE\"\n      },\n      {\n        \"category\": \"HARM_CATEGORY_DANGEROUS_CONTENT\",\n        \"threshold\": \"BLOCK_MEDIUM_AND_ABOVE\"\n      }\n    ]\n  }\n};\n\n// ============================================================\n// 4. ADVANCED: JSON MODE với structured output\n// ============================================================\nconst jsonModeConfig = {\n  \"data\": {\n    \"lo_id\": \"LO-MATH-04-AREA\",\n    \"subject\": \"Mathematics\",\n    \"topic\": \"Geometry\",\n    \"target_age\": \"9-11\",\n    \"content\": \"Tạo câu hỏi có cấu trúc JSON\",\n    \"keywords\": [\"json\", \"structured\"]\n  },\n  \"prompt\": \"Tạo 3 câu hỏi trắc nghiệm về hình học...\",\n  \"model_id\": \"gemini-2.0-flash\",\n  \"generate_content_api\": \"generateContent\",\n  \"request_settings\": {\n    \"contents\": [\n      {\n        \"role\": \"user\",\n        \"parts\": [\n          {\n            \"text\": \"INSERT_INPUT_HERE\"\n          }\n        ]\n      }\n    ],\n    \"generationConfig\": {\n      \"temperature\": 0.8,\n      \"responseMimeType\": \"application/json\",\n      \"responseSchema\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"questions\": {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"object\",\n              \"properties\": {\n                \"question_text\": {\n                  \"type\": \"string\",\n                  \"description\": \"Nội dung câu hỏi\"\n                },\n                \"options\": {\n                  \"type\": \"array\",\n                  \"items\": {\n                    \"type\": \"string\"\n                  },\n                  \"description\": \"Các đáp án\"\n                },\n                \"correct_answer\": {\n                  \"type\": \"integer\",\n                  \"description\": \"Index của đáp án đúng (0-based)\"\n                },\n                \"explanation\": {\n                  \"type\": \"string\",\n                  \"description\": \"Giải thích đáp án\"\n                }\n              },\n              \"required\": [\"question_text\", \"options\", \"correct_answer\"]\n            }\n          }\n        },\n        \"required\": [\"questions\"]\n      }\n    }\n  }\n};\n\n// ============================================================\n// 5. THINKING MODE - Cho các model hỗ trợ reasoning\n// ============================================================\nconst thinkingModeConfig = {\n  \"data\": {\n    \"lo_id\": \"LO-MATH-10-COMPLEX\",\n    \"subject\": \"Mathematics\",\n    \"topic\": \"Problem Solving\",\n    \"target_age\": \"15-17\",\n    \"content\": \"Giải quyết bài toán phức tạp\",\n    \"keywords\": [\"logic\", \"reasoning\", \"problem solving\"]\n  },\n  \"prompt\": \"Tạo bài toán logic phức tạp với lời giải chi tiết...\",\n  \"model_id\": \"gemini-2.0-flash-thinking-exp\", // Model hỗ trợ thinking\n  \"generate_content_api\": \"generateContent\",\n  \"request_settings\": {\n    \"contents\": [\n      {\n        \"role\": \"user\",\n        \"parts\": [\n          {\n            \"text\": \"INSERT_INPUT_HERE\"\n          }\n        ]\n      }\n    ],\n    \"generationConfig\": {\n      \"temperature\": 1.0,\n      \"maxOutputTokens\": 8192,\n      \"thinkingConfig\": {\n        \"includeThoughts\": true,\n        \"thinkingLevel\": \"HIGH\" // LOW, HIGH\n        // Hoặc dùng: \"thinkingBudget\": 5000 (số token cho thinking)\n      }\n    }\n  }\n};\n\n// ============================================================\n// EXPORT EXAMPLES\n// ============================================================\nmodule.exports = {\n  textOnlyConfig,\n  textWithImageConfig,\n  longContextConfig,\n  jsonModeConfig,\n  thinkingModeConfig\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8224,
+        6768
+      ],
+      "id": "9060e670-9c23-48d4-8e41-4d222d832c28",
+      "name": "Gemini API Setting Samples"
+    },
+    {
+      "parameters": {
+        "content": "Phân tích workflow\n--------------------\n\nMục đích chính là tạo một agent AI tùy chỉnh sử dụng API của Google Gemini (một mô hình AI sinh nội dung) để xử lý prompt, với cơ chế luân phiên key API (key rotation) để tránh lạm dụng hoặc lỗi từ một key duy nhất. Workflow hỗ trợ retry (thử lại) khi gặp lỗi, báo cáo trạng thái key, và xử lý input động.\n\n### Phân tích connections (luồng dữ liệu)\n- **Trigger → Input**: Webhook hoặc When Called by Others → Workflow Input (xử lý input JSON).\n- **Input → Prompt → Key → API Call**: Workflow Input → Create Final Prompt → Get Active Key → Gemini API Call.\n- **API Call success → Report Success → Output**: Gemini API Call (main[0]) → Report Success → Workflow Output.\n- **API Call error → Report Failure → Retry**: Gemini API Call (main[1]) → Report Failure → Retry Logic → quay lại Get Active Key (thử key mới).\n- **Get Active Key error → Stop**: Get Active Key (main[1]) → Stop and Error.\n- **Retry loop**: Nếu retry < 3, quay lại Get Active Key; nếu không, throw error.\n\nWorkflow chạy executeOnce ở một số node để tránh lặp item, và sử dụng $runIndex cho retry. Tổng flow là linear với nhánh error, đảm bảo robustness (chịu lỗi tốt) nhờ key rotation và retry.",
+        "height": 1248,
+        "width": 336
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        8144,
+        5888
+      ],
+      "typeVersion": 1,
+      "id": "9b875568-8d3e-41c4-a138-eed9e90139fd",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "Hướng dẫn cách sử dụng\n----------------------\n\n### Yêu cầu trước khi sử dụng\n- **n8n instance**: Workflow này chạy trên n8n (ví dụ: https://n8n.makexyz.site). Bạn cần quyền admin để import JSON workflow (copy JSON vào n8n editor để tạo).\n- **Key rotator**: Phải có workflow rotator riêng (như mã bạn cung cấp trước, quản lý danh sách key Google API). Đảm bảo webhook `get-active-key` và `set-key-state` hoạt động.\n- **Credentials**: Set basicAuth cho Webhook (ở đây dùng \"MakeXYZ N8N User\").\n- **API Key Google**: Các key trong rotator phải là API key hợp lệ cho Google Generative Language API (Gemini).\n- **Test mode**: Sử dụng mẫu input trong node \"When Called by Others\" để test (ví dụ: tạo câu hỏi toán học cho trẻ em).\n\n### Cách kích hoạt workflow\n1. **Qua Webhook (HTTP request)**:\n   - Gửi POST request đến URL: `https://<your-n8n-instance>/webhook/custom-ai-agent/agent-with-rotation-key`.\n   - Headers: Authorization Basic (username/password từ credentials).\n   - Body: JSON giống mẫu:\n     ```\n     {\n       \"data\": {},\n       \"prompt\": \"\",\n       \"ai_settings\": {}\n     }\n     ```\n   - Response: JSON với `md_result` (markdown output từ AI, ví dụ: câu hỏi và đáp án).\n\n2. **Qua gọi sub-workflow**:\n   - Trong một workflow n8n khác, sử dụng node \"Execute Workflow\" và chọn workflow này.\n   - Truyền input JSON như trên.\n\n### Input format\n- **data**: Object chứa dữ liệu động (key-value, hỗ trợ array).\n- **prompt**: String template với placeholder như {{ key }} (sẽ được thay thế bởi giá trị từ data).\n- **ai_settings**: Object cài đặt AI:\n  - model_id: Tên model (ví dụ: \"gemini-2.5-flash\").\n  - generate_content_api: Endpoint (thường \"generateContent\").\n  - generationConfig: Cài đặt sinh (temperature, topP, maxOutputTokens, etc.).\n\n### Output\n- Thành công: { md_result: \"Markdown string từ AI\" }.\n- Thất bại: Error message (ví dụ: \"Max retries reached\" hoặc \"No valid key\").\n\n### Mẹo sử dụng và debug\n- **Test trong n8n**: Activate workflow, gửi request qua Postman/Curl. Kiểm tra execution log để xem error (ví dụ: nếu key rotator fail).\n- **Tùy chỉnh**: Thay đổi maxRetries (trong Retry Logic) hoặc COOLDOWN_MINUTES (nếu tích hợp với rotator).\n- **Scale**: Workflow này phù hợp cho AI agent tự động (ví dụ: tạo nội dung giáo dục). Nếu cần nhiều request, tích hợp với queue để tránh overload.\n- **Lỗi thường gặp**: Key hết hạn → rotator sẽ block; Prompt không khớp placeholder → giữ nguyên (debug bằng log).\n- **Nâng cao**: Thêm node để lưu output vào DB (ví dụ: Google Sheets) hoặc tích hợp với Slack/Email cho notify.",
+        "height": 1248,
+        "width": 752
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        8496,
+        5888
+      ],
+      "typeVersion": 1,
+      "id": "1c159c4f-a326-43f1-8f07-8d93fc647f07",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## 5. PREPARE NEXT TASK\nCreate next stage tasks if configured",
+        "height": 452,
+        "width": 684,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        11872,
+        5888
+      ],
+      "typeVersion": 1,
+      "id": "6dabb7a6-8e3a-48ad-9354-57959157bc0f",
+      "name": "Phase 5 - Next Task"
+    },
+    {
+      "parameters": {
+        "content": "## 4. POST-PROCESS\nOptional webhook/subworkflow after AI",
+        "height": 452,
+        "width": 252,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        11600,
+        5888
+      ],
+      "typeVersion": 1,
+      "id": "6539de16-0b4f-4660-abfd-a7303b8e1afe",
+      "name": "Phase 4 - Post-Process"
+    },
+    {
+      "parameters": {
+        "content": "## 3. AI GEN\nGemini API with key rotation",
+        "height": 548,
+        "width": 1376,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        10208,
+        5792
+      ],
+      "typeVersion": 1,
+      "id": "902f5337-e28a-4735-b3ee-edbdd52c018c",
+      "name": "Phase 3 - AI Gen"
+    },
+    {
+      "parameters": {
+        "content": "## 2. PRE-PROCESS\nOptional webhook/subworkflow before AI",
+        "height": 452,
+        "width": 284,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        9904,
+        5888
+      ],
+      "typeVersion": 1,
+      "id": "4d0821b2-5c54-4321-bb56-82b0d5824885",
+      "name": "Phase 2 - Pre-Process"
+    },
+    {
+      "parameters": {
+        "content": "## 1. GET TASK\nFetch and parse highest priority task from queue",
+        "height": 452,
+        "width": 412,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        9472,
+        5888
+      ],
+      "typeVersion": 1,
+      "id": "449567c6-0b1e-40a3-bbfb-878a57473ff0",
+      "name": "Phase 1 - Get Task"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        9328,
+        6000
+      ],
+      "id": "89370821-a2e8-470f-a148-5492f1c58755",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        9328,
+        6160
+      ],
+      "id": "00054540-8f59-4173-82e8-66904b4b782e",
+      "name": "When clicking 'Execute workflow'"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "LT77b3PENHxZuRwj",
+          "mode": "list",
+          "cachedResultName": "n8n-task-queue"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "keyValue": "plan"
+            }
+          ]
+        },
+        "limit": 10
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        9536,
+        6000
+      ],
+      "id": "4f1cb88b-2317-4bb9-816a-a556f47119ab",
+      "name": "Get Tasks",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ========== PHASE 1: GET & PARSE TASK ==========\n// Merged from: Filter A Task + JSON Parse\n\nconst tasks = $input.all().map(item => item.json);\nif (tasks.length === 0) return [];\n\n// Sort by priority: test_mode > batch_priority > sequence > created_at\nconst sortedTasks = tasks.sort((a, b) => {\n  const testModeA = a.test_mode === true || a.test_mode === 'true';\n  const testModeB = b.test_mode === true || b.test_mode === 'true';\n  if (testModeA && !testModeB) return -1;\n  if (!testModeA && testModeB) return 1;\n\n  if (a.batch_priority && b.batch_priority) {\n    const priorityA = new Date(a.batch_priority).getTime();\n    const priorityB = new Date(b.batch_priority).getTime();\n    if (priorityA !== priorityB) return priorityA - priorityB;\n  } else if (a.batch_priority) return -1;\n  else if (b.batch_priority) return 1;\n\n  const seqA = parseInt(a.sequence) || 1;\n  const seqB = parseInt(b.sequence) || 1;\n  if (seqA !== seqB) return seqA - seqB;\n\n  if (a.created_at && b.created_at) {\n    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();\n  }\n  return 0;\n});\n\nconst t = sortedTasks[0];\n\n// Parse JSON string fields safely\nconst safeParse = (val, fallback) => {\n  if (!val) return fallback;\n  if (typeof val === 'object' && val !== null) return val;\n  try { return JSON.parse(val); } catch { return fallback; }\n};\n\nreturn {\n  ...t,\n  task_id: t.task_id || '',\n  supabase_task_id: t.supabase_task_id || t.id,\n  launch_id: t.launch_id || null,\n  user_id: t.user_id || null,\n  batch_id: t.batch_id || '',\n  extra: safeParse(t.extra, {}),\n  data: safeParse(t.data, {}),\n  ai_settings: safeParse(t.ai_settings, {}),\n  hierarchy_path: safeParse(t.hierarchy_path, []),\n  step_number: parseInt(t.step_number) || 1,\n  stage_key: t.stage_key || '',\n  parent_task_id: t.parent_task_id || null,\n  split_group_id: t.split_group_id || null,\n  test_mode: t.test_mode === true || t.test_mode === 'true',\n  requires_approval: t.requires_approval === true || t.requires_approval === 'true',\n  _retry_count: 0\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9728,
+        6000
+      ],
+      "id": "c39ba779-a6c3-4e8c-b85e-fca8e11a596b",
+      "name": "1. Parse Task",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ========== PHASE 2: PRE-PROCESS ==========\n// Merged from: Check Pre-Process + Execute Pre-Process Webhook\n//              + Merge Pre-Process Output + Handle Pre-Process Failure\n\nconst task = $json;\nconst cfg = task.extra?.pre_process;\n\n// Skip if pre-process not enabled or no URL\nif (!cfg?.enabled || !cfg?.webhook_url) {\n  return { ...task, _pre_process_skipped: true };\n}\n\ntry {\n  const method = cfg.webhook_method || 'POST';\n  const res = await this.helpers.httpRequest({\n    method,\n    url: cfg.webhook_url,\n    body: task.data,\n    json: true,\n    timeout: 30000\n  });\n\n  // Merge output based on output_handling config\n  let mergedData = { ...task.data };\n  const outputHandling = cfg.output_handling || 'merge';\n\n  if (outputHandling === 'replace') {\n    mergedData = res;\n  } else if (outputHandling === 'merge') {\n    mergedData = { ...mergedData, ...res };\n  } else if (outputHandling === 'nested') {\n    const fieldName = cfg.nested_field_name || 'pre_output';\n    mergedData[fieldName] = res;\n  }\n\n  return { ...task, data: mergedData, _pre_process_executed: true };\n\n} catch (error) {\n  const onFailure = cfg.on_failure || 'continue';\n\n  if (onFailure === 'abort') {\n    throw new Error('Pre-process webhook failed: ' + error.message);\n  }\n\n  // Continue with original data\n  return {\n    ...task,\n    _pre_process_failed: true,\n    _pre_process_error: error.message\n  };\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9984,
+        6000
+      ],
+      "id": "70d659c0-26cb-4ec4-af6e-6d48e07e34eb",
+      "name": "2. Pre-Process",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        11408,
+        6096
+      ],
+      "id": "1d9064ea-d59a-4097-98ac-60535610ec6c",
+      "name": "Wait Loop",
+      "webhookId": "consolidated-wait-loop"
+    },
+    {
+      "parameters": {
+        "url": "https://n8n.teky.vn/webhook/get-active-key",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        10320,
+        6000
+      ],
+      "id": "ff72c9e2-97bd-4847-a6fa-96c8fd9bd9f9",
+      "name": "Get Key",
+      "executeOnce": true,
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "4STFVBW6SDzs3GJf",
+          "name": "AI Content Creator"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "errorMessage": "[403] Key Rotation Manager has no valid key!"
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        10512,
+        6128
+      ],
+      "id": "c7cc70ca-c18b-41f2-a112-714cc18ea7fb",
+      "name": "Stop - No Key"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ ($('2. Pre-Process').item.json.ai_settings && $('2. Pre-Process').item.json.ai_settings.model_id) ? $('2. Pre-Process').item.json.ai_settings.model_id : $('1. Parse Task').item.json.ai_settings.model_id }}:{{ ($('2. Pre-Process').item.json.ai_settings && $('2. Pre-Process').item.json.ai_settings.generate_content_api) ? $('2. Pre-Process').item.json.ai_settings.generate_content_api : $('1. Parse Task').item.json.ai_settings.generate_content_api }}?key={{ $json.api_key }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ \n  JSON.stringify({\n    \"generationConfig\": ($('2. Pre-Process').item.json.ai_settings || {}).generationConfig || ($('1. Parse Task').item.json.ai_settings || {}).generationConfig || {},\n    \"contents\": [\n      {\n        \"role\": \"user\",\n        \"parts\": [\n          { \"text\": $('2. Pre-Process').item.json.prompt }\n        ]\n      }\n    ],\n    \"safetySettings\": ($('2. Pre-Process').item.json.ai_settings || {}).safetySettings || ($('1. Parse Task').item.json.ai_settings || {}).safetySettings || [],\n    \"systemInstruction\": ($('2. Pre-Process').item.json.ai_settings || {}).systemInstruction || ($('1. Parse Task').item.json.ai_settings || {}).systemInstruction || undefined\n  })\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        10512,
+        5952
+      ],
+      "id": "a29820bd-078e-4405-85d3-4578e26bba35",
+      "name": "Gemini API",
+      "executeOnce": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ========== PHASE 3: PARSE AI RESPONSE & MERGE METADATA ==========\n// Merged from: Convert MarkdownJSON to JSON + Add AlongWith Attributes\n\n// Step 1: Parse Gemini response (markdown JSON → JS object)\nfunction convertMarkdownJsonToJsObject(partsArray) {\n  const fullText = partsArray.map(part => part.text).join('');\n  let trimmed = fullText.trim();\n\n  let jsonContent;\n  if (trimmed.startsWith('```json')) {\n    jsonContent = trimmed.slice(7, trimmed.lastIndexOf('```')).trim();\n  } else if (trimmed.startsWith('{') || trimmed.startsWith('[')) {\n    jsonContent = trimmed;\n  } else {\n    throw new Error('Invalid JSON format');\n  }\n\n  // Minimal cleaning - remove control chars\n  jsonContent = jsonContent.replace(/[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F]/g, '');\n  return JSON.parse(jsonContent);\n}\n\nlet finalResult;\ntry {\n  const partsArray = $json.candidates[0].content.parts;\n  finalResult = convertMarkdownJsonToJsObject(partsArray);\n} catch (e) {\n  // Parse failed or Gemini error - trigger retry via Check Retry\n  return { _retry: true, _error: e.message };\n}\n\n// Step 2: Merge with task metadata (AlongWith Attributes logic)\n// USE PRE-PROCESS OUTPUT as source of truth for extra/data\nvar taskInfo = $('2. Pre-Process').first().json;\nvar extra = taskInfo.extra || {};\nvar data = taskInfo.data || {};\nvar returnAlongWith = (extra && extra[\"return-along-with\"]) || [];\n\nif (returnAlongWith.length > 0) {\n  for (var key of returnAlongWith) {\n    if (data.hasOwnProperty(key)) {\n      finalResult[key] = data[key];\n    }\n  }\n}\n\nreturn {\n  ...taskInfo,\n  \"result\": finalResult,\n  \"extra\": extra,\n  \"data\": data,\n  \"supabase_task_id\": taskInfo.supabase_task_id || taskInfo.id\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10720,
+        5952
+      ],
+      "id": "b3af1402-5b4e-4187-a761-33fb90a7731f",
+      "name": "3. Parse & Report"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "retry-check",
+              "leftValue": "={{ $json._retry }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        10880,
+        5952
+      ],
+      "id": "b0ae346c-450a-4496-a2ed-48ecb46011da",
+      "name": "Check Retry"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ========== PHASE 4: POST-PROCESS ==========\n// Merged from: Check Post-Process + Execute Post-Process Webhook\n//              + Handle Post-Process Result\n\nconst task = $json;\nconst extra = task.extra || {};\nconst cfg = extra.post_process;\n\n// Skip if post-process not enabled\nif (!cfg?.enabled || !cfg?.webhook_url) {\n  return { ...task, _post_process_skipped: true };\n}\n\n// Prepare request body based on input_source config\nlet requestBody;\nconst inputSource = cfg.input_source || 'output_only';\n\nif (inputSource === 'output_only') {\n  requestBody = task.result;\n} else if (inputSource === 'input_and_output') {\n  requestBody = { input: task.data, output: task.result };\n} else {\n  requestBody = task.result;\n}\n\ntry {\n  const method = cfg.webhook_method || 'POST';\n  const res = await this.helpers.httpRequest({\n    method,\n    url: cfg.webhook_url,\n    body: requestBody,\n    json: true,\n    timeout: 30000\n  });\n\n  return {\n    ...task,\n    _post_process_executed: true,\n    _post_process_response: res\n  };\n\n} catch (error) {\n  const onFailure = cfg.on_failure || 'continue';\n\n  if (onFailure === 'abort') {\n    throw new Error('Post-process webhook failed: ' + error.message);\n  }\n\n  // Continue with original result\n  return {\n    ...task,\n    _post_process_failed: true,\n    _post_process_error: error.message\n  };\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11680,
+        6000
+      ],
+      "id": "e22b2574-6f10-47d7-8757-d310ef1e9a5c",
+      "name": "4. Post-Process",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ========== PHASE 5: DETERMINE & CREATE NEXT STAGE TASKS (GRT SUPPORT) ==========\n// This node handles task chaining and parallel branching.\n// It uses the Global Routing Table (GRT) provided in 'extra' to hydrate child tasks.\n\nconst task = $json;\nconst extra = task.extra || {};\n\n// Get current stage config\nconst currentStageConfig = extra.current_stage_config || null;\n\n// Get next stage configs (hydrated roadmap from parent)\n// Normalization: Ensure it's always an array\nlet nextConfigs = extra.next_stage_configs || extra.next_stage_config || [];\nif (!Array.isArray(nextConfigs)) {\n  nextConfigs = [nextConfigs];\n}\n\n// Get Global Routing Table for recursive hydration\nconst grt = extra.grt || {};\n\n// === TERMINATE: No next stage ===\nif (!currentStageConfig || nextConfigs.length === 0) {\n  return {\n    action: 'terminate',\n    task_id: task.supabase_task_id,\n    message: 'No next stage configured - final stage reached'\n  };\n}\n\nconst cardinality = currentStageConfig.cardinality || 'one_to_one';\nconst result = task.result;\nconst inputData = task.data || {};\n\n// Helper: extract stage key from template ID\nfunction extractStageKey(templateId) {\n  if (!templateId) return 'unknown_stage';\n  // Example: \"uuid_stage_name\" -> \"stage_name\"\n  const parts = templateId.split('_');\n  if (parts.length < 2) return templateId;\n  return parts.slice(1).join('_');\n}\n\nconst currentStageKey = task.stage_key || (currentStageConfig.template_id ? extractStageKey(currentStageConfig.template_id) : 'unknown_stage');\nconst rootId = task.root_task_id || task.supabase_task_id;\nconst hierarchyPath = [...(task.hierarchy_path || []), task.supabase_task_id];\nconst currentStepNumber = parseInt(task.step_number) || 1;\n\n// Helper: build metadata for a new child task\nfunction buildTaskMetadata(nextConfig, index, total, dataForTask) {\n  const nextTplId = nextConfig.template_id || nextConfig.prompt_id;\n  const nextStageKey = extractStageKey(nextTplId);\n\n  // Parse task_type suffix (BUG-4 Fix)\n  const taskTypeMatch = nextTplId.match(/^[0-9a-f-]+_(.+)$/);\n  const taskType = taskTypeMatch ? taskTypeMatch[1] : nextStageKey;\n\n  // RECURSIVE HYDRATION using GRT\n  const childRouting = grt[nextTplId] || {};\n  const grandChildIds = childRouting.next_ids || [];\n  const grandChildConfigs = grandChildIds.map(gcId => {\n    const gcInfo = grt[gcId];\n    if (!gcInfo) return null;\n    return {\n      template_id: gcInfo.template_id,\n      prompt_id: gcInfo.prompt_id,\n      cardinality: gcInfo.cardinality,\n      split_mode: gcInfo.split_mode,\n      split_path: gcInfo.split_path,\n      output_mapping: gcInfo.output_mapping\n    };\n  }).filter(Boolean);\n\n  return {\n    prompt_template_id: childRouting.template_id || nextTplId,\n    task_type: taskType,\n    input_data: dataForTask,\n    parent_task_id: task.supabase_task_id, // Fix BUG-3\n    root_task_id: rootId,\n    hierarchy_path: hierarchyPath,\n    batch_id: task.batch_id || null,\n    user_id: task.user_id || null,\n    launch_id: task.launch_id || null,\n    test_mode: task.test_mode || false,\n    sequence: index + 1,\n    total_steps: total,\n    status: 'pending',\n\n    // Metadata preservation\n    stage_key: nextStageKey,\n    step_number: currentStepNumber + 1,\n    split_group_id: task.split_group_id,\n    requires_approval: childRouting.requires_approval || task.requires_approval || false,\n\n    extra: {\n      current_stage_config: {\n        template_id: childRouting.template_id || nextTplId,\n        prompt_id: childRouting.prompt_id || null,\n        cardinality: childRouting.cardinality || 'one_to_one',\n        split_path: childRouting.split_path || null,\n        split_mode: childRouting.split_mode || 'per_item',\n        output_mapping: childRouting.output_mapping || 'result'\n      },\n      next_stage_configs: grandChildConfigs, // ✅ PASSING THE ROADMAP\n      grt: grt, // ✅ PASSING THE ENGINE\n      parent_stage_key: currentStageKey,\n      parent_task_id: task.supabase_task_id\n    }\n  };\n}\n\n// === EXECUTE BRANCHING ===\nlet finalTasks = [];\n\nif (cardinality === 'one_to_one') {\n  finalTasks = nextConfigs.map((cfg, idx) => buildTaskMetadata(cfg, idx, 1, result));\n} else if (cardinality === 'one_to_many') {\n  const splitPath = currentStageConfig.split_path || 'result';\n\n  // Navigate to array\n  const pathParts = splitPath.split('.');\n  let arrayToSplit = result;\n  for (const part of pathParts) {\n    if (part === 'result') continue;\n    arrayToSplit = arrayToSplit?.[part];\n  }\n\n  if (Array.isArray(arrayToSplit)) {\n    const splitMode = currentStageConfig.split_mode || 'per_item';\n    for (const nextConfig of nextConfigs) {\n      if (splitMode === 'per_item') {\n        arrayToSplit.forEach((item, idx) => {\n          finalTasks.push(buildTaskMetadata(nextConfig, idx, arrayToSplit.length, {\n            ...inputData,\n            user_id: task.user_id || null,\n            batch_id: task.batch_id || null,\n            launch_id: task.launch_id || null,\n            item: item,\n            _split_index: idx,\n            _split_total: arrayToSplit.length\n          }));\n        });\n      } else if (splitMode === 'per_batch') {\n        const batchSize = currentStageConfig.batch_size || 10;\n        for (let i = 0, bIdx = 0; i < arrayToSplit.length; i += batchSize, bIdx++) {\n          const batchItems = arrayToSplit.slice(i, i + batchSize);\n          finalTasks.push(buildTaskMetadata(nextConfig, bIdx, Math.ceil(arrayToSplit.length / batchSize), {\n            ...inputData,\n            user_id: task.user_id || null,\n            batch_id: task.batch_id || null,\n            launch_id: task.launch_id || null,\n            items: batchItems,\n            _batch_index: bIdx\n          }));\n        }\n      }\n    }\n  }\n}\n\nreturn {\n  action: finalTasks.length > 0 ? 'create_tasks_for_branches' : 'terminate',\n  tasks: finalTasks,\n  total_count: finalTasks.length,\n  task_id: task.supabase_task_id\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11936,
+        6000
+      ],
+      "id": "91817f5d-83af-4b59-acad-4ee206f07918",
+      "name": "5. Prepare Next Tasks"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "LT77b3PENHxZuRwj",
+          "mode": "list",
+          "cachedResultName": "n8n-task-queue"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "task_id",
+              "keyValue": "={{ $('4. Post-Process').item.json.task_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "generated",
+            "result": "={{ JSON.stringify($('4. Post-Process').item.json.result) }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        11936,
+        6192
+      ],
+      "id": "81433331-4e52-4789-a3eb-c9e6cf4136eb",
+      "name": "Mark Generated",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ========== PHASE 6: CREATE NEXT STAGE TASKS ==========\n// Handles the output from Phase 5 and creates tasks in Supabase\n\nconst config = $json;\n\n// Handle terminate - no next tasks needed\nif (config.action === 'terminate') {\n  return [];\n}\n\n// Handle error\nif (config.action === 'error') {\n  throw new Error(config.message);\n}\n\n// Handle create_tasks_for_branches\nif (config.action === 'create_tasks_for_branches') {\n  return config.tasks.map(task => ({\n    prompt_template_id: task.prompt_template_id,\n    task_type: task.task_type || '',\n    input_data: task.input_data,\n    parent_task_id: task.parent_task_id,\n    root_task_id: task.root_task_id,\n    hierarchy_path: task.hierarchy_path,\n    batch_id: task.batch_id || null,\n    user_id: task.user_id || null,\n    launch_id: task.launch_id || null,\n    test_mode: task.test_mode,\n    sequence: task.sequence,\n    total_steps: task.total_steps,\n    status: task.status || 'pending',\n    stage_key: task.stage_key,\n    step_number: task.step_number,\n    split_group_id: task.split_group_id,\n    requires_approval: task.requires_approval,\n    extra: task.extra\n  }));\n}\n\n// Fallback: return empty array\nreturn [];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        12144,
+        6000
+      ],
+      "id": "d2f92c07-7771-4952-ba2f-8016134bed27",
+      "name": "6. Format Tasks"
+    },
+    {
+      "parameters": {
+        "tableId": "ai_tasks",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        12352,
+        6000
+      ],
+      "id": "8e96002d-f535-4cec-9817-9ac18caf63c7",
+      "name": "Create a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "tOzBo3n0Kkt5Bt41",
+          "name": "Supabase Account Tony"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.teky.vn/webhook/set-key-state",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "key_id",
+              "value": "={{ $('Get Key').item.json.key_id }}"
+            },
+            {
+              "name": "status",
+              "value": "success"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        10720,
+        5808
+      ],
+      "id": "47bf201e-49a6-45f0-adad-7fac938c8bf2",
+      "name": "Report Success",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "4STFVBW6SDzs3GJf",
+          "name": "AI Content Creator"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.teky.vn/webhook/set-key-state",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "key_id",
+              "value": "={{ $('Get Key').item.json.key_id }}"
+            },
+            {
+              "name": "status",
+              "value": "fail"
+            },
+            {
+              "name": "error_code",
+              "value": "={{ $json.error ? '[' + ($json.error.status || 'API_ERROR') + '] ' + ($json.error.message || '') : ($json._error ? '[PARSE_ERROR] ' + $json._error : 'UNKNOWN_ERROR') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        11056,
+        6096
+      ],
+      "id": "025a3d52-4e1d-41ba-9749-df3ac37d67f4",
+      "name": "Report Failure",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "4STFVBW6SDzs3GJf",
+          "name": "AI Content Creator"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const maxRetries = 3;\nconst currentRun = $runIndex;\n\nif (currentRun >= maxRetries - 1) {\n    throw new Error(\"Max retries reached. All available keys failed.\");\n}\n\nreturn { json: { retry_count: currentRun + 1 } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11232,
+        6096
+      ],
+      "id": "ad196444-dd56-4d3a-87e8-1926e0d3d1da",
+      "name": "Retry Logic"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "Get Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Tasks": {
+      "main": [
+        [
+          {
+            "node": "1. Parse Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Parse Task": {
+      "main": [
+        [
+          {
+            "node": "2. Pre-Process",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Pre-Process": {
+      "main": [
+        [
+          {
+            "node": "Get Key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Loop": {
+      "main": [
+        [
+          {
+            "node": "Get Key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Key": {
+      "main": [
+        [
+          {
+            "node": "Gemini API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop - No Key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini API": {
+      "main": [
+        [
+          {
+            "node": "3. Parse & Report",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Report Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Parse & Report": {
+      "main": [
+        [
+          {
+            "node": "Check Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Retry": {
+      "main": [
+        [
+          {
+            "node": "Report Failure",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "4. Post-Process",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Post-Process": {
+      "main": [
+        [
+          {
+            "node": "5. Prepare Next Tasks",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Mark Generated",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Prepare Next Tasks": {
+      "main": [
+        [
+          {
+            "node": "6. Format Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. Format Tasks": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report Failure": {
+      "main": [
+        [
+          {
+            "node": "Retry Logic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retry Logic": {
+      "main": [
+        [
+          {
+            "node": "Wait Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3c3655861b945e2f23873d293f97337788a318f9e0823cca507f13751bd70fd7"
+  }
+}

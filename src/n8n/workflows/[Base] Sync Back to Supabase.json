@@ -1,0 +1,160 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "LT77b3PENHxZuRwj",
+          "mode": "list",
+          "cachedResultName": "n8n-task-queue",
+          "cachedResultUrl": "/projects/B8LPf0gekMWp8vZq/datatables/LT77b3PENHxZuRwj"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "keyValue": "generated"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        2032,
+        576
+      ],
+      "id": "57b79ac9-0f00-4d30-88e5-624bc07c8b52",
+      "name": "Get Generated Tasks"
+    },
+    {
+      "parameters": {
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "value": "LT77b3PENHxZuRwj",
+          "mode": "list",
+          "cachedResultName": "n8n-task-queue",
+          "cachedResultUrl": "/projects/B8LPf0gekMWp8vZq/datatables/LT77b3PENHxZuRwj"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "task_id",
+              "keyValue": "={{ $('Get Generated Tasks').item.json.task_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        2512,
+        576
+      ],
+      "id": "838574ff-c612-4d57-ab73-9dac78bb85b4",
+      "name": "Delete from Queue"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 2
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        1808,
+        576
+      ],
+      "id": "807eee94-6085-42a9-8647-31b880b1b7f4",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Determine final status based on requires_approval flag\nconst task = $input.item.json;\n\n// Parse requires_approval from n8n table (stored as string or boolean)\nconst requiresApproval = task.requires_approval === true || task.requires_approval === 'true';\n\n// Parse result as JSON if it's a string\nlet outputData = task.result;\nif (typeof outputData === 'string') {\n  try {\n    outputData = JSON.parse(outputData);\n  } catch (e) {\n    outputData = { raw: outputData };\n  }\n}\n\nreturn {\n  json: {\n    supabase_task_id: task.supabase_task_id || task.task_id,\n    final_status: requiresApproval ? 'awaiting_approval' : 'completed',\n    output_data: JSON.stringify(outputData),\n    completed_at: new Date().toISOString(),\n    requires_approval: requiresApproval,\n    next_task_config: task.next_task_config || null\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2272,
+        576
+      ],
+      "id": "f398fbe9-cdae-4356-bb7d-968b1205cc7b",
+      "name": "Determine Final Status"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        1808,
+        400
+      ],
+      "id": "07e9d989-f8f3-4bf3-8fd5-50187e53aff6",
+      "name": "When Executed by Another Workflow"
+    }
+  ],
+  "connections": {
+    "Get Generated Tasks": {
+      "main": [
+        [
+          {
+            "node": "Determine Final Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Generated Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine Final Status": {
+      "main": [
+        [
+          {
+            "node": "Delete from Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Get Generated Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3c3655861b945e2f23873d293f97337788a318f9e0823cca507f13751bd70fd7"
+  }
+}

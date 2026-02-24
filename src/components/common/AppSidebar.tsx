@@ -1,4 +1,4 @@
-import { Boxes, Play, Activity, Settings, Sparkles } from 'lucide-react';
+import { Boxes, Search, FileJson, Settings, Sparkles, Database, Code, Library, Calculator } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import {
@@ -16,9 +16,11 @@ import {
 } from '@/components/ui/sidebar';
 
 const mainNavItems = [
-  { title: 'Designer', url: '/designer', icon: Boxes, description: 'Thiết kế Orchestrator' },
-  { title: 'Launcher', url: '/launcher', icon: Play, description: 'Khởi chạy Execution' },
-  { title: 'Monitor', url: '/monitor', icon: Activity, description: 'Theo dõi Tiến trình' },
+  { title: 'Designer', url: '/designer', icon: Boxes, description: 'Visual Pipeline Builder' },
+  { title: 'Launcher', url: '/launcher', icon: Code, description: 'Run Batch Jobs' },
+  { title: 'Monitor', url: '/monitor', icon: Search, description: 'Track Executions' },
+  { title: 'Assets', url: '/assets', icon: Library, description: 'Prompt & Component Library' },
+  { title: 'Calculator', url: '/calculator', icon: Calculator, description: 'Token Cost Estimator' },
 ];
 
 export function AppSidebar() {
@@ -36,8 +38,8 @@ export function AppSidebar() {
           </div>
           {!collapsed && (
             <div className="flex flex-col">
-              <span className="font-semibold text-sidebar-foreground">EduGen</span>
-              <span className="text-xs text-sidebar-foreground/60">Learning Materials</span>
+              <span className="font-semibold text-sidebar-foreground">Orchable</span>
+              <span className="text-xs text-sidebar-foreground/60">Orchestrate Anything</span>
             </div>
           )}
         </div>
@@ -90,7 +92,7 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-sidebar-border p-4">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip={collapsed ? 'Cài đặt' : undefined}>
+            <SidebarMenuButton asChild tooltip={collapsed ? 'Settings' : undefined}>
               <NavLink
                 to="/settings"
                 className="flex items-center gap-3 px-3 py-2 rounded-lg transition-all hover:bg-sidebar-accent"
@@ -98,7 +100,7 @@ export function AppSidebar() {
               >
                 <Settings className="h-5 w-5 text-sidebar-foreground/70" />
                 {!collapsed && (
-                  <span className="text-sm text-sidebar-foreground/70">Cài đặt</span>
+                  <span className="text-sm text-sidebar-foreground/70">Settings</span>
                 )}
               </NavLink>
             </SidebarMenuButton>

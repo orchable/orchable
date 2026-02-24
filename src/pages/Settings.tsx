@@ -8,11 +8,11 @@ import { Separator } from "@/components/ui/separator";
 
 
 export default function SettingsPage() {
+    const [geminiApiKey, setGeminiApiKey] = useState("");
     const [n8nUrl, setN8nUrl] = useState("");
     const [n8nApiKey, setN8nApiKey] = useState("");
     const [supabaseUrl, setSupabaseUrl] = useState("");
     const [supabaseKey, setSupabaseKey] = useState("");
-
     const [defaultTimeout, setDefaultTimeout] = useState("300000");
     const [defaultRetries, setDefaultRetries] = useState("3");
 
@@ -21,6 +21,7 @@ export default function SettingsPage() {
 
     useEffect(() => {
         // Load from localStorage or fall back to env/defaults
+        setGeminiApiKey(localStorage.getItem("orchable_gemini_api_key") || "");
         setN8nUrl(localStorage.getItem("lovable_n8n_url") || import.meta.env.VITE_N8N_BASE_URL || "");
         setN8nApiKey(localStorage.getItem("lovable_n8n_api_key") || import.meta.env.VITE_N8N_API_KEY || "");
 
@@ -38,6 +39,7 @@ export default function SettingsPage() {
         const currentSupabaseUrl = localStorage.getItem("lovable_supabase_url");
         const currentSupabaseKey = localStorage.getItem("lovable_supabase_key");
 
+        localStorage.setItem("orchable_gemini_api_key", geminiApiKey);
         localStorage.setItem("lovable_n8n_url", n8nUrl);
         localStorage.setItem("lovable_n8n_api_key", n8nApiKey);
 
@@ -59,6 +61,7 @@ export default function SettingsPage() {
     };
 
     const handleReset = () => {
+        localStorage.removeItem("orchable_gemini_api_key");
         localStorage.removeItem("lovable_n8n_url");
         localStorage.removeItem("lovable_n8n_api_key");
         localStorage.removeItem("lovable_supabase_url");
@@ -93,11 +96,37 @@ export default function SettingsPage() {
             </div>
 
             <div className="grid gap-6">
+                <Card className="border-primary/20 bg-primary/5">
+                    <CardHeader>
+                        <CardTitle className="text-xl flex items-center gap-2">
+                            AI Execution Settings
+                        </CardTitle>
+                        <CardDescription>
+                            Configure your Gemini API key for local browser execution (Lite tier).
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="gemini-api-key">Gemini API Key</Label>
+                            <Input
+                                id="gemini-api-key"
+                                type="password"
+                                placeholder="AIza..."
+                                value={geminiApiKey}
+                                onChange={(e) => setGeminiApiKey(e.target.value)}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Get your key from the <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-primary hover:underline">Google AI Studio</a>.
+                            </p>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 <Card>
                     <CardHeader>
-                        <CardTitle>Integration Settings</CardTitle>
+                        <CardTitle>Infrastructure Settings (Advanced)</CardTitle>
                         <CardDescription>
-                            Configure connections to external services like n8n and Supabase.
+                            Configure connections to external services for Free and Premium tiers.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">

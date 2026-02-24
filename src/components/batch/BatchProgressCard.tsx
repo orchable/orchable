@@ -24,7 +24,14 @@ export function BatchProgressCard({ progress, className }: BatchProgressCardProp
             <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                     <div>
-                        <CardTitle className="text-xl font-bold">{progress.orchestrator_name}</CardTitle>
+                        <div className="flex items-center gap-2">
+                            <CardTitle className="text-xl font-bold">{progress.orchestrator_name}</CardTitle>
+                            {progress.config_name && progress.config_name !== progress.orchestrator_name && (
+                                <Badge variant="outline" className="text-[10px] h-5 bg-primary/5 text-primary border-primary/20">
+                                    {progress.config_name}
+                                </Badge>
+                            )}
+                        </div>
                         <CardDescription className="font-mono text-xs">
                             Batch ID: {progress.orchestrator_execution_id}
                         </CardDescription>

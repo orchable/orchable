@@ -107,6 +107,8 @@ export const n8nService = {
     executionId: string;
     configId: string;
     syllabusRow: any;
+    launchId?: string;
+    batchId?: string;
   }): Promise<void> {
     const baseUrl = localStorage.getItem("lovable_n8n_url") || N8N_BASE_URL;
 

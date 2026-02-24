@@ -12,32 +12,32 @@ interface StatusBadgeProps {
 
 const statusConfig: Record<Status, { label: string; className: string; icon: React.ElementType }> = {
   pending: {
-    label: 'Chờ xử lý',
+    label: 'Pending',
     className: 'bg-muted text-muted-foreground',
     icon: Clock,
   },
   running: {
-    label: 'Đang chạy',
+    label: 'Running',
     className: 'bg-info/10 text-info border-info/20',
     icon: Loader2,
   },
   completed: {
-    label: 'Hoàn thành',
+    label: 'Completed',
     className: 'bg-success/10 text-success border-success/20',
     icon: CheckCircle2,
   },
   failed: {
-    label: 'Thất bại',
+    label: 'Failed',
     className: 'bg-destructive/10 text-destructive border-destructive/20',
     icon: XCircle,
   },
   cancelled: {
-    label: 'Đã hủy',
+    label: 'Cancelled',
     className: 'bg-muted text-muted-foreground',
     icon: Ban,
   },
   skipped: {
-    label: 'Bỏ qua',
+    label: 'Skipped',
     className: 'bg-muted text-muted-foreground',
     icon: Ban,
   },

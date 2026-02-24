@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "type": "stage_config",
+  "name": "A",
+  "stage_key": "core_question",
+  "label": "Core Question",
+  "task_type": "core_question_gen",
+  "cardinality": "1:1",
+  "split_path": "result.questions",
+  "split_mode": "per_item",
+  "output_mapping": "result",
+  "prompt_template_id": "c13fc761-dcbd-47d5-8972-a417312b4d7c_core_question",
+  "ai_settings": {
+    "model_id": "gemini-flash-latest",
+    "temperature": 1,
+    "topP": 0.95,
+    "topK": 40,
+    "maxOutputTokens": 32000,
+    "generate_content_api": "generateContent",
+    "timeout": 300000,
+    "maxRetries": 3,
+    "retryDelay": 5000
+  },
+  "contract": {
+    "input": {
+      "fields": [
+        {
+          "name": "batch_number",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "lo_count",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "target_question_count",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "lo_entries",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "delimiters": {
+        "end": "%%",
+        "start": "%%"
+      },
+      "auto_extracted": true
+    },
+    "output": {
+      "schema": [
+        {
+          "name": "batch_info",
+          "type": "object",
+          "required": true,
+          "properties": [
+            {
+              "name": "total_los",
+              "type": "number",
+              "required": true
+            },
+            {
+              "name": "generated_questions",
+              "type": "number",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "core_questions",
+          "type": "array",
+          "items": {
+            "name": "item",
+            "type": "object",
+            "required": true,
+            "properties": [
+              {
+                "name": "id",
+                "type": "number",
+                "required": true
+              },
+              {
+                "name": "lo_code",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "bloom_level",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "context_code",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "difficulty",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "target_question_type",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "original_question_type",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "scenario",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "core_question",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "ideal_response",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "explanation",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "misconceptions",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "image_description",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          "required": true
+        }
+      ],
+      "rootType": "object",
+      "validation": "loose",
+      "format_injection": "append"
+    }
+  }
+}
