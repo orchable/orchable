@@ -33,7 +33,7 @@ def scan_files(root_dir):
     return results
 
 if __name__ == "__main__":
-    base_dir = "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/n8n-gen"
+    base_dir = "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/orchable"
     findings = scan_files(base_dir)
     
     print(f"Found {len(findings)} lines with Vietnamese characters.\n")

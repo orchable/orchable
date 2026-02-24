@@ -2,9 +2,9 @@ import json
 import os
 
 # Paths
-PHASE5_JS_PATH = "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/n8n-gen/src/n8n/scripts/phase5_prepare_next_tasks.js"
-BASE_WF = "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/n8n-gen/src/n8n/workflows/[Base] Base Agent with Key.json"
-CONSOLIDATED_WF = "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/n8n-gen/src/n8n/workflows/[Base] Base Agent with Key - Consolidated.json"
+PHASE5_JS_PATH = "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/orchable/src/n8n/scripts/phase5_prepare_next_tasks.js"
+BASE_WF = "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/orchable/src/n8n/workflows/[Base] Base Agent with Key.json"
+CONSOLIDATED_WF = "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/orchable/src/n8n/workflows/[Base] Base Agent with Key - Consolidated.json"
 
 def patch_file(path, metadata_node_names, gemini_node_names, phase5_node_names):
     if not os.path.exists(path):

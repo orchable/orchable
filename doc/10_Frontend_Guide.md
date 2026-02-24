@@ -1,6 +1,6 @@
 # 🖥️ Frontend Guide
 
-This document describes the primary pages, services, and components of the React Frontend within the `n8n-gen` module.
+This document describes the primary pages, services, and components of the React Frontend within the `orchable` module.
 
 ---
 

@@ -1,8 +1,8 @@
 import json
 import os
 
-ST_WF_PATH = "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/n8n-gen/src/n8n/workflows/[Base] Base Agent with Key.json"
-SCRIPT_PATH = "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/n8n-gen/src/n8n/scripts/phase5_prepare_next_tasks.js"
+ST_WF_PATH = "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/orchable/src/n8n/workflows/[Base] Base Agent with Key.json"
+SCRIPT_PATH = "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/orchable/src/n8n/scripts/phase5_prepare_next_tasks.js"
 
 # --- FIX 1: Standard Agent Workflow (Singular -> Plural Output) ---
 # Target: "next_stage_config: grandChildConfigs," -> "next_stage_configs: grandChildConfigs,"

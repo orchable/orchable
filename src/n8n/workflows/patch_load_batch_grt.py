@@ -2,8 +2,8 @@ import json
 import os
 
 # Paths
-WORKFLOW_PATH = "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/n8n-gen/src/n8n/workflows/[Base] Load Batch - Supabase to n8n.json"
-TRANSFORM_JS_PATH = "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/n8n-gen/src/n8n/scripts/load_batch_transform.js"
+WORKFLOW_PATH = "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/orchable/src/n8n/workflows/[Base] Load Batch - Supabase to n8n.json"
+TRANSFORM_JS_PATH = "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/orchable/src/n8n/scripts/load_batch_transform.js"
 
 def patch_load_batch():
     if not os.path.exists(WORKFLOW_PATH):

@@ -1,6 +1,6 @@
 # 🗄️ Database Schema
 
-The system utilizes PostgreSQL on Supabase. Below is a detailed description of the tables within the `n8n-gen` module.
+The system utilizes PostgreSQL on Supabase. Below is a detailed description of the tables within the `orchable` module.
 
 ---
 

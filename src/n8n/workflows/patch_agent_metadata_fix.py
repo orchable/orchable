@@ -3,10 +3,10 @@ import os
 
 # Paths
 WORKFLOW_PATHS = [
-    "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/n8n-gen/src/n8n/workflows/[Base] Base Agent with Key.json",
-    "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/n8n-gen/src/n8n/workflows/[Base] Base Agent with Key - Consolidated.json"
+    "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/orchable/src/n8n/workflows/[Base] Base Agent with Key.json",
+    "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/orchable/src/n8n/workflows/[Base] Base Agent with Key - Consolidated.json"
 ]
-PHASE5_JS_PATH = "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/n8n-gen/src/n8n/scripts/phase5_prepare_next_tasks.js"
+PHASE5_JS_PATH = "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/orchable/src/n8n/scripts/phase5_prepare_next_tasks.js"
 
 def patch_agent_workflow():
     # 1. Load the PHASE 5 JS

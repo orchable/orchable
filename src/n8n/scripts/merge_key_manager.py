@@ -1,9 +1,9 @@
 import json
 import os
 
-OLD_PATH = '/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/n8n-gen/src/n8n/workflows/[Base] API Key Rotation Manager - OLD.json'
-NEW_PATH = '/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/n8n-gen/src/n8n/workflows/[Base] API Key Rotation Manager.json'
-TARGET_PATH = '/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/n8n-gen/src/n8n/workflows/[Base] API Key Rotation Manager.json'
+OLD_PATH = '/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/orchable/src/n8n/workflows/[Base] API Key Rotation Manager - OLD.json'
+NEW_PATH = '/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/orchable/src/n8n/workflows/[Base] API Key Rotation Manager.json'
+TARGET_PATH = '/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/orchable/src/n8n/workflows/[Base] API Key Rotation Manager.json'
 
 def merge_workflows():
     with open(OLD_PATH, 'r') as f:

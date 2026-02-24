@@ -1,4 +1,4 @@
-# Analysis: Integrating N-Stage Orchestrator into n8n-gen
+# Analysis: Integrating N-Stage Orchestrator into orchable
 
 > **Date:** 2026-01-31  
 > **Reference:** [enhance-n-stage-orchestrator](file:///Users/tonypham/MEGA/WebApp/pbl-asset-tools/openspec/changes/enhance-n-stage-orchestrator)
@@ -47,7 +47,7 @@ lab_step_executions (individual steps)
 
 ### Features IN enhance-n-stage-orchestrator
 
-| Feature | Status in n8n-gen |
+| Feature | Status in orchable |
 |---------|-------------------------------|
 | `root_task_id` (hierarchy root) | ❌ Missing |
 | `hierarchy_path` (ancestor chain) | ❌ Missing |

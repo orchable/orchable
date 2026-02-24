@@ -1,8 +1,8 @@
 import json
 import os
 
-ST_WF_PATH = "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/n8n-gen/src/n8n/workflows/[Base] Base Agent with Key.json"
-CON_WF_PATH = "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/n8n-gen/src/n8n/workflows/[Base] Base Agent with Key - Consolidated.json"
+ST_WF_PATH = "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/orchable/src/n8n/workflows/[Base] Base Agent with Key.json"
+CON_WF_PATH = "/Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/orchable/src/n8n/workflows/[Base] Base Agent with Key - Consolidated.json"
 
 OLD_CODE_SNIPPET = "const nextConfigs = extra.next_stage_config || [];"
 NEW_CODE_SNIPPET = """// Get next stage configs (hydrated roadmap from parent)
