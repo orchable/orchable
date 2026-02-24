@@ -20,9 +20,13 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTier } from '@/contexts/TierContext';
+import { storage } from '@/lib/storage';
+import { executorService } from '@/services/executorService';
 
 export function LauncherPage() {
   const { user } = useAuth();
+  const { tier, isLite } = useTier();
   const navigate = useNavigate();
   const { data: configs, isLoading: isLoadingConfigs } = useConfigs();
   const createExecutionMutation = useCreateExecution();
@@ -268,24 +272,19 @@ export function LauncherPage() {
           );
 
           // Create a task_batches record for THIS ROW
-          const { data: batch, error: batchError } = await supabase
-            .from('task_batches')
-            .insert({
-              name: `${config.name} - Row ${selectedTaskIndices[i] + 1}`,
-              total_tasks: 1, // Will be updated by triggers if more tasks are created in stages
-              pending_tasks: 1,
-              status: 'processing',
-              batch_type: 'manual_run',
-              orchestrator_config_id: config.id,
-              launch_id: launchId, // Campaign grouping
-              preset_key: 'manual', // Legacy compatibility
-              grade_code: 'none',    // Legacy compatibility
-              created_by: user?.id
-            })
-            .select('id')
-            .single();
+          const batch = await storage.adapter.createBatch({
+            name: `${config.name} - Row ${selectedTaskIndices[i] + 1}`,
+            total_tasks: 1, // Will be updated by triggers if more tasks are created in stages
+            pending_tasks: 1,
+            status: 'processing',
+            batch_type: 'manual_run',
+            orchestrator_config_id: config.id,
+            launch_id: launchId, // Campaign grouping
+            preset_key: 'manual', // Legacy compatibility
+            grade_code: 'none',    // Legacy compatibility
+            created_by: user?.id
+          });
 
-          if (batchError) throw batchError;
           const batchId = batch.id;
 
           allTasksToInsert.push({
@@ -337,8 +336,16 @@ export function LauncherPage() {
         }
 
         // 3. Perform bulk insert of all initial tasks (Stage 1)
-        const { error: insertError } = await supabase.from('ai_tasks').insert(allTasksToInsert);
-        if (insertError) throw insertError;
+        await storage.adapter.createTasks(allTasksToInsert);
+
+        if (isLite) {
+          const apiKey = localStorage.getItem('lovable_gemini_api_key');
+          if (apiKey) {
+            executorService.start(apiKey, tier);
+          } else {
+            toast.warning('Please configure your Gemini API Key in Settings for local execution.');
+          }
+        }
 
         toast.success(`Successfully launched campaign with ${allTasksToInsert.length} pipelines`);
       } else {
@@ -369,14 +376,32 @@ export function LauncherPage() {
             syllabusRow: row
           });
 
-          await n8nService.triggerMasterWorkflow({
-            executionId: execution.id,
-            configId: selectedConfigId!,
-            syllabusRow: row,
-            // Pass the new grouping IDs
-            launchId: launchId,
-            batchId: execution.id // Here execution.id (lab_execution) can act as the batch_id
-          });
+          if (isLite) {
+            // In Lite mode, we use the storage adapter for batch creation too
+            // lab_execution (execution) is already created, but we need n8n-gen compatible batch
+            await storage.adapter.createBatch({
+              id: execution.id,
+              name: `${config.name} - ${row.lessonTitle}`,
+              status: 'pending',
+              orchestrator_config_id: config.id,
+              batch_type: 'manual_run',
+              created_by: user?.id
+            });
+
+            const apiKey = localStorage.getItem('lovable_gemini_api_key');
+            if (apiKey) {
+              executorService.start(apiKey, tier);
+            }
+          } else {
+            await n8nService.triggerMasterWorkflow({
+              executionId: execution.id,
+              configId: selectedConfigId!,
+              syllabusRow: row,
+              // Pass the new grouping IDs
+              launchId: launchId,
+              batchId: execution.id // Here execution.id (lab_execution) can act as the batch_id
+            });
+          }
         }
         toast.success(`Successfully launched ${dataToProcess.length} execution(s)`);
       }

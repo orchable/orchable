@@ -269,6 +269,9 @@ export interface Execution {
 	name?: string;
 	syllabus_row?: SyllabusRow;
 	status: ExecutionStatus;
+	batch_type?: string; // New
+	preset_key?: string; // New
+	grade_code?: string; // New
 	started_at?: string;
 	completed_at?: string;
 	error_message?: string;
@@ -282,6 +285,17 @@ export interface Execution {
 	launch_id?: string; // New
 	created_at: string;
 	updated_at: string;
+	created_by?: string; // New
+
+	// Parity with task_batches table
+	source_file?: string | null;
+	exam_round_code?: string | null;
+	week_range?: string | null;
+	config?: Record<string, unknown> | null;
+	n8n_workflow_id?: string | null;
+	n8n_execution_id?: string | null;
+	finished_tasks?: number;
+	pending_tasks?: number; // Added for parity
 }
 
 export interface StepExecution {

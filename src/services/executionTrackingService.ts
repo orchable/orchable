@@ -47,6 +47,29 @@ export interface TaskSummary {
 	input_data?: Record<string, unknown> | null;
 	output_data?: Record<string, unknown> | null;
 	prompt_template_id?: string | null;
+
+	// Parity with ai_tasks table
+	n8n_execution_id?: string | null;
+	orchestrator_tracking?: Record<string, unknown> | null;
+	agent_id?: string | null;
+	batch_priority?: string | null;
+	test_mode?: boolean;
+	sequence?: number | null;
+	phase_code?: string | null;
+	retry_count?: number;
+	step_id?: string | null;
+	total_steps?: number | null;
+	next_task_config?: Record<string, unknown> | null;
+	orchestrator_execution_id?: string | null;
+	step_execution_id?: string | null;
+	requires_approval?: boolean;
+	approved_at?: string | null;
+	approved_by?: string | null;
+	edited_output_data?: Record<string, unknown> | null;
+	edit_notes?: string | null;
+	extra?: Record<string, unknown> | null;
+	split_group_id?: string | null;
+	launch_id?: string | null;
 }
 
 /**

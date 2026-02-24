@@ -35,6 +35,13 @@ export const syncService = {
 				);
 			}
 
+			// 3. Sync configs
+			const localConfigs = await db.orchestrator_configs.toArray();
+			for (const config of localConfigs) {
+				await cloudAdapter.saveConfig(config);
+				console.log(`[SyncService] Synced config ${config.id}`);
+			}
+
 			console.log("[SyncService] Sync completed.");
 		} catch (error) {
 			console.error("[SyncService] Sync failed:", error);

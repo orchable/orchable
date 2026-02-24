@@ -4,7 +4,7 @@ import {
 	PromptTemplate,
 	CustomComponent,
 } from "./StorageAdapter";
-import { Execution as TaskBatch } from "../types";
+import { Execution as TaskBatch, OrchestratorConfig } from "../types";
 import { TaskSummary as AiTask } from "../../services/executionTrackingService";
 
 export class SupabaseAdapter implements IStorageAdapter {
@@ -166,6 +166,87 @@ export class SupabaseAdapter implements IStorageAdapter {
 		const { error } = await supabase
 			.from("custom_components")
 			.upsert(component);
+
+		if (error) throw error;
+	}
+
+	// Configs
+	async saveConfig(
+		config: Partial<OrchestratorConfig>,
+	): Promise<OrchestratorConfig> {
+		const {
+			data: { user },
+		} = await supabase.auth.getUser();
+
+		const { data, error } = await supabase
+			.from("lab_orchestrator_configs")
+			.insert({
+				...config,
+				created_by: user?.id,
+			})
+			.select()
+			.single();
+
+		if (error) throw error;
+		return data as OrchestratorConfig;
+	}
+
+	async listConfigs(): Promise<OrchestratorConfig[]> {
+		const {
+			data: { user },
+		} = await supabase.auth.getUser();
+		if (!user) return [];
+
+		const { data, error } = await supabase
+			.from("lab_orchestrator_configs")
+			.select("*")
+			.eq("created_by", user.id)
+			.order("created_at", { ascending: false });
+
+		if (error) throw error;
+		return data as OrchestratorConfig[];
+	}
+
+	async getConfig(id: string): Promise<OrchestratorConfig | null> {
+		const {
+			data: { user },
+		} = await supabase.auth.getUser();
+		if (!user) return null;
+
+		const { data, error } = await supabase
+			.from("lab_orchestrator_configs")
+			.select("*")
+			.eq("id", id)
+			.eq("created_by", user.id)
+			.maybeSingle();
+
+		if (error) throw error;
+		return data as OrchestratorConfig;
+	}
+
+	async updateConfig(
+		id: string,
+		updates: Partial<OrchestratorConfig>,
+	): Promise<OrchestratorConfig> {
+		const { data, error } = await supabase
+			.from("lab_orchestrator_configs")
+			.update({
+				...updates,
+				updated_at: new Date().toISOString(),
+			})
+			.eq("id", id)
+			.select()
+			.single();
+
+		if (error) throw error;
+		return data as OrchestratorConfig;
+	}
+
+	async deleteConfig(id: string): Promise<void> {
+		const { error } = await supabase
+			.from("lab_orchestrator_configs")
+			.delete()
+			.eq("id", id);
 
 		if (error) throw error;
 	}

@@ -6,21 +6,34 @@ import { StepConfig } from "../types";
 export interface PromptTemplate {
 	id: string;
 	name: string;
-	stage_key: string;
-	task_type: string;
-	prompt_text: string;
-	stage_config?: Partial<StepConfig>;
+	description?: string;
+	template: string;
+	version: number;
+	is_active: boolean;
+	default_ai_settings?: Record<string, any>;
 	next_stage_template_ids?: string[];
-	created_at: string;
-	updated_at: string;
+	organization_code?: string;
+	input_schema?: Record<string, any>;
+	output_schema?: Record<string, any>;
+	stage_config?: Record<string, any>;
+	requires_approval?: boolean;
+	custom_component_id?: string;
+	view_config?: Record<string, any>;
+	next_stage_template_id?: string; // Legacy parity
+	created_at?: string;
+	updated_at?: string;
 }
 
 export interface CustomComponent {
 	id: string;
 	name: string;
+	description?: string;
 	code: string;
-	created_at: string;
-	updated_at: string;
+	mock_data?: Record<string, any>;
+	is_public: boolean;
+	created_at?: string;
+	updated_at?: string;
+	created_by?: string;
 }
 
 export interface IStorageAdapter {
@@ -48,4 +61,16 @@ export interface IStorageAdapter {
 	listComponents(): Promise<CustomComponent[]>;
 	getComponent(id: string): Promise<CustomComponent | null>;
 	upsertComponent(component: CustomComponent): Promise<void>;
+
+	// Configs
+	saveConfig(
+		config: Partial<OrchestratorConfig>,
+	): Promise<OrchestratorConfig>;
+	listConfigs(): Promise<OrchestratorConfig[]>;
+	getConfig(id: string): Promise<OrchestratorConfig | null>;
+	updateConfig(
+		id: string,
+		updates: Partial<OrchestratorConfig>,
+	): Promise<OrchestratorConfig>;
+	deleteConfig(id: string): Promise<void>;
 }

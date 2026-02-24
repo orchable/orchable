@@ -4,7 +4,7 @@ import {
 	PromptTemplate,
 	CustomComponent,
 } from "./StorageAdapter";
-import { Execution as TaskBatch } from "../types";
+import { Execution as TaskBatch, OrchestratorConfig } from "../types";
 import { TaskSummary as AiTask } from "../../services/executionTrackingService";
 
 export interface MetadataValue {
@@ -17,16 +17,20 @@ export class OrchableDatabase extends Dexie {
 	ai_tasks!: Table<AiTask>;
 	prompt_templates!: Table<PromptTemplate>;
 	custom_components!: Table<CustomComponent>;
+	orchestrator_configs!: Table<OrchestratorConfig>;
 	metadata!: Table<{ key: string; value: MetadataValue }>;
 
 	constructor() {
 		super("orchable_db");
-		this.version(2).stores({
-			task_batches: "id, status, created_at",
-			ai_tasks: "id, batch_id, status, stage_key, [batch_id+stage_key]",
-			prompt_templates: "id, name, stage_key",
+		this.version(4).stores({
+			task_batches:
+				"id, status, created_at, orchestrator_config_id, launch_id",
+			ai_tasks:
+				"id, batch_id, status, stage_key, [batch_id+stage_key], launch_id",
+			prompt_templates: "id, name, stage_key, organization_code",
 			custom_components: "id, name",
 			metadata: "key", // for usage, config, etc.
+			orchestrator_configs: "id, name, created_at",
 		});
 	}
 
@@ -154,5 +158,49 @@ export class IndexedDBAdapter implements IStorageAdapter {
 
 	async upsertComponent(component: CustomComponent): Promise<void> {
 		await db.custom_components.put(component);
+	}
+
+	// Configs
+	async saveConfig(
+		config: Partial<OrchestratorConfig>,
+	): Promise<OrchestratorConfig> {
+		const newConfig = {
+			id: crypto.randomUUID(),
+			created_at: new Date().toISOString(),
+			updated_at: new Date().toISOString(),
+			...config,
+		} as OrchestratorConfig;
+
+		await db.orchestrator_configs.add(newConfig);
+		return newConfig;
+	}
+
+	async listConfigs(): Promise<OrchestratorConfig[]> {
+		return db.orchestrator_configs
+			.orderBy("created_at")
+			.reverse()
+			.toArray();
+	}
+
+	async getConfig(id: string): Promise<OrchestratorConfig | null> {
+		const config = await db.orchestrator_configs.get(id);
+		return config || null;
+	}
+
+	async updateConfig(
+		id: string,
+		updates: Partial<OrchestratorConfig>,
+	): Promise<OrchestratorConfig> {
+		await db.orchestrator_configs.update(id, {
+			...updates,
+			updated_at: new Date().toISOString(),
+		});
+		const updated = await db.orchestrator_configs.get(id);
+		if (!updated) throw new Error("Config not found after update");
+		return updated;
+	}
+
+	async deleteConfig(id: string): Promise<void> {
+		await db.orchestrator_configs.delete(id);
 	}
 }
