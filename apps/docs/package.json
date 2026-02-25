@@ -1,12 +1,24 @@
 {
-	"name": "orchable-docs",
+	"name": "docs",
 	"version": "1.0.0",
 	"private": true,
 	"scripts": {
-		"build": "mkdir -p dist && echo 'Mintlify documentation is hosted externally. Redirecting...' > dist/index.html",
-		"dev": "mintlify dev"
+		"dev": "next dev",
+		"build": "next build",
+		"start": "next start"
+	},
+	"dependencies": {
+		"lucide-react": "latest",
+		"next": "15.1.6",
+		"nextra": "latest",
+		"nextra-theme-docs": "latest",
+		"react": "19",
+		"react-dom": "19",
+		"tailwindcss": "latest",
+		"postcss": "latest",
+		"autoprefixer": "latest"
 	},
 	"devDependencies": {
-		"mintlify": "^4.2.384"
+		"postcss-import": "^16.1.1"
 	}
 }
