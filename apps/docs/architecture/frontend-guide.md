@@ -1,8 +1,3 @@
----
-sidebar_position: 3
-title: Frontend Guide
----
-
 # 🖥️ Frontend Guide
 
 This document describes the primary pages, services, and components of the React Frontend within the `orchable` module.
@@ -182,12 +177,12 @@ const Component = ({ data, schema }) => {
 
 ```mermaid
 graph LR
-    User -->|"Visit App"| AuthGuard
-    AuthGuard -->|"No session"| Login
-    Login -->|"Email OTP"| Supabase
-    Login -->|"Google OAuth"| Supabase
-    Supabase -->|"Session"| AuthContext
-    AuthContext -->|"currentUser"| App
+    User  -->|"Visit App"| AuthGuard
+    AuthGuard  -->|"No session"| Login
+    Login  -->|"Email OTP"| Supabase
+    Login  -->|"Google OAuth"| Supabase
+    Supabase  -->|"Session"| AuthContext
+    AuthContext  -->|"currentUser"| App
 ```
 
 - `AuthContext` (`contexts/AuthContext.tsx`): Provides `currentUser`, `signIn()`, `signOut()`, and `loading` state.

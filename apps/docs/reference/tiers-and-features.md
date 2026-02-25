@@ -3,7 +3,7 @@ sidebar_position: 3
 title: Tiers & Features
 ---
 
-<!-- # 🏷️ Tiers & Features -->
+{/*  # 🏷️ Tiers & Features  -->
 
 Orchable offers three tiers based on user needs and resource requirements.
 

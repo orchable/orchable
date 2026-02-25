@@ -1,8 +1,3 @@
----
-sidebar_position: 2
-title: Database Schema
----
-
 # 🗄️ Database Schema
 
 The system utilizes PostgreSQL on Supabase. Below is a detailed description of the tables within the `orchable` module.
@@ -79,7 +74,7 @@ Stores all prompts and stage configurations for the Orchestrator.
 
 ---
 
-## 4. Asset Registry Table: `custom_components`
+## 4. Asset Registry Table: `custom_components` *(New — 2026-02-24)*
 
 Repository for custom UI Components written in TSX, used to render task results in specialized ways.
 
@@ -180,9 +175,9 @@ erDiagram
 | `20260221_optimize_view_performance.sql` | 2026-02-21 | Optimized `v_runnable_tasks` view |
 | `20260222_add_isolated_batch_creation.sql` | 2026-02-22 | Added isolated batch_grouping |
 | `20240223_add_view_config_to_prompt_templates.sql` | 2026-02-23 | Added `view_config` column |
-| `20260223_add_delete_policies.sql" | 2026-02-23 | Added RLS delete + cascade RPC |
+| `20260223_add_delete_policies.sql` | 2026-02-23 | Added RLS delete + cascade RPC |
 | `20260223_add_retry_rpc.sql` | 2026-02-23 | Added RPC for task/batch retry |
 | `20260223_tighten_rls.sql` | 2026-02-23 | Tightened RLS isolation by user |
-| `20260224_add_custom_components_table.sql` | 2026-02-24 | Created `custom_components` table + linkage |
+| `20260224_add_custom_components_table.sql` | 2026-02-24 | **Created `custom_components` table + linkage** |
 
 *Last Updated: 2026-02-24*

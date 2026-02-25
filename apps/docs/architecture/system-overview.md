@@ -1,8 +1,3 @@
----
-sidebar_position: 1
-title: System Overview
----
-
 # 🏛️ System Architecture
 
 ## 1. Overview
@@ -53,28 +48,28 @@ Goal: Automate any multi-step AI content generation pipeline through a configura
 
 ```mermaid
 graph TD
-    User["👤 User (Browser)"] -->|"Design"| Designer["Designer (ReactFlow)"]
-    User -->|"Launch batch"| Launcher
-    User -->|"View results"| Monitor
-    User -->|"Manage assets"| AssetLibrary["Asset Library"]
-    User -->|"Estimate cost"| Calculator
+    User["👤 User (Browser)"]  -->|"Design"| Designer["Designer (ReactFlow)"]
+    User  -->|"Launch batch"| Launcher
+    User  -->|"View results"| Monitor
+    User  -->|"Manage assets"| AssetLibrary["Asset Library"]
+    User  -->|"Estimate cost"| Calculator
 
-    Designer -->|"Sync Stages"| PT[("prompt_templates\n(Supabase)")]
-    Launcher -->|"Create Batch"| TB[("task_batches\n(Supabase)")]
-    TB -->|"Resolves"| AT[("ai_tasks\n(Supabase)")]
-    Monitor -->|"Realtime sub"| AT
+    Designer  -->|"Sync Stages"| PT[("prompt_templates\n(Supabase)")]
+    Launcher  -->|"Create Batch"| TB[("task_batches\n(Supabase)")]
+    TB  -->|"Resolves"| AT[("ai_tasks\n(Supabase)")]
+    Monitor  -->|"Realtime sub"| AT
 
-    n8n["n8n Engine"] -->|"Polls plan tasks"| AT
-    n8n -->|"Get API Key"| Rotator["Key Rotator Workflow"]
-    Rotator -->|"Picks active key"| UK[("user_api_keys")]
-    n8n -->|"Generate Content"| Gemini["Gemini API"]
-    Gemini -->|"JSON Response"| n8n
-    n8n -->|"Update output_data"| AT
-    n8n -->|"Create sub-tasks"| AT
+    n8n["n8n Engine"]  -->|"Polls plan tasks"| AT
+    n8n  -->|"Get API Key"| Rotator["Key Rotator Workflow"]
+    Rotator  -->|"Picks active key"| UK[("user_api_keys")]
+    n8n  -->|"Generate Content"| Gemini["Gemini API"]
+    Gemini  -->|"JSON Response"| n8n
+    n8n  -->|"Update output_data"| AT
+    n8n  -->|"Create sub-tasks"| AT
 
-    AssetLibrary -->|"CRUD"| PT
-    AssetLibrary -->|"CRUD"| CC[("custom_components\n(Supabase)")]
-    PT -->|"Links to"| CC
+    AssetLibrary  -->|"CRUD"| PT
+    AssetLibrary  -->|"CRUD"| CC[("custom_components\n(Supabase)")]
+    PT  -->|"Links to"| CC
 ```
 
 ---
@@ -91,10 +86,10 @@ sequenceDiagram
     U->>SB: 1. Create Batch (POST task_batches)
     SB->>SB: 2. Trigger: Create Root Tasks (ai_tasks)
     N8N->>SB: 3. Poll: Get tasks with status='plan'
-    SB-->>N8N: [List of tasks]
+    SB -->>N8N: [List of tasks]
     N8N->>SB: 4. Fetch Prompt Template
     N8N->>AI: 5. Generate Content (prompt + data)
-    AI-->>N8N: 6. JSON Response
+    AI -->>N8N: 6. JSON Response
     N8N->>SB: 7. Update output_data, status='generated'
     N8N->>SB: 8. Create Next-Stage sub-tasks (if any)
     U->>SB: 9. Realtime: Receive status update
@@ -144,4 +139,4 @@ ai_task.output_data → [Custom TSX Component Sandbox] → Rendered HTML
 | Supabase Realtime | Instant task status updates |
 | Gemini Structured Output | Reduced JSON parse errors, increased reliability |
 
-*Last Updated: 2026-02-24*
+*Updated: 2026-02-24*

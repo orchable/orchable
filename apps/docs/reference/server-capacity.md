@@ -3,7 +3,7 @@ sidebar_position: 4
 title: Server Capacity
 ---
 
-<!-- # 🖥️ Server Capacity & Optimization -->
+{/*  # 🖥️ Server Capacity & Optimization  -->
 
 Guidelines for managing system resources and optimizing throughput.
 
