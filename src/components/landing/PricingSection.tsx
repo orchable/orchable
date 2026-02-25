@@ -4,9 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function PricingSection() {
     const navigate = useNavigate();
+    const { user } = useAuth();
 
     const tiers = [
         {
@@ -113,7 +115,7 @@ export function PricingSection() {
                                     "w-full h-14 text-lg font-black rounded-2xl",
                                     tier.popular && "bg-primary hover:bg-primary/90 text-white shadow-glow"
                                 )}
-                                onClick={() => navigate(idx === 1 ? '/login' : '/designer')}
+                                onClick={() => user ? navigate('/designer') : navigate('/login')}
                             >
                                 {tier.cta}
                             </Button>

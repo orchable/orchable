@@ -151,7 +151,7 @@ export function HomePage() {
             <Button
               size="lg"
               className="h-16 px-12 text-xl font-black bg-primary hover:bg-primary/90 text-white shadow-glow transition-all"
-              onClick={() => navigate('/designer')}
+              onClick={() => navigate('/login')}
             >
               Start Free Today
               <ArrowRight className="w-6 h-6 ml-3" />

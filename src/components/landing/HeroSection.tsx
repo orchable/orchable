@@ -63,7 +63,7 @@ export function HeroSection() {
                     <Button
                         size="lg"
                         className="h-14 px-10 text-lg font-bold bg-primary hover:bg-primary/90 shadow-glow group"
-                        onClick={() => navigate('/designer')}
+                        onClick={() => navigate('/login')}
                     >
                         Start Free Today
                         <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />

@@ -21,6 +21,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { TierProvider } from "./contexts/TierContext";
 import { Login } from "./pages/Login";
 import { AuthCallback } from "./pages/AuthCallback";
+import { ProtectedRoute } from "./components/common/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -39,13 +40,13 @@ const App = () => (
                 <Layout>
                   <Routes>
                     <Route path="/" element={<HomePage />} />
-                    <Route path="/designer" element={<DesignerPage />} />
-                    <Route path="/launcher" element={<LauncherPage />} />
-                    <Route path="/monitor" element={<MonitorPage />} />
-                    <Route path="/batch/:batchId" element={<BatchProgress />} />
-                    <Route path="/assets" element={<AssetLibrary />} />
-                    <Route path="/calculator" element={<CalculatorPage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/designer" element={<ProtectedRoute><DesignerPage /></ProtectedRoute>} />
+                    <Route path="/launcher" element={<ProtectedRoute><LauncherPage /></ProtectedRoute>} />
+                    <Route path="/monitor" element={<ProtectedRoute><MonitorPage /></ProtectedRoute>} />
+                    <Route path="/batch/:batchId" element={<ProtectedRoute><BatchProgress /></ProtectedRoute>} />
+                    <Route path="/assets" element={<ProtectedRoute><AssetLibrary /></ProtectedRoute>} />
+                    <Route path="/calculator" element={<ProtectedRoute><CalculatorPage /></ProtectedRoute>} />
+                    <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
                     <Route path="/hub" element={<HubBrowse />} />
                     <Route path="/hub/:category" element={<HubBrowse />} />
                     <Route path="/hub/c/:type/:slug" element={<AssetDetail />} />

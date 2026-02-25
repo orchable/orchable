@@ -98,7 +98,7 @@ export function LandingNav() {
                             <Button
                                 size="sm"
                                 className="bg-primary hover:bg-primary/90 shadow-glow"
-                                onClick={() => navigate('/designer')}
+                                onClick={() => navigate('/login')}
                             >
                                 Start Free Today
                             </Button>
@@ -169,7 +169,7 @@ export function LandingNav() {
                                             className="w-full h-12 text-lg shadow-glow"
                                             onClick={() => {
                                                 setMobileMenuOpen(false);
-                                                navigate('/designer');
+                                                navigate('/login');
                                             }}
                                         >
                                             Start Free Today
