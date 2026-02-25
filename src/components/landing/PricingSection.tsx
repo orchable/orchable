@@ -107,7 +107,7 @@ export function PricingSection() {
 
                             <Button
                                 size="lg"
-                                variant={tier.variant as any}
+                                variant={tier.variant as "default" | "outline" | "secondary" | "ghost" | "link" | "destructive"}
                                 disabled={tier.disabled}
                                 className={cn(
                                     "w-full h-14 text-lg font-black rounded-2xl",

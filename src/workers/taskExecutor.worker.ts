@@ -2,10 +2,11 @@ import { db } from "../lib/storage/IndexedDBAdapter";
 import { TaskSummary as AiTask } from "../services/executionTrackingService";
 import { PromptTemplate } from "../lib/storage/StorageAdapter";
 import { StepConfig, AISettings, Execution } from "../lib/types";
+import { KeyConfig } from "../services/keyPoolService";
 
 // Types for the worker messages
 export type WorkerMessage =
-	| { type: "START"; configs: any[]; tier: string }
+	| { type: "START"; configs: KeyConfig[]; tier: string }
 	| { type: "STOP" };
 
 export type WorkerStatus =
@@ -14,7 +15,7 @@ export type WorkerStatus =
 	| { type: "BATCH_COMPLETE"; batchId: string };
 
 let isRunning = false;
-let currentConfigs: any[] = [];
+let currentConfigs: KeyConfig[] = [];
 let currentConfigIndex = 0;
 let currentTier = "free";
 
@@ -574,12 +575,12 @@ async function handleManyToOne(task: AiTask, template: PromptTemplate) {
 	if (!allDone) return; // Wait for others
 
 	// 2. Aggregate data
-	const mergePath = stageConfig.merge_path || null;
+	const mergePath = (stageConfig.merge_path as string) || null;
 	const allOutputs = siblings
 		.map((s) =>
 			s.id === task.id
-				? (task as unknown as Record<string, unknown>).output_data
-				: s.output_data,
+				? (task.output_data as Record<string, unknown>)
+				: (s.output_data as Record<string, unknown>),
 		)
 		.filter(Boolean);
 

@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import type { SyllabusRow, OrchestratorConfig, StepConfig } from '@/lib/types';
 import { n8nService } from '@/services/n8nService';
-import { analyzeJsonStructure, getValueByPath, processTaskData } from '@/lib/jsonAnalyzer';
+import { analyzeJsonStructure, getValueByPath, processTaskData, type AnalysisResult, type FieldInfo } from '@/lib/jsonAnalyzer';
 import type { FieldSelection, FieldMapping, StageContract } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 import { JsonInputSection } from '@/components/launcher/JsonInputSection';
@@ -40,12 +40,18 @@ export function LauncherPage() {
   const [isParsing, setIsParsing] = useState(false);
 
   // JSON Mode State
-  const [jsonData, setJsonData] = useState<any | null>(null);
-  const [jsonAnalysis, setJsonAnalysis] = useState<any | null>(null);
+  const [jsonData, setJsonData] = useState<Record<string, unknown>[] | null>(null);
+  const [jsonAnalysis, setJsonAnalysis] = useState<AnalysisResult | null>(null);
   const [fieldSelection, setFieldSelection] = useState<FieldSelection>({ shared: [], perTask: [] });
   const [fieldMapping, setFieldMapping] = useState<FieldMapping>({});
   const [selectedTaskIndices, setSelectedTaskIndices] = useState<number[]>([]);
-  const [rootStages, setRootStages] = useState<(StepConfig & { id: string; name: string })[]>([]);
+
+  interface RootStage extends StepConfig {
+    id: string;
+    name: string;
+    _nextStage?: StepConfig;
+  }
+  const [rootStages, setRootStages] = useState<RootStage[]>([]);
   const [mappingWarning, setMappingWarning] = useState<string[]>([]);
   const [isMappingDialogOpen, setIsMappingDialogOpen] = useState(false);
 
@@ -73,7 +79,7 @@ export function LauncherPage() {
           name: s.label || s.name,
           // We'll use this nextStage info during launch
           _nextStage: nextStage
-        } as any;
+        } as RootStage;
       });
 
     setRootStages(roots);
@@ -136,7 +142,7 @@ export function LauncherPage() {
     if (!config) return null;
 
     const firstStage = rootStages[0];
-    const nextStage = (firstStage as any)?._nextStage;
+    const nextStage = firstStage?._nextStage;
     const nextStageKey = nextStage?.stage_key;
 
     const firstStageTemplateId = `${config.id}_${firstStage.stage_key}_${firstStage.id}`;
@@ -250,7 +256,7 @@ export function LauncherPage() {
         }
 
         const firstStage = rootStages[0];
-        const nextStage = (firstStage as any)?._nextStage;
+        const nextStage = firstStage?._nextStage;
 
         // Build full template IDs matching stageService format: configId_stageKey_stepId
         const firstStageTemplateId = `${config.id}_${firstStage.stage_key}_${firstStage.id}`;
@@ -259,7 +265,7 @@ export function LauncherPage() {
         // 2. Process each row into its own batch
         toast.info(`Preparing ${selectedTasks.length} pipelines...`);
 
-        const allTasksToInsert: any[] = [];
+        const allTasksToInsert: Record<string, unknown>[] = [];
 
         for (let i = 0; i < selectedTasks.length; i++) {
           const task = selectedTasks[i];
@@ -631,8 +637,8 @@ export function LauncherPage() {
           onOpenChange={setIsMappingDialogOpen}
           contract={rootStages[0]?.contract || null}
           availableFields={jsonAnalysis ? [
-            ...jsonAnalysis.sharedFields.map((f: any) => f.path),
-            ...jsonAnalysis.perTaskFields.map((f: any) => f.path)
+            ...jsonAnalysis.sharedFields.map((f: FieldInfo) => f.path),
+            ...jsonAnalysis.perTaskFields.map((f: FieldInfo) => f.path)
           ] : []}
           mapping={fieldMapping}
           onMappingChange={setFieldMapping}
