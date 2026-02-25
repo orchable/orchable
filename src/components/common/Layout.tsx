@@ -15,24 +15,32 @@ import {
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
+import { useLocation } from 'react-router-dom';
+
 interface LayoutProps {
   children: ReactNode;
 }
 
 export function Layout({ children }: LayoutProps) {
   const { user, signOut } = useAuth();
+  const location = useLocation();
+  const isLandingPage = location.pathname === '/';
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={!isLandingPage}>
       <div className="min-h-screen flex w-full">
-        <AppSidebar />
+        {!isLandingPage && <AppSidebar />}
 
         <div className="flex-1 flex flex-col">
           {/* Header */}
           <header className="h-14 border-b bg-card/50 backdrop-blur-sm flex items-center justify-between px-4 sticky top-0 z-40">
             <div className="flex items-center gap-3">
-              <SidebarTrigger />
-              <div className="h-5 w-px bg-border" />
+              {!isLandingPage && (
+                <>
+                  <SidebarTrigger />
+                  <div className="h-5 w-px bg-border" />
+                </>
+              )}
               <span className="text-sm text-muted-foreground">Orchable | AI Agent Orchestrator</span>
             </div>
             <div className="flex items-center gap-2">

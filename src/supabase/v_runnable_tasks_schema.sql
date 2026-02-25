@@ -49,14 +49,15 @@ from
   left join ai_tasks parent on t.parent_task_id = parent.id
   left join task_batches b on t.batch_id = b.id
 where
-  t.status::text = 'pending'::text
+  t.status::text = 'plan'::text
   and (
     t.parent_task_id is null
     or (
       parent.status::text = any (
         array[
-          'completed'::character varying::text,
-          'approved'::character varying::text
+          'completed'::text,
+          'generated'::text,
+          'approved'::text
         ]
       )
     )

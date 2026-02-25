@@ -1,11 +1,11 @@
 import { storage } from "../lib/storage";
-import { OrchestratorConfig, StepConfig } from "../lib/types";
+import { OrchestratorConfig } from "../lib/types";
 import { TaskSummary as AiTask } from "./executionTrackingService";
 import { topologicalSortStages } from "./stageService";
 
 export interface CreateBatchOptions {
 	config: OrchestratorConfig;
-	inputItems: any[];
+	inputItems: Record<string, unknown>[];
 	batchName?: string;
 	userId?: string;
 	launchId?: string;
@@ -27,7 +27,12 @@ export const batchService = {
 		const adapter = storage.adapter;
 
 		// 1. Get sorted stages
-		const sortedStages = topologicalSortStages(config.steps as any, []); // Edges are in steps.dependsOn mostly
+		const sortedStages = topologicalSortStages(
+			config.steps as unknown as Parameters<
+				typeof topologicalSortStages
+			>[0],
+			[],
+		); // Edges are in steps.dependsOn mostly
 		const firstStage = sortedStages[0];
 
 		if (!firstStage) {
@@ -54,7 +59,7 @@ export const batchService = {
 			created_by: userId || "anonymous",
 			// Store launchId in extra or as a separate field if adapter supports it
 			// For Supabase, we have a launch_id column.
-			...({ launch_id: launchId } as any),
+			...({ launch_id: launchId } as Record<string, unknown>),
 		});
 
 		// 3. Prepare tasks
@@ -62,6 +67,7 @@ export const batchService = {
 			batch_id: batch.id,
 			launch_id: launchId,
 			stage_key: firstStage.stage_key,
+			task_type: firstStage.task_type || "generic",
 			step_number: 1,
 			status: "plan", // Worker uses 'plan'
 			input_data: {
@@ -71,7 +77,10 @@ export const batchService = {
 				_prompt_template_id: firstStage.prompt_template_id,
 				_next_stage_template_ids: nextStageTemplateIds,
 			},
-			lo_code: item.lo_code || item.code || null,
+			lo_code:
+				(item as Record<string, string>).lo_code ||
+				(item as Record<string, string>).code ||
+				null,
 			prompt_template_id: firstStage.prompt_template_id,
 			user_id: userId || "anonymous",
 			sequence: i,
@@ -84,10 +93,9 @@ export const batchService = {
 						firstStage.cardinality === "one_to_many"
 							? "one_to_many"
 							: "one_to_one",
-					split_path: (firstStage as any).split_path || null,
-					split_mode: (firstStage as any).split_mode || "per_item",
-					output_mapping:
-						(firstStage as any).output_mapping || "result",
+					split_path: firstStage.split_path || null,
+					split_mode: firstStage.split_mode || "per_item",
+					output_mapping: firstStage.output_mapping || "result",
 				},
 				next_stage_configs: nextStages.map((ns) => ({
 					template_id:

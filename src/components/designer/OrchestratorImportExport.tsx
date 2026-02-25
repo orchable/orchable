@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { Download, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDesignerStore } from '@/stores/designerStore';
+import { StepConfig } from '@/lib/types';
 import { toast } from 'sonner';
 
 const EXPORT_VERSION = 1;
@@ -23,7 +24,7 @@ export function OrchestratorImportExport() {
         // Build the latest config steps dynamically from nodes to guarantee 100% sync
         const stepNodes = nodes.filter(n => n.type === 'stepNode');
         const steps = stepNodes.map(node => {
-            const data = node.data as any;
+            const data = node.data as unknown as StepConfig;
             return {
                 id: node.id,
                 name: data.name,
@@ -37,20 +38,14 @@ export function OrchestratorImportExport() {
                 output_mapping: data.output_mapping || 'result',
                 return_along_with: data.return_along_with || [],
                 ai_settings: (() => {
-                    const raw = data.ai_settings || {};
-                    const genCfg = raw.generationConfig || {};
+                    const raw = data.ai_settings;
+                    const genCfg = raw?.generationConfig || {};
                     // Normalize: generate_content_api always at root, never in generationConfig
-                    const { generate_content_api: gcaInner, responseMimeType, ...restGenCfg } = genCfg;
+                    const { generate_content_api: gcaInner, responseMimeType, ...restGenCfg } = genCfg as any;
                     return {
-                        model_id: raw.model_id || 'gemini-flash-latest',
-                        generate_content_api: raw.generate_content_api || gcaInner || 'generateContent',
-                        generationConfig: {
-                            temperature: restGenCfg.temperature ?? 1.0,
-                            topP: restGenCfg.topP ?? 0.95,
-                            topK: restGenCfg.topK ?? 40,
-                            maxOutputTokens: restGenCfg.maxOutputTokens ?? 8192,
-                            ...(responseMimeType ? { responseMimeType } : {})
-                        }
+                        model_id: raw?.model_id || 'gemini-2.0-flash',
+                        generate_content_api: (raw?.generate_content_api || (gcaInner as string) || 'generateContent') as "generateContent" | "streamGenerateContent",
+                        generationConfig: (raw?.generationConfig || {}) as Record<string, unknown>
                     };
                 })(),
                 timeout: data.timeout || 300000,
@@ -169,8 +164,9 @@ export function OrchestratorImportExport() {
                 toast.success(
                     `Orchestration "${importedName || file.name}" imported!`
                 );
-            } catch (err: any) {
-                toast.error(`Import failed: ${err?.message ?? 'Invalid file'}`);
+            } catch (err: unknown) {
+                const errorMessage = err instanceof Error ? err.message : 'Invalid file';
+                toast.error(`Import failed: ${errorMessage}`);
             } finally {
                 // Reset input so the same file can be re-imported if needed
                 if (fileInputRef.current) fileInputRef.current.value = '';

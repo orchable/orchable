@@ -266,7 +266,9 @@ export async function getExecutionProgress(
 		const completed = stageTasks.filter(
 			(t) => t.status === "completed",
 		).length;
-		const pending = stageTasks.filter((t) => t.status === "pending").length;
+		const pending = stageTasks.filter(
+			(t) => t.status === "plan" || t.status === "pending",
+		).length;
 		const running = stageTasks.filter(
 			(t) => t.status === "processing" || t.status === "running",
 		).length;
@@ -561,7 +563,7 @@ async function getRecentBatchesFallback(
 			batchMap.set(batchId, {
 				id: batchId,
 				orchestrator_name: orchestratorName,
-				status: "pending",
+				status: "plan",
 				created_at: task.created_at,
 				task_count: 0,
 				completed_tasks: 0,
@@ -585,7 +587,7 @@ async function getRecentBatchesFallback(
 		if (b.completed_tasks === b.task_count) status = "completed";
 		else if (b.failed_tasks > 0) status = "failed";
 		else if (b.completed_tasks === 0 && b.failed_tasks === 0)
-			status = "pending";
+			status = "plan";
 
 		return {
 			...b,

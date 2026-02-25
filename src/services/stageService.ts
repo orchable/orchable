@@ -72,6 +72,8 @@ export interface PromptTemplateRecord {
 		customComponent?: string; // Legacy/fallback
 		[key: string]: unknown;
 	};
+	stage_key?: string;
+	created_by?: string;
 }
 
 /**
@@ -246,6 +248,7 @@ export async function syncStagesToPromptTemplates(
 			stage_config: stageConfig,
 			requires_approval: stage.requires_approval || false,
 			organization_code: orchestratorId,
+			stage_key: stage.stage_key, // Sync for orchestration routing
 			custom_component_id: stage.custom_component_id,
 		};
 
@@ -270,10 +273,13 @@ export async function syncStagesToPromptTemplates(
 			nextTemplateIds.length > 0 ? nextTemplateIds[0] : null;
 
 		if (nextTemplateIds.length > 0) {
-			await storage.adapter.upsertTemplate({
-				...((await storage.adapter.getTemplate(templateId)) as any),
-				next_stage_template_ids: nextTemplateIds,
-			});
+			const existing = await storage.adapter.getTemplate(templateId);
+			if (existing) {
+				await storage.adapter.upsertTemplate({
+					...existing,
+					next_stage_template_ids: nextTemplateIds,
+				});
+			}
 		}
 	}
 
@@ -337,13 +343,15 @@ export async function createCustomComponent(
 	component: Partial<CustomComponent>,
 ): Promise<CustomComponent> {
 	// Need to handle partial here or add createComponent to Adapter
-	const newComponent = {
+	const newComponent: CustomComponent = {
 		id: crypto.randomUUID(),
 		created_at: new Date().toISOString(),
 		updated_at: new Date().toISOString(),
 		is_public: false,
+		name: component.name || "Untitled Component",
+		code: component.code || "",
 		...component,
-	} as any;
+	} as CustomComponent;
 	await storage.adapter.upsertComponent(newComponent);
 	return newComponent;
 }

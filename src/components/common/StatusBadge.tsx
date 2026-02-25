@@ -11,6 +11,11 @@ interface StatusBadgeProps {
 }
 
 const statusConfig: Record<Status, { label: string; className: string; icon: React.ElementType }> = {
+  plan: {
+    label: 'Plan',
+    className: 'bg-muted text-muted-foreground',
+    icon: Clock,
+  },
   pending: {
     label: 'Pending',
     className: 'bg-muted text-muted-foreground',
@@ -21,8 +26,28 @@ const statusConfig: Record<Status, { label: string; className: string; icon: Rea
     className: 'bg-info/10 text-info border-info/20',
     icon: Loader2,
   },
+  processing: {
+    label: 'Processing',
+    className: 'bg-info/10 text-info border-info/20',
+    icon: Loader2,
+  },
   completed: {
     label: 'Completed',
+    className: 'bg-success/10 text-success border-success/20',
+    icon: CheckCircle2,
+  },
+  generated: {
+    label: 'Generated',
+    className: 'bg-success/10 text-success border-success/20',
+    icon: CheckCircle2,
+  },
+  awaiting_approval: {
+    label: 'Awaiting Approval',
+    className: 'bg-warning/10 text-warning border-warning/20',
+    icon: Clock,
+  },
+  approved: {
+    label: 'Approved',
     className: 'bg-success/10 text-success border-success/20',
     icon: CheckCircle2,
   },

@@ -68,7 +68,7 @@ export const DEFAULT_STAGE_CONFIG = {
 	output_mapping: "result",
 	prompt_template_id: "",
 	ai_settings: {
-		model_id: "gemini-flash-latest" as const,
+		model_id: "gemini-2.0-flash" as const,
 		generationConfig: {
 			temperature: 1,
 			topP: 0.95,

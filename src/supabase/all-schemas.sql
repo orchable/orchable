@@ -1,10 +1,23 @@
--- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
+-- Enum
+CREATE TYPE public.ai_task_status AS ENUM (
+  'plan',
+  'pending',
+  'running',
+  'processing',
+  'awaiting_approval',
+  'approved',
+  'completed',
+  'generated',
+  'failed',
+  'cancelled',
+  'skipped'
+);
 
 CREATE TABLE public.ai_tasks (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   task_type character varying NOT NULL,
-  status character varying NOT NULL DEFAULT 'pending'::character varying,
+  status ai_task_status NOT NULL DEFAULT 'plan'::ai_task_status,
   input_data jsonb DEFAULT '{}'::jsonb,
   output_data jsonb,
   error_message text,
@@ -40,6 +53,7 @@ CREATE TABLE public.ai_tasks (
   stage_key character varying,
   extra jsonb DEFAULT '{}'::jsonb,
   split_group_id uuid,
+  launch_id uuid,
   CONSTRAINT ai_tasks_pkey PRIMARY KEY (id),
   CONSTRAINT ai_tasks_step_id_fkey FOREIGN KEY (step_id) REFERENCES public.orchestrator_steps(id),
   CONSTRAINT ai_tasks_parent_task_id_fkey FOREIGN KEY (parent_task_id) REFERENCES public.ai_tasks(id),
@@ -48,7 +62,8 @@ CREATE TABLE public.ai_tasks (
   CONSTRAINT ai_tasks_step_execution_id_fkey FOREIGN KEY (step_execution_id) REFERENCES public.step_executions(id),
   CONSTRAINT ai_tasks_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES auth.users(id),
   CONSTRAINT ai_tasks_root_task_id_fkey FOREIGN KEY (root_task_id) REFERENCES public.ai_tasks(id),
-  CONSTRAINT ai_tasks_prompt_template_id_fkey FOREIGN KEY (prompt_template_id) REFERENCES public.prompt_templates(id)
+  CONSTRAINT ai_tasks_prompt_template_id_fkey FOREIGN KEY (prompt_template_id) REFERENCES public.prompt_templates(id),
+  CONSTRAINT ai_tasks_batch_id_fkey FOREIGN KEY (batch_id) REFERENCES public.task_batches(id)
 );
 CREATE TABLE public.alembic_version (
   version_num character varying NOT NULL,
@@ -244,6 +259,19 @@ CREATE TABLE public.curriculum_units_v2 (
   CONSTRAINT curriculum_units_v2_pkey PRIMARY KEY (id),
   CONSTRAINT curriculum_units_v2_workspace_id_fkey FOREIGN KEY (workspace_id) REFERENCES public.course_workspaces(id)
 );
+CREATE TABLE public.custom_components (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name character varying NOT NULL,
+  description text,
+  code text NOT NULL,
+  mock_data jsonb DEFAULT '{}'::jsonb,
+  is_public boolean DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  created_by uuid,
+  CONSTRAINT custom_components_pkey PRIMARY KEY (id),
+  CONSTRAINT custom_components_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id)
+);
 CREATE TABLE public.knowledge_categories (
   code character varying NOT NULL,
   name character varying NOT NULL,
@@ -289,22 +317,6 @@ CREATE TABLE public.knowledge_trees (
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT knowledge_trees_pkey PRIMARY KEY (id)
 );
-CREATE TABLE public.lab_executions (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  config_id uuid NOT NULL,
-  syllabus_row jsonb NOT NULL,
-  status character varying NOT NULL DEFAULT 'pending'::character varying,
-  started_at timestamp with time zone,
-  completed_at timestamp with time zone,
-  error_message text,
-  total_steps integer,
-  completed_steps integer DEFAULT 0,
-  failed_steps integer DEFAULT 0,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT lab_executions_pkey PRIMARY KEY (id),
-  CONSTRAINT lab_executions_config_id_fkey FOREIGN KEY (config_id) REFERENCES public.lab_orchestrator_configs(id)
-);
 CREATE TABLE public.lab_orchestrator_configs (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   name character varying NOT NULL,
@@ -315,26 +327,8 @@ CREATE TABLE public.lab_orchestrator_configs (
   created_by character varying,
   viewport jsonb DEFAULT '{"x": 0, "y": 0, "zoom": 1}'::jsonb,
   n8n_workflow_id text,
+  input_mapping jsonb,
   CONSTRAINT lab_orchestrator_configs_pkey PRIMARY KEY (id)
-);
-CREATE TABLE public.lab_step_executions (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  execution_id uuid NOT NULL,
-  step_id character varying NOT NULL,
-  step_name character varying NOT NULL,
-  status character varying NOT NULL DEFAULT 'pending'::character varying,
-  started_at timestamp with time zone,
-  completed_at timestamp with time zone,
-  result jsonb,
-  error_message text,
-  retry_count integer DEFAULT 0,
-  max_retries integer DEFAULT 3,
-  n8n_execution_id character varying,
-  duration_ms integer,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT lab_step_executions_pkey PRIMARY KEY (id),
-  CONSTRAINT lab_step_executions_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.lab_executions(id)
 );
 CREATE TABLE public.learning_objective_concepts (
   lo_code character varying NOT NULL,
@@ -449,10 +443,19 @@ CREATE TABLE public.prompt_templates (
   stage_config jsonb DEFAULT '{}'::jsonb,
   requires_approval boolean DEFAULT false,
   next_stage_template_ids jsonb DEFAULT '[]'::jsonb,
+  custom_component_id uuid,
+  view_config jsonb DEFAULT '{}'::jsonb,
+  stage_key text,
   CONSTRAINT prompt_templates_pkey PRIMARY KEY (id),
   CONSTRAINT prompt_templates_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id),
-  CONSTRAINT prompt_templates_next_stage_fkey FOREIGN KEY (next_stage_template_id) REFERENCES public.prompt_templates(id)
+  CONSTRAINT prompt_templates_next_stage_fkey FOREIGN KEY (next_stage_template_id) REFERENCES public.prompt_templates(id),
+  CONSTRAINT prompt_templates_custom_component_id_fkey FOREIGN KEY (custom_component_id) REFERENCES public.custom_components(id)
 );
+CREATE INDEX IF NOT EXISTS idx_prompt_templates_org ON public.prompt_templates (organization_code);
+CREATE INDEX IF NOT EXISTS idx_prompt_templates_active ON public.prompt_templates (is_active) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_prompt_templates_next_stage ON public.prompt_templates (next_stage_template_id);
+CREATE INDEX IF NOT EXISTS idx_prompt_templates_stage_config ON public.prompt_templates USING gin (stage_config);
+CREATE INDEX IF NOT EXISTS idx_prompt_templates_stage_key ON public.prompt_templates (stage_key);
 CREATE TABLE public.step_executions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   execution_id uuid NOT NULL,
@@ -506,8 +509,8 @@ CREATE TABLE public.task_batches (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   name character varying NOT NULL,
   source_file character varying,
-  preset_key character varying NOT NULL,
-  grade_code character varying NOT NULL,
+  preset_key character varying,
+  grade_code character varying,
   exam_round_code character varying,
   week_range character varying,
   total_tasks integer NOT NULL DEFAULT 0,
@@ -524,8 +527,14 @@ CREATE TABLE public.task_batches (
   started_at timestamp with time zone,
   completed_at timestamp with time zone,
   updated_at timestamp with time zone DEFAULT now(),
+  batch_type character varying DEFAULT 'generic'::character varying,
+  orchestrator_config_id uuid,
+  launch_id uuid,
+  finished_tasks integer DEFAULT 0,
+  is_public boolean DEFAULT false,
   CONSTRAINT task_batches_pkey PRIMARY KEY (id),
-  CONSTRAINT task_batches_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id)
+  CONSTRAINT task_batches_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id),
+  CONSTRAINT task_batches_orchestrator_config_id_fkey FOREIGN KEY (orchestrator_config_id) REFERENCES public.lab_orchestrator_configs(id)
 );
 CREATE TABLE public.task_sync_barriers (
   sync_group_id uuid NOT NULL,

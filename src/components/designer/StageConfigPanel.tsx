@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -71,7 +71,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { PrePostProcessSection } from './PrePostProcessSection';
 import { ContractSection } from './ContractSection';
-import type { AIModel, Cardinality, PreProcessConfig, PostProcessConfig, StageContract } from '@/lib/types';
+import type { AIModel, Cardinality, PreProcessConfig, PostProcessConfig, StageContract, AIModelSetting, StepConfig, AISettings } from '@/lib/types';
 import { PromptEditorDialog } from './PromptEditorDialog';
 import { ICONS } from '@/lib/icons';
 
@@ -82,13 +82,10 @@ interface PromptTemplate {
     description: string | null;
     template: string;
     version: number;
-    default_ai_settings: {
-        model_id?: string;
-        temperature?: number;
-    } | null;
+    default_ai_settings: AISettings | null;
     stage_config?: any;
     custom_component_id?: string | null;
-    custom_component?: any;
+    custom_component?: { id: string; name: string; description?: string };
 }
 
 interface CustomComponentOption {
@@ -97,11 +94,7 @@ interface CustomComponentOption {
     description?: string;
 }
 
-// Model options
-const AI_MODELS: { value: AIModel; label: string }[] = [
-    { value: 'gemini-flash-latest', label: 'Gemini Flash (Fast)' },
-    { value: 'gemini-pro-latest', label: 'Gemini Pro (Quality)' }
-];
+// Removing hardcoded AI_MODELS in favor of dynamic fetching
 
 const CARDINALITY_OPTIONS: { value: Cardinality; label: string; description: string }[] = [
     { value: 'one_to_one', label: '1:1 (One to One)', description: 'One input → One output' },
@@ -127,7 +120,7 @@ const stageConfigSchema = z.object({
     output_mapping: z.string().optional(),
     prompt_template_id: z.string().optional(),
     custom_component_id: z.string().optional(),
-    model_id: z.enum(['gemini-flash-latest', 'gemini-pro-latest']),
+    model_id: z.string().min(1, 'Model is required'),
     temperature: z.number().min(0).max(2),
     topP: z.number().min(0).max(1),
     topK: z.number().min(1).max(100),
@@ -137,7 +130,9 @@ const stageConfigSchema = z.object({
     retryDelay: z.number().min(0),
     generate_content_api: z.string().optional(),
     requires_approval: z.boolean().default(false),
-    return_along_with: z.string().optional()
+    return_along_with: z.string().optional(),
+    thinkingLevel: z.string().optional(),
+    thinkingBudget: z.number().optional()
 });
 
 type StageFormData = z.infer<typeof stageConfigSchema>;
@@ -223,12 +218,16 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
     const [registryComponents, setRegistryComponents] = useState<CustomComponentOption[]>([]);
     const [loadingComponents, setLoadingComponents] = useState(false);
 
+    // AI Models state (dynamic from db)
+    const [aiModels, setAiModels] = useState<AIModelSetting[]>([]);
+    const [loadingAiModels, setLoadingAiModels] = useState(false);
+
     // Delete template state
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
     const form = useForm<StageFormData>({
-        resolver: zodResolver(stageConfigSchema as any),
+        resolver: zodResolver(stageConfigSchema),
         defaultValues: {
             name: '',
             stage_key: '',
@@ -242,7 +241,7 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
             output_mapping: 'result',
             prompt_template_id: '',
             custom_component_id: '',
-            model_id: 'gemini-flash-latest',
+            model_id: 'gemini-2.0-flash',
             temperature: 1.0,
             topP: 0.95,
             topK: 40,
@@ -251,36 +250,36 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
             maxRetries: 3,
             retryDelay: 5000,
             requires_approval: false,
-            return_along_with: ''
+            return_along_with: '',
+            thinkingLevel: '',
+            thinkingBudget: 0
         }
     });
 
     // Fetch prompt templates from Supabase
-    const fetchTemplates = async () => {
+    const fetchTemplates = useCallback(async () => {
         setLoadingTemplates(true);
         try {
             const { data, error } = await supabase
                 .from('prompt_templates')
-                .select('id, name, description, template, version, default_ai_settings, stage_config, custom_component_id')
-                .eq('is_active', true)
+                .select('*')
                 .order('name');
-
             if (error) throw error;
             setTemplates(data || []);
         } catch (err) {
-            console.error('Failed to fetch prompt templates:', err);
-            toast.error('Failed to load prompt templates');
+            console.error('Failed to fetch templates:', err);
         } finally {
             setLoadingTemplates(false);
         }
-    };
+    }, []);
 
-    const fetchComponents = async () => {
+    const fetchComponents = useCallback(async () => {
         setLoadingComponents(true);
         try {
             const { data, error } = await supabase
-                .from('custom_components')
+                .from('registry_components')
                 .select('id, name, description')
+                .eq('is_active', true)
                 .order('name');
             if (error) throw error;
             setRegistryComponents(data || []);
@@ -289,12 +288,37 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
         } finally {
             setLoadingComponents(false);
         }
-    };
+    }, []);
+
+    const fetchAiModels = useCallback(async () => {
+        setLoadingAiModels(true);
+        try {
+            const { data, error } = await supabase
+                .from('ai_model_settings')
+                .select('*')
+                .eq('is_active', true)
+                .order('name');
+            if (error) throw error;
+            setAiModels(data || []);
+            // Set default if form model_id is empty
+            if (!form.getValues('model_id') && data && data.length > 0) {
+                const defaultModel = data.find((m: AIModelSetting) => m.model_id === 'gemini-2.0-flash') || data[0];
+                form.setValue('model_id', defaultModel.model_id);
+            }
+        } catch (err) {
+            console.error('Failed to fetch AI models:', err);
+        } finally {
+            setLoadingAiModels(false);
+        }
+    }, [form]);
+
+    const watchedVariables = form.watch(['model_id', 'temperature', 'topP', 'topK', 'maxOutputTokens', 'generate_content_api', 'thinkingLevel', 'thinkingBudget']);
 
     useEffect(() => {
         fetchTemplates();
         fetchComponents();
-    }, []);
+        fetchAiModels();
+    }, [fetchTemplates, fetchComponents, fetchAiModels]);
 
     // Prompt Editor State
     const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -442,11 +466,13 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
         }
     };
 
-    // Load stage data when selection changes
     useEffect(() => {
         if (stage) {
-            const data = stage.data as any;
-            const templateId = data.prompt_template_id || data.prompt_template_name || '';
+            const data = stage.data as unknown as StepConfig;
+            const templateId = data.prompt_template_id || (data as unknown as Record<string, string>).prompt_template_name || '';
+            const ai = data.ai_settings || {} as AISettings;
+            const gc = (ai.generationConfig || {}) as Record<string, unknown>;
+
             form.reset({
                 name: data.name || '',
                 stage_key: data.stage_key || data.name || '',
@@ -459,18 +485,20 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                 merge_path: data.merge_path || 'output_data',
                 output_mapping: data.output_mapping || 'result',
                 prompt_template_id: templateId,
-                model_id: data.ai_settings?.model_id || 'gemini-flash-latest',
-                temperature: data.ai_settings?.generationConfig?.temperature ?? data.ai_settings?.temperature ?? 1.0,
-                topP: data.ai_settings?.generationConfig?.topP ?? data.ai_settings?.topP ?? 0.95,
-                topK: data.ai_settings?.generationConfig?.topK ?? data.ai_settings?.topK ?? 40,
-                maxOutputTokens: data.ai_settings?.generationConfig?.maxOutputTokens ?? data.ai_settings?.maxOutputTokens ?? 8192,
-                generate_content_api: data.ai_settings?.generationConfig?.generate_content_api || data.ai_settings?.generate_content_api || 'generateContent',
-                requires_approval: data.requires_approval ?? data.stage_config?.requires_approval ?? false,
-                timeout: data.timeout ?? data.ai_settings?.timeout ?? 300000,
-                maxRetries: data.retryConfig?.maxRetries ?? data.ai_settings?.maxRetries ?? 3,
-                retryDelay: data.retryConfig?.retryDelay ?? data.ai_settings?.retryDelay ?? 5000,
+                model_id: ai.model_id || 'gemini-2.0-flash',
+                temperature: gc.temperature ?? (ai as any).temperature ?? 1.0,
+                topP: gc.topP ?? (ai as any).topP ?? 0.95,
+                topK: gc.topK ?? (ai as any).topK ?? 40,
+                maxOutputTokens: gc.maxOutputTokens ?? (ai as any).maxOutputTokens ?? 8192,
+                generate_content_api: ai.generate_content_api || gc.generate_content_api || 'generateContent',
+                requires_approval: data.requires_approval ?? (data as any).stage_config?.requires_approval ?? false,
+                timeout: data.timeout ?? (ai as unknown as Record<string, number>).timeout ?? 300000,
+                maxRetries: (data.retryConfig?.maxRetries ?? (ai as unknown as Record<string, number>).maxRetries) ?? 3,
+                retryDelay: (data.retryConfig?.retryDelay ?? (ai as unknown as Record<string, number>).retryDelay) ?? 5000,
                 custom_component_id: data.custom_component_id || '',
-                return_along_with: Array.isArray(data.return_along_with) ? data.return_along_with.join(', ') : data.return_along_with || ''
+                return_along_with: Array.isArray(data.return_along_with) ? data.return_along_with.join(', ') : data.return_along_with || '',
+                thinkingLevel: (gc.thinkingLevel as string) || (ai as unknown as Record<string, string>).thinkingLevel || '',
+                thinkingBudget: (gc.thinkingBudget as number) ?? (ai as unknown as Record<string, number>).thinkingBudget ?? 0
             });
 
             // Find and set selected template
@@ -485,33 +513,22 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
 
             // Load contract (with backward-compatible migration)
             if (data.contract && JSON.stringify(data.contract) !== JSON.stringify(contract)) {
-                const migratedContract = { ...data.contract };
                 // Auto-migrate legacy OutputSchemaField[] to GeminiJsonSchema
-                if (migratedContract.output) {
-                    const legacySchema = migratedContract.output.schema;
-                    const legacyRootType = migratedContract.output.rootType;
-                    migratedContract.output.schema = ensureGeminiSchema(legacySchema, legacyRootType);
+                if (data.contract.output) {
+                    const output = data.contract.output as Record<string, unknown>;
+                    const legacySchema = output.schema as any;
+                    const legacyRootType = output.rootType as string | undefined;
+                    data.contract.output.schema = ensureGeminiSchema(legacySchema, legacyRootType);
                     // Clean up legacy rootType field
-                    delete migratedContract.output.rootType;
+                    delete (data.contract.output as any).rootType;
                 }
-                setContract(migratedContract);
+                setContract(data.contract);
             }
         }
     }, [stage, form, templates, contract]);
 
-    // Set selected template when form value changes
-    const watchedTemplateId = form.watch('prompt_template_id');
-    useEffect(() => {
-        if (watchedTemplateId) {
-            const found = templates.find(t => t.id === watchedTemplateId);
-            setSelectedTemplate(found || null);
-        } else {
-            setSelectedTemplate(null);
-        }
-    }, [watchedTemplateId, templates]);
-
     // Handle explicit template selection (auto-fill)
-    const handleTemplateSelect = (templateId: string) => {
+    const handleTemplateSelect = useCallback((templateId: string) => {
         const found = templates.find(t => t.id === templateId);
         if (found) {
             // Auto-fill Stage Config from template
@@ -520,7 +537,7 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                 if (sc.task_type) form.setValue('task_type', sc.task_type);
                 if (sc.cardinality) {
                     const mapped = (sc.cardinality === 'many_to_one' || sc.cardinality === 'N:1') ? 'many_to_one' : ((sc.cardinality === 'one_to_many' || sc.cardinality === '1:N') ? 'one_to_many' : 'one_to_one');
-                    form.setValue('cardinality', mapped as any);
+                    form.setValue('cardinality', mapped as Cardinality);
                 }
                 if (sc.split_path) form.setValue('split_path', sc.split_path);
                 if (sc.split_mode) form.setValue('split_mode', sc.split_mode);
@@ -529,9 +546,14 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                 if (sc.output_mapping) form.setValue('output_mapping', sc.output_mapping);
                 if (sc.requires_approval !== undefined) form.setValue('requires_approval', sc.requires_approval);
                 if (sc.timeout) form.setValue('timeout', sc.timeout);
-                if (sc.retryConfig) {
-                    if (sc.retryConfig.maxRetries) form.setValue('maxRetries', sc.retryConfig.maxRetries);
-                    if (sc.retryConfig.retryDelay) form.setValue('retryDelay', sc.retryConfig.retryDelay);
+                if (sc.maxRetries !== undefined) form.setValue('maxRetries', sc.maxRetries);
+                if (sc.retryDelay !== undefined) form.setValue('retryDelay', sc.retryDelay);
+                // Handle nested retryConfig if present in legacy/DB data
+                const scRaw = sc as Record<string, unknown>;
+                if (scRaw.retryConfig) {
+                    const rc = scRaw.retryConfig as Record<string, unknown>;
+                    if (rc.maxRetries) form.setValue('maxRetries', rc.maxRetries as number);
+                    if (rc.retryDelay) form.setValue('retryDelay', rc.retryDelay as number);
                 }
                 if (sc.return_along_with && Array.isArray(sc.return_along_with)) {
                     form.setValue('return_along_with', sc.return_along_with.join(', '));
@@ -542,13 +564,16 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
             if (found.default_ai_settings) {
                 const settings = found.default_ai_settings;
                 if (settings.model_id) {
-                    const modelId = settings.model_id as AIModel;
-                    if (AI_MODELS.some(m => m.value === modelId)) {
-                        form.setValue('model_id', modelId);
-                    }
+                    form.setValue('model_id', settings.model_id);
                 }
                 if (settings.temperature !== undefined) {
                     form.setValue('temperature', settings.temperature);
+                }
+                if (settings.thinkingLevel !== undefined) {
+                    form.setValue('thinkingLevel', settings.thinkingLevel);
+                }
+                if (settings.thinkingBudget !== undefined) {
+                    form.setValue('thinkingBudget', settings.thinkingBudget);
                 }
             }
 
@@ -559,7 +584,23 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                 form.setValue('custom_component_id', '');
             }
         }
-    };
+    }, [templates, form]);
+
+    // Set selected template when form value changes
+    const watchedTemplateId = form.watch('prompt_template_id');
+    useEffect(() => {
+        if (watchedTemplateId) {
+            const found = templates.find(t => t.id === watchedTemplateId);
+            if (found) {
+                setSelectedTemplate(found);
+                handleTemplateSelect(watchedTemplateId); // Apply template settings
+            } else {
+                setSelectedTemplate(null);
+            }
+        } else {
+            setSelectedTemplate(null);
+        }
+    }, [watchedTemplateId, templates, handleTemplateSelect]);
 
     // Extract available variables from parent stages
     const availableScope = useMemo(() => {
@@ -583,11 +624,11 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
         parentIds.forEach(id => {
             const parentNode = nodes.find(n => n.id === id);
             if (parentNode?.data) {
-                const data = parentNode.data as any;
-                const schemaObj = data.contract?.output?.schema;
+                const data = parentNode.data as unknown as StepConfig;
+                const schemaObj = (data.contract as unknown as Record<string, any>)?.output?.schema;
                 const outputFields: string[] = schemaObj?.properties
                     ? Object.keys(schemaObj.properties)
-                    : (Array.isArray(schemaObj) ? schemaObj.map((f: any) => f.name) : []);
+                    : (Array.isArray(schemaObj) ? schemaObj.map((f: { name: string }) => f.name) : []);
                 // return_along_with fields
                 const returnAlongWith = Array.isArray(data.return_along_with)
                     ? data.return_along_with
@@ -598,7 +639,7 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
         });
 
         return Array.from(new Set(scope));
-    }, [stageId, edges, nodes]);
+    }, [stageId, edges, nodes, contract?.input?.fields]);
 
     // Extract variables from selected template
     const templateVariables = useMemo(() => {
@@ -615,7 +656,7 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
     const handleExport = () => {
         if (!stage) return;
 
-        const data = stage.data as any;
+        const data = stage.data as unknown as StepConfig;
         const configToExport = {
             version: 1,
             type: 'stage_config',
@@ -730,13 +771,15 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
             output_mapping: data.output_mapping,
             prompt_template_id: data.prompt_template_id,
             ai_settings: {
-                model_id: data.model_id,
+                model_id: data.model_id as AIModel,
+                generate_content_api: (data.generate_content_api || 'generateContent') as "generateContent" | "streamGenerateContent",
                 generationConfig: {
                     temperature: data.temperature,
                     topP: data.topP,
                     topK: data.topK,
                     maxOutputTokens: data.maxOutputTokens,
-                    generate_content_api: data.generate_content_api
+                    thinkingLevel: data.thinkingLevel || undefined,
+                    thinkingBudget: data.thinkingBudget || undefined
                 }
             },
             timeout: data.timeout,
@@ -769,7 +812,7 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                 }
 
                 const stageConfig = {
-                    cardinality: data.cardinality === 'N:1' ? 'N:1' : ((data.cardinality === '1:N' || data.cardinality === 'one_to_many') ? 'one_to_many' : 'one_to_one'),
+                    cardinality: (data.cardinality === 'N:1' ? 'N:1' : ((data.cardinality === '1:N' || data.cardinality === 'one_to_many') ? 'one_to_many' : 'one_to_one')) as Cardinality,
                     split_path: data.split_path || '',
                     split_mode: data.split_mode || 'per_item',
                     batch_grouping: data.batch_grouping || 'global',
@@ -800,14 +843,14 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                 };
 
                 // Update local state immediately so subsequent re-renders don't read stale data
-                const updatedTemplate = {
+                const updatedTemplate: PromptTemplate = {
                     ...selectedTemplate,
                     template: finalPrompt,
-                    stage_config: stageConfig,
-                    default_ai_settings: aiSettings
+                    stage_config: stageConfig as unknown, // Cast because StageFormData 100% matches what we need
+                    default_ai_settings: aiSettings as unknown as AISettings
                 };
                 setSelectedTemplate(updatedTemplate);
-                setTemplates(prev => prev.map(t => t.id === updatedTemplate.id ? updatedTemplate : t));
+                setTemplates((prev: PromptTemplate[]) => prev.map(t => t.id === updatedTemplate.id ? updatedTemplate : t));
 
                 console.log('Saving to Supabase - Stage Config:', stageConfig);
 
@@ -818,7 +861,7 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                         stage_config: stageConfig,
                         default_ai_settings: aiSettings,
                         input_schema: mapContractToInputSchema(contract),
-                        output_schema: mapContractToOutputSchema(contract) as any,
+                        output_schema: mapContractToOutputSchema(contract) as unknown,
                         custom_component_id: (data.custom_component_id === '_default' || !data.custom_component_id) ? null : data.custom_component_id
                     })
                     .eq('id', data.prompt_template_id);
@@ -840,7 +883,7 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
     };
 
     if (!stage) return null;
-    const stageData = stage.data as any;
+    const stageData = stage.data as unknown as StepConfig;
 
     return (
         <Card className="h-full border-none rounded-none shadow-none">
@@ -1187,18 +1230,44 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>AI Model</FormLabel>
-                                            <Select onValueChange={field.onChange} value={field.value}>
+                                            <Select
+                                                value={field.value}
+                                                onValueChange={(val) => {
+                                                    field.onChange(val);
+                                                    // Auto-fill defaults from the selected dynamic model
+                                                    const selectedModel = aiModels.find(m => m.model_id === val);
+                                                    if (selectedModel) {
+                                                        form.setValue('temperature', selectedModel.temperature);
+                                                        form.setValue('topP', selectedModel.top_p);
+                                                        form.setValue('topK', selectedModel.top_k);
+                                                        form.setValue('maxOutputTokens', selectedModel.max_output_tokens);
+                                                        form.setValue('generate_content_api', selectedModel.generate_content_api);
+                                                        form.setValue('timeout', selectedModel.timeout_ms);
+                                                        form.setValue('maxRetries', selectedModel.retries);
+                                                    }
+                                                }}
+                                            >
                                                 <FormControl>
-                                                    <SelectTrigger>
-                                                        <SelectValue />
+                                                    <SelectTrigger className="border-primary/50 bg-primary/5 text-foreground">
+                                                        <SelectValue placeholder="Select an AI model" />
                                                     </SelectTrigger>
                                                 </FormControl>
                                                 <SelectContent>
-                                                    {AI_MODELS.map(model => (
-                                                        <SelectItem key={model.value} value={model.value}>
-                                                            {model.label}
-                                                        </SelectItem>
-                                                    ))}
+                                                    {loadingAiModels ? (
+                                                        <SelectItem value="loading" disabled>Loading models...</SelectItem>
+                                                    ) : aiModels.length > 0 ? (
+                                                        aiModels.map(model => (
+                                                            <SelectItem key={model.id} value={model.model_id}>
+                                                                {model.name}
+                                                            </SelectItem>
+                                                        ))
+                                                    ) : (
+                                                        // Fallback just in case db is empty
+                                                        <>
+                                                            <SelectItem value="gemini-flash-latest">Gemini Flash (Fast)</SelectItem>
+                                                            <SelectItem value="gemini-pro-latest">Gemini Pro (Quality)</SelectItem>
+                                                        </>
+                                                    )}
                                                 </SelectContent>
                                             </Select>
                                             <FormMessage />
@@ -1292,6 +1361,76 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                                         </FormItem>
                                     )}
                                 />
+
+                                {/* Thinking Configuration Section */}
+                                {(() => {
+                                    const currentModelId = form.watch('model_id');
+                                    const modelSettings = aiModels.find(m => m.model_id === currentModelId);
+                                    if (!modelSettings?.capabilities?.thinking) return null;
+
+                                    return (
+                                        <div className="space-y-4 pt-4 border-t bg-primary/5 p-3 rounded-lg border border-primary/20">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="text-sm font-semibold flex items-center gap-1.5">
+                                                    🧠 Reasoning (Thinking)
+                                                </span>
+                                                <Badge variant="outline" className="text-[10px] bg-background">
+                                                    {modelSettings.thinking_config_type === 'level' ? 'thinkingLevel' : 'thinkingBudget'}
+                                                </Badge>
+                                            </div>
+
+                                            {modelSettings.thinking_config_type === 'level' ? (
+                                                <FormField
+                                                    control={form.control}
+                                                    name="thinkingLevel"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-xs">Reasoning Level</FormLabel>
+                                                            <Select onValueChange={field.onChange} value={field.value || ''}>
+                                                                <FormControl>
+                                                                    <SelectTrigger className="bg-background">
+                                                                        <SelectValue placeholder="Select thinking level" />
+                                                                    </SelectTrigger>
+                                                                </FormControl>
+                                                                <SelectContent>
+                                                                    <SelectItem value="minimal">Minimal</SelectItem>
+                                                                    <SelectItem value="low">Low</SelectItem>
+                                                                    <SelectItem value="medium">Medium</SelectItem>
+                                                                    <SelectItem value="high">High</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                            <FormDescription className="text-[10px]">Controls the depth of reasoning</FormDescription>
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            ) : (
+                                                <FormField
+                                                    control={form.control}
+                                                    name="thinkingBudget"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <div className="flex justify-between">
+                                                                <FormLabel className="text-xs">Reasoning Budget (tokens)</FormLabel>
+                                                                <span className="text-xs text-muted-foreground">{field.value}</span>
+                                                            </div>
+                                                            <FormControl>
+                                                                <Slider
+                                                                    min={0}
+                                                                    max={32000}
+                                                                    step={512}
+                                                                    value={[field.value || 0]}
+                                                                    onValueChange={([v]) => field.onChange(v)}
+                                                                    className="py-2"
+                                                                />
+                                                            </FormControl>
+                                                            <FormDescription className="text-[10px]">Max tokens dedicated to internal reasoning</FormDescription>
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            )}
+                                        </div>
+                                    );
+                                })()}
 
                                 <FormField
                                     control={form.control}

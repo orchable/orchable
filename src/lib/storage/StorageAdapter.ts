@@ -10,16 +10,18 @@ export interface PromptTemplate {
 	template: string;
 	version: number;
 	is_active: boolean;
-	default_ai_settings?: Record<string, any>;
+	default_ai_settings?: Record<string, unknown>;
 	next_stage_template_ids?: string[];
 	organization_code?: string;
-	input_schema?: Record<string, any>;
-	output_schema?: Record<string, any>;
-	stage_config?: Record<string, any>;
+	input_schema?: Record<string, unknown>;
+	output_schema?: Record<string, unknown>;
+	stage_config?: Record<string, unknown>;
 	requires_approval?: boolean;
 	custom_component_id?: string;
-	view_config?: Record<string, any>;
+	view_config?: Record<string, unknown>;
 	next_stage_template_id?: string; // Legacy parity
+	stage_key?: string; // New: for orchestration routing
+	created_by?: string; // New: metadata
 	created_at?: string;
 	updated_at?: string;
 }
@@ -29,7 +31,7 @@ export interface CustomComponent {
 	name: string;
 	description?: string;
 	code: string;
-	mock_data?: Record<string, any>;
+	mock_data?: Record<string, unknown>;
 	is_public: boolean;
 	created_at?: string;
 	updated_at?: string;

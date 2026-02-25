@@ -1,1634 +1,1515 @@
 {
-  "nodes": [
-    {
-      "parameters": {
-        "content": "## Gemini Agent with Rotation Key - Gen",
-        "height": 752,
-        "width": 1568,
-        "color": 6
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "position": [
-        -48,
-        160
-      ],
-      "typeVersion": 1,
-      "id": "66d95f8f-249d-49ea-8b0e-5e192872cd0a",
-      "name": "Sticky Note2"
-    },
-    {
-      "parameters": {
-        "operation": "get",
-        "dataTableId": {
-          "__rl": true,
-          "value": "LT77b3PENHxZuRwj",
-          "mode": "list",
-          "cachedResultName": "n8n-task-queue",
-          "cachedResultUrl": "/projects/B8LPf0gekMWp8vZq/datatables/LT77b3PENHxZuRwj"
-        },
-        "matchType": "allConditions",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "status",
-              "keyValue": "plan"
-            }
-          ]
-        },
-        "limit": 10
-      },
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1,
-      "position": [
-        -1632,
-        576
-      ],
-      "id": "f3e264f8-3a39-4ef6-b2cc-16774d039e10",
-      "name": "Get Tasks To Solve",
-      "executeOnce": true
-    },
-    {
-      "parameters": {
-        "jsCode": "// Priority Task Selector for Multi-Agent Queue\n// Place this Code node AFTER \"Get A Task To Solve\" node\n\n// Get all tasks from previous node\nconst tasks = $input.all().map(item => item.json);\n\n// If no tasks, return empty\nif (tasks.length === 0) {\n  return [];\n}\n\n// Sort by priority order:\n// 1. test_mode = true first (DESC)\n// 2. batch_priority earliest first (ASC)\n// 3. sequence lowest first (ASC)\n// 4. created_at earliest first (ASC) - fallback\nconst sortedTasks = tasks.sort((a, b) => {\n  // 1. Test mode first (true > false)\n  const testModeA = a.test_mode === true || a.test_mode === 'true';\n  const testModeB = b.test_mode === true || b.test_mode === 'true';\n  \n  if (testModeA && !testModeB) return -1;\n  if (!testModeA && testModeB) return 1;\n  \n  // 2. Batch priority (earlier timestamp first)\n  if (a.batch_priority && b.batch_priority) {\n    const priorityA = new Date(a.batch_priority).getTime();\n    const priorityB = new Date(b.batch_priority).getTime();\n    if (priorityA !== priorityB) return priorityA - priorityB;\n  } else if (a.batch_priority) {\n    return -1; // Has priority comes first\n  } else if (b.batch_priority) {\n    return 1;\n  }\n  \n  // 3. Sequence (lower number first)\n  const seqA = parseInt(a.sequence) || 1;\n  const seqB = parseInt(b.sequence) || 1;\n  if (seqA !== seqB) return seqA - seqB;\n  \n  // 4. Created at (fallback - earlier first)\n  if (a.created_at && b.created_at) {\n    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();\n  }\n  \n  return 0;\n});\n\n// Return only the highest priority task (first after sort)\nreturn [{ json: sortedTasks[0] }];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -1424,
-        576
-      ],
-      "id": "1c410038-ea87-4a3c-a9c2-241408def25a",
-      "name": "Filter A Task"
-    },
-    {
-      "parameters": {
-        "jsCode": "var finalResult = $json;\nvar taskInfo = $('JSON Parse').first().json; // Fallback for standard\nif (!taskInfo || !taskInfo.supabase_task_id) {\n    // Try Consolidated mappings if standard fails\n    try { taskInfo = $('1. Parse Task').first().json; } catch(e) {}\n}\n\nvar extra = taskInfo.extra || {};\nvar data = taskInfo.data || {};\nvar returnAlongWith = (extra && extra[\"return-along-with\"]) || [];\n\nif (returnAlongWith.length > 0) { \n  for (var key of returnAlongWith) {\n    if (data.hasOwnProperty(key)) {\n        finalResult[key] = data[key];\n    }\n  }\n}\n\nreturn { \n  ...taskInfo,\n  \"result\": finalResult,\n  \"extra\": extra,\n  \"data\": data,\n  \"supabase_task_id\": taskInfo.supabase_task_id || taskInfo.id\n};"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1120,
-        288
-      ],
-      "id": "62aa1fee-9598-42f0-abcc-17a6f1c86dcf",
-      "name": "Add AlongWith Attributes"
-    },
-    {
-      "parameters": {
-        "jsCode": "function convertMarkdownJsonToJsObject(partsArray) {\n  const fullText = partsArray.map(part => part.text).join('');\n  let trimmed = fullText.trim();\n  \n  let jsonContent;\n  if (trimmed.startsWith('```json')) {\n    jsonContent = trimmed.slice(7, trimmed.lastIndexOf('```')).trim();\n  } else if (trimmed.startsWith('{') || trimmed.startsWith('[')) {\n    jsonContent = trimmed;\n  } else {\n    throw new Error('Invalid JSON format');\n  }\n  \n  // Minimal cleaning - chỉ remove control chars\n  jsonContent = jsonContent.replace(/[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F]/g, '');\n  \n  return JSON.parse(jsonContent);\n}\n\nvar partsArray = $input.first().json.candidates[0].content.parts; \nreturn convertMarkdownJsonToJsObject(partsArray);"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        592,
-        240
-      ],
-      "id": "df58c710-aca0-4872-9198-803eee596f13",
-      "name": "Convert MarkdownJSON to JSON",
-      "notesInFlow": true,
-      "onError": "continueErrorOutput",
-      "notes": "Check max retry, wait 1s"
-    },
-    {
-      "parameters": {
-        "amount": 1
-      },
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [
-        1328,
-        672
-      ],
-      "id": "031e29bf-f067-440e-807e-33ef22805f20",
-      "name": "Wait",
-      "webhookId": "1d8bacfa-5632-4b41-a63f-fee5f8faa40d"
-    },
-    {
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "minutes"
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [
-        -1824,
-        576
-      ],
-      "id": "84d24ebc-3c13-4e8f-b908-2695bafa831d",
-      "name": "Schedule Trigger"
-    },
-    {
-      "parameters": {
-        "jsCode": "const item = $input.first().json;\n\n// Safe parse helper for JSON columns that might come as strings or objects\nconst parseSafe = (val, fallback) => {\n    if (val === null || val === undefined) return fallback;\n    if (typeof val === 'object') return val;\n    try {\n        let parsed = JSON.parse(val);\n        // Handle potential double-stringification\n        if (typeof parsed === 'string') parsed = JSON.parse(parsed);\n        return parsed;\n    } catch (e) {\n        console.error('Parse error:', e, val);\n        return fallback;\n    }\n};\n\nreturn {\n  task_id: item.task_id,\n  batch_id: item.batch_id,\n  user_id: item.user_id,\n  task_type: item.task_type,\n  prompt: item.prompt,\n  extra: parseSafe(item.extra, {}),\n  status: item.status,\n  data: parseSafe(item.data, {}),\n  ai_settings: parseSafe(item.ai_settings, {}),\n  supabase_task_id: item.supabase_task_id || item.id,\n  launch_id: item.launch_id || null,\n  root_task_id: item.root_task_id || null,\n  hierarchy_path: parseSafe(item.hierarchy_path, []),\n  step_number: item.step_number || 1,\n  stage_key: item.stage_key || '',\n  parent_task_id: item.parent_task_id || null,\n  split_group_id: item.split_group_id || null,\n  test_mode: item.test_mode || false,\n  requires_approval: item.requires_approval || false,\n  sequence: item.sequence || null\n};"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -1216,
-        576
-      ],
-      "id": "ab1ab715-f1d1-4039-a79a-40b2b4fb5dde",
-      "name": "JSON Parse",
-      "executeOnce": true
-    },
-    {
-      "parameters": {
-        "errorMessage": "[403] Key Rotation Manager has no valid key!"
-      },
-      "type": "n8n-nodes-base.stopAndError",
-      "typeVersion": 1,
-      "position": [
-        256,
-        672
-      ],
-      "id": "96fc9742-0e65-475e-a6e1-04a555f05ea2",
-      "name": "Stop and Error"
-    },
-    {
-      "parameters": {
-        "url": "https://n8n.teky.vn/webhook/get-active-key",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpBasicAuth",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [
-        80,
-        576
-      ],
-      "id": "235fa51a-c95b-4b0a-b51b-6de3b8bdb43f",
-      "name": "Get Active Key",
-      "notesInFlow": true,
-      "executeOnce": true,
-      "credentials": {
-        "httpBasicAuth": {
-          "id": "4STFVBW6SDzs3GJf",
-          "name": "AI Content Creator"
-        }
-      },
-      "onError": "continueErrorOutput"
-    },
-    {
-      "parameters": {
-        "jsCode": "const maxRetries = 3;\nconst currentRun = $runIndex;\n\nif (currentRun >= maxRetries - 1) {\n    throw new Error(\"Max retries reached. All available keys failed.\");\n}\n\n// Wait a bit before retrying\nreturn new Promise((resolve) => {\n  setTimeout(() => {\n    resolve([{ json: { retry: currentRun + 1 } }]);\n  }, 1000);\n});"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1120,
-        672
-      ],
-      "id": "3b1046c5-3c06-41e6-99a0-f857988aba93",
-      "name": "Retry Logic",
-      "notesInFlow": true,
-      "notes": "Check max retry, wait 1s"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://n8n.teky.vn/webhook/set-key-state",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpBasicAuth",
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "key_id",
-              "value": "={{ $('Get Active Key').item.json.key_id }}"
-            },
-            {
-              "name": "status",
-              "value": "fail"
-            },
-            {
-              "name": "error_code",
-              "value": "=[{{ $json.error.status}}] {{ $json.error.message || 'API_ERROR' }}"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [
-        896,
-        672
-      ],
-      "id": "11a8a292-375c-45e0-bdc9-f0aa1c307da4",
-      "name": "Report Failure",
-      "notesInFlow": true,
-      "credentials": {
-        "httpBasicAuth": {
-          "id": "4STFVBW6SDzs3GJf",
-          "name": "AI Content Creator"
-        }
-      },
-      "notes": "Báo Rotator: Key hỏng, block hoặc đánh dấu lỗi"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://n8n.teky.vn/webhook/set-key-state",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpBasicAuth",
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "key_id",
-              "value": "={{ $('Get Active Key').item.json.key_id }}"
-            },
-            {
-              "name": "status",
-              "value": "success"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [
-        592,
-        416
-      ],
-      "id": "c06b205b-9b5d-4fe3-98ca-566d107f6caa",
-      "name": "Report Success",
-      "notesInFlow": true,
-      "credentials": {
-        "httpBasicAuth": {
-          "id": "4STFVBW6SDzs3GJf",
-          "name": "AI Content Creator"
-        }
-      },
-      "notes": "Báo Rotator: Key này tốt, reset cooldown"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{$('Final Result').item.json.ai_settings.model_id}}:{{$('Final Result').item.json.ai_settings.generate_content_api}}?key={{ $json.api_key }}",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ \n  JSON.stringify({\n    \"generationConfig\": ($('Final Result').item.json.ai_settings || {}).generationConfig || {},\n    \"contents\": [\n      {\n        \"role\": \"user\",\n        \"parts\": [\n          { \"text\": $('Final Result').item.json.prompt }\n        ]\n      }\n    ]\n  })\n}}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [
-        368,
-        480
-      ],
-      "id": "3f3e8eed-4d8d-41a5-b1be-738b1012f088",
-      "name": "Gemini API Call",
-      "notesInFlow": true,
-      "executeOnce": true,
-      "onError": "continueErrorOutput"
-    },
-    {
-      "parameters": {
-        "content": "## ## Gemini Agent with Rotation Key - Update Result Phase",
-        "height": 752,
-        "width": 2272
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "position": [
-        2416,
-        160
-      ],
-      "typeVersion": 1,
-      "id": "b136679c-ca3a-4d25-8f8b-cf5e72f5095d",
-      "name": "Sticky Note3"
-    },
-    {
-      "parameters": {
-        "mode": "raw",
-        "jsonOutput": "={{ $json }}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        2480,
-        576
-      ],
-      "id": "75281336-bcdd-46cc-b071-ae2c6a5e24e3",
-      "name": "Input - Submit Result Phase1"
-    },
-    {
-      "parameters": {
-        "jsCode": "// ========== PHASE 5: DETERMINE & CREATE NEXT STAGE TASKS ==========\n// This node handles task chaining and parallel branching.\n// Each task carries current_stage_config and next_stage_configs from the prompt-template.\n// The child task's next_stage_configs will be populated by Load Batch via template lookup.\n\nconst task = $json;\nconst extra = task.extra || {};\n\n// Get current stage config\nconst currentStageConfig = extra.current_stage_config || null;\n\n// Get next stage configs (from prompt-template lookup in Load Batch)\nconst nextConfigs = extra.next_stage_configs || \n                   (extra.next_stage_config ? [extra.next_stage_config] : []);\n\n// === TERMINATE: No next stage ===\nif (!currentStageConfig || nextConfigs.length === 0) {\n  return {\n    action: 'terminate',\n    task_id: task.supabase_task_id,\n    message: 'No next stage configured - final stage reached'\n  };\n}\n\nconst cardinality = currentStageConfig.cardinality || 'one_to_one';\nconst result = task.result;\nconst inputData = task.data || {};\n\n// Helper: extract stage key from template ID\n// === FIXED: Sử dụng regex loại bỏ phần _step_ nếu có ===\nfunction extractStageKey(templateId) {\n  if (!templateId) return 'unknown_stage';\n  \n  // 1. Nếu có format: uuid_tênstage_step_1234\n  const stepMatch = templateId.match(/^[0-9a-fA-F-]+_(.+)_step_\\d+$/);\n  if (stepMatch) return stepMatch[1];\n  \n  // 2. Fallback: uuid_tênstage\n  const match = templateId.match(/^[0-9a-fA-F-]+_(.+)$/);\n  return match ? match[1] : templateId;\n}\n\nconst currentStageKey = task.stage_key || (currentStageConfig.template_id ? extractStageKey(currentStageConfig.template_id) : 'unknown_stage');\nconst rootId = task.root_task_id || task.supabase_task_id;\nconst hierarchyPath = [...(task.hierarchy_path || []), task.supabase_task_id];\nconst currentStepNumber = parseInt(task.step_number) || 1;\n\n// Helper: build metadata for a new child task\nfunction buildTaskMetadata(nextConfig, index, total, dataForTask) {\n  if (!nextConfig) return null;\n  const nextTplId = nextConfig.template_id || nextConfig.prompt_id;\n  const nextStageKey = extractStageKey(nextTplId);\n\n  // Parse task_type suffix\n  const taskTypeMatch = nextTplId.match(/^[0-9a-f-]+_(.+)$/);\n  const taskType = taskTypeMatch ? taskTypeMatch[1] : nextStageKey;\n\n  return {\n    prompt_template_id: nextTplId,\n    task_type: taskType,\n    input_data: dataForTask,\n    parent_task_id: task.supabase_task_id,\n    root_task_id: rootId,\n    hierarchy_path: hierarchyPath,\n    user_id: task.user_id || null,\n    batch_id: nextConfig.batch_grouping === \"isolated\" ? null : (task.batch_id || null),\n    launch_id: task.launch_id || null,\n    test_mode: task.test_mode || false,\n    sequence: index + 1,\n    total_steps: total,\n    status: 'pending',\n\n    stage_key: nextStageKey,\n    step_number: currentStepNumber + 1,\n    split_group_id: task.split_group_id,\n    requires_approval: nextConfig.requires_approval || task.requires_approval || false,\n\n    // Child's extra: current_stage_config from nextConfig\n    // next_stage_configs will be populated by Load Batch when this task is loaded\n    extra: {\n      current_stage_config: {\n        template_id: nextTplId,\n        cardinality: nextConfig.cardinality || 'one_to_one',\n        split_path: nextConfig.split_path || null,\n        split_mode: nextConfig.split_mode || 'per_item',\n        output_mapping: nextConfig.output_mapping || 'result'\n      },\n      // next_stage_configs intentionally omitted — Load Batch will hydrate\n      // from prompt_templates.next_stage_template_ids at load time\n      parent_stage_key: currentStageKey,\n      parent_task_id: task.supabase_task_id\n    }\n  };\n}\n\n// === EXECUTE BRANCHING ===\nlet finalTasks = [];\n\nif (cardinality === 'one_to_one' || cardinality === '1:1') {\n  finalTasks = nextConfigs.map((cfg, idx) => buildTaskMetadata(cfg, idx, 1, result)).filter(Boolean);\n} else if (cardinality === \"one_to_many\" || cardinality === \"1:N\") {\n  const splitPath = currentStageConfig.split_path || 'result';\n\n  const pathParts = splitPath.split('.');\n  let arrayToSplit = result;\n  for (const part of pathParts) {\n    if (part === 'result') continue;\n    arrayToSplit = arrayToSplit?.[part];\n  }\n\n  if (!Array.isArray(arrayToSplit)) {\n    return {\n      action: 'terminate',\n      task_id: task.supabase_task_id,\n      message: `split_path '${splitPath}' did not resolve to an array`\n    };\n  }\n\n  const splitMode = currentStageConfig.split_mode || 'per_item';\n  for (const nextConfig of nextConfigs) {\n    if (splitMode === 'per_item') {\n      arrayToSplit.forEach((item, idx) => {\n        finalTasks.push(buildTaskMetadata(nextConfig, idx, arrayToSplit.length, {\n          ...inputData,\n          user_id: task.user_id || null,\n          batch_id: task.batch_id || null,\n          launch_id: task.launch_id || null,\n          item: item,\n          _split_index: idx,\n          _split_total: arrayToSplit.length\n        }));\n      });\n    } else if (splitMode === 'per_batch') {\n      const batchSize = currentStageConfig.batch_size || 10;\n      for (let i = 0, bIdx = 0; i < arrayToSplit.length; i += batchSize, bIdx++) {\n        const batchItems = arrayToSplit.slice(i, i + batchSize);\n        finalTasks.push(buildTaskMetadata(nextConfig, bIdx, Math.ceil(arrayToSplit.length / batchSize), {\n          ...inputData,\n          items: batchItems,\n          _batch_index: bIdx\n        }));\n      }\n    }\n  }\n  finalTasks = finalTasks.filter(Boolean);\n} else if (cardinality === \"N:1\" || cardinality === \"many_to_one\") {\n  return {\n    action: 'wait_for_merge',\n    task_id: task.supabase_task_id,\n    cardinality: \"many_to_one\",\n    next_stage_configs: nextConfigs\n  };\n}\n\nreturn {\n  action: finalTasks.length > 0 ? 'create_tasks_for_branches' : 'terminate',\n  tasks: finalTasks,\n  total_count: finalTasks.length,\n  task_id: task.supabase_task_id\n};"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2672,
-        576
-      ],
-      "id": "db7ff56a-ecfd-417f-8f34-e354c55aa071",
-      "name": "Determine Next Stage"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Node: \"Create Next Stage Tasks\" (Always Returns Array)\nconst config = $input.first().json;\nconst next_action = config.next_action || config.action;\n\n// Handle terminate action - return empty array\nif (next_action === 'terminate') {\n  return [];  // ✅ Return empty array instead of object\n}\n\n// Handle error action\nif (next_action === 'error') {\n  throw new Error(config.message);\n}\n\n// === MỚI: Xử lý parallel branches ===\nconst tasks = config.tasks || $('Determine Next Stage').first().json.tasks || [];\nif (tasks.length === 0) return [];\n\nreturn tasks.map(task => ({\n  prompt_template_id: task.prompt_template_id,\n  task_type: task.task_type || '',\n  input_data: task.input_data,\n  parent_task_id: task.parent_task_id,\n  root_task_id: task.root_task_id,\n  hierarchy_path: task.hierarchy_path,\n  batch_id: task.batch_id || null,\n  user_id: task.user_id || null,\n  launch_id: task.launch_id || null,\n  created_at: task.created_at || null,\n  started_at: task.started_at || null,\n  completed_at: task.completed_at || null,\n  test_mode: task.test_mode,\n  sequence: task.sequence,\n  total_steps: task.total_steps,\n  status: task.status || 'pending',\n  stage_key: task.stage_key,\n  step_number: task.step_number,\n  split_group_id: task.split_group_id,\n  requires_approval: task.requires_approval,\n  extra: task.extra\n}));\n\n// Fallback - return empty array\nreturn [];\n"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        4288,
-        576
-      ],
-      "id": "7de40abd-edf2-4c7a-b610-0e49c3b8a961",
-      "name": "Create Next Stage Tasks"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 1
-          },
-          "conditions": [
-            {
-              "id": "pre-process-enabled",
-              "leftValue": "={{ $json.extra?.pre_process?.enabled }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        -960,
-        576
-      ],
-      "id": "00936458-7f12-49a8-83b1-775ae2f05840",
-      "name": "Check Pre-Process"
-    },
-    {
-      "parameters": {
-        "method": "={{ $('JSON Parse').item.json.extra?.pre_process?.webhook_method || 'POST' }}",
-        "url": "={{ $('JSON Parse').item.json.extra?.pre_process?.webhook_url }}",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($('JSON Parse').item.json.data) }}",
-        "options": {
-          "timeout": 30000
-        }
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [
-        -736,
-        384
-      ],
-      "id": "9fa79a52-6e00-4d96-ac97-8001e648da4b",
-      "name": "Execute Pre-Process Webhook",
-      "notesInFlow": true,
-      "onError": "continueErrorOutput",
-      "notes": "Fetch external data before AI processing"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Merge Pre-Process Output into input_data\nconst task = $('JSON Parse').first().json;\nconst preOutput = $json;\nconst preConfig = task.extra?.pre_process || {};\nconst outputHandling = preConfig.output_handling || 'merge';\n\nlet mergedData = { ...task.data };\n\nif (preOutput && !preOutput.error) {\n  if (outputHandling === 'replace') {\n    mergedData = preOutput;\n  } else if (outputHandling === 'merge') {\n    mergedData = { ...mergedData, ...preOutput };\n  } else if (outputHandling === 'nested') {\n    const fieldName = preConfig.nested_field_name || 'pre_output';\n    mergedData[fieldName] = preOutput;\n  }\n}\n\nreturn {\n  ...task,\n  data: mergedData,\n  _pre_process_executed: true\n};"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -480,
-        272
-      ],
-      "id": "1f796dee-7c9b-463a-92a9-16256f907fea",
-      "name": "Merge Pre-Process Output"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Handle Pre-Process Failure\nconst task = $('JSON Parse').first().json;\nconst preConfig = task.extra?.pre_process || {};\nconst onFailure = preConfig.on_failure || 'continue';\n\nif (onFailure === 'abort') {\n  throw new Error('Pre-process webhook failed: ' + JSON.stringify($json.error));\n}\n\n// Continue with original data\nreturn {\n  ...task,\n  _pre_process_failed: true,\n  _pre_process_error: $json.error\n};"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -480,
-        464
-      ],
-      "id": "c7596dac-a1fb-4720-960f-0eb5e90b1e9b",
-      "name": "Handle Pre-Process Failure"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 1
-          },
-          "conditions": [
-            {
-              "id": "post-process-enabled",
-              "leftValue": "={{ $('JSON Parse').item.json.extra.current_stage_config.post_process.enabled }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        1600,
-        576
-      ],
-      "id": "7518f259-1c55-4b07-b636-a78c77ab113e",
-      "name": "Check Post-Process"
-    },
-    {
-      "parameters": {
-        "method": "={{ $('JSON Parse').item.json.extra?.post_process?.webhook_method || 'POST' }}",
-        "url": "={{ $('JSON Parse').item.json.extra?.post_process?.webhook_url }}",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify((function() { const cfg = $('JSON Parse').item.json.extra?.post_process; const src = cfg?.input_source || 'output_only'; if (src === 'output_only') return $json.result; if (src === 'input_and_output') return { input: $('JSON Parse').item.json.data, output: $json.result }; return $json.result; })()) }}",
-        "options": {
-          "timeout": 30000
-        }
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [
-        2032,
-        432
-      ],
-      "id": "68273013-95d0-4875-9c27-176d4b7419ba",
-      "name": "Execute Post-Process Webhook",
-      "notesInFlow": true,
-      "onError": "continueErrorOutput",
-      "notes": "Push results to external system after AI processing"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Handle Post-Process result\nconst originalResult = $('Add AlongWith Attributes').first().json;\nconst postConfig = $('JSON Parse').first().json.extra?.post_process || {};\nconst onFailure = postConfig.on_failure || 'continue';\n\n// If post-process failed but on_failure = 'continue', proceed with original result\nif ($json.error && onFailure === 'abort') {\n  throw new Error('Post-process webhook failed: ' + JSON.stringify($json.error));\n}\n\n// Return original result (post-process doesn't modify task output)\nreturn {\n  ...originalResult,\n  _post_process_executed: true,\n  _post_process_response: $json.error ? null : $json\n};"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2240,
-        432
-      ],
-      "id": "a05cf51b-d6ea-4fbc-b363-1fe695318489",
-      "name": "Handle Post-Process Result"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 1
-          },
-          "conditions": [
-            {
-              "id": "is-merge-type",
-              "leftValue": "={{ $json.extra.current_stage_config.post_process.type }}",
-              "rightValue": "merge_with_input",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        1808,
-        688
-      ],
-      "id": "c94bd98e-8b43-405e-a9e1-0f2606b43563",
-      "name": "Check Post-Process Type"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Merge With Input - post-process that merges AI's partial output with original input\nconst originalTask = $('JSON Parse').first().json;\nconst aiResult = $('Add AlongWith Attributes').first().json;\nconst postConfig = originalTask.extra?.post_process || {};\n\nconst mergeKey = postConfig.merge_key || 'code';\nconst outputArrayPath = postConfig.merge_array_path || 'output_data';\nconst inputArrayPath = postConfig.input_array_path || 'output_data';\n\n// 1. Get the full array from the original input_data\nconst inputData = typeof originalTask.data === 'string' \n  ? JSON.parse(originalTask.data) \n  : (originalTask.data || {});\nconst fullArray = inputData[inputArrayPath] || [];\n\n// 2. Get the partial corrections from AI output\nconst aiOutput = aiResult.result || {};\nconst corrections = aiOutput[outputArrayPath] || [];\n\n// 3. Build a lookup map from corrections\nconst correctionMap = new Map();\ncorrections.forEach(item => {\n  const key = item[mergeKey];\n  if (key) correctionMap.set(key, item);\n});\n\n// 4. Merge: replace items that have corrections, keep originals for the rest\nconst merged = fullArray.map(original => {\n  const key = original[mergeKey];\n  return correctionMap.has(key) ? correctionMap.get(key) : original;\n});\n\n// 5. Rebuild the result with the merged array\nconst mergedResult = {\n  ...aiOutput,    // Keep other AI outputs like batch_info\n  [outputArrayPath]: merged,\n  batch_info: {\n    ...(aiOutput.batch_info || {}),\n    total_items: merged.length,\n    corrected_items: corrections.length,\n    unchanged_items: merged.length - corrections.length\n  }\n};\n\nreturn {\n  ...aiResult,\n  result: mergedResult,\n  _merge_applied: true,\n  _merge_stats: {\n    total: merged.length,\n    corrected: corrections.length,\n    unchanged: merged.length - corrections.length\n  }\n};"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2032,
-        688
-      ],
-      "id": "4c05e568-a056-4549-b2a3-a33ee35bc8db",
-      "name": "Merge With Input"
-    },
-    {
-      "parameters": {
-        "content": "## Gemini Agent with Rotation Key - PreGen",
-        "height": 752,
-        "width": 960,
-        "color": 6
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "position": [
-        -1024,
-        160
-      ],
-      "typeVersion": 1,
-      "id": "f2b38e74-8ba0-4c5e-a49f-c0415de2f342",
-      "name": "Sticky Note4"
-    },
-    {
-      "parameters": {
-        "content": "## Gemini Agent with Rotation Key - PostGen",
-        "height": 752,
-        "width": 864,
-        "color": 6
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "position": [
-        1536,
-        160
-      ],
-      "typeVersion": 1,
-      "id": "90aecbeb-ccdd-4815-a7a9-7840237f0d68",
-      "name": "Sticky Note5"
-    },
-    {
-      "parameters": {
-        "content": "## Get Task",
-        "height": 752,
-        "width": 848
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "position": [
-        -1888,
-        160
-      ],
-      "typeVersion": 1,
-      "id": "8f83f137-2039-462a-b93d-f165d43835a4",
-      "name": "Sticky Note6"
-    },
-    {
-      "parameters": {
-        "jsCode": "// 1. Lấy kết quả từ RPC call (Node ngay phía trước)\nconst rpcRaw = $input.first().json;\nconst rpcResult = Array.isArray(rpcRaw) ? rpcRaw[0] : rpcRaw;\n\n// 2. Lấy thông tin từ node Determine Next Stage\nconst determineNode = $('Determine Next Stage').item.json;\nconst nextAction = determineNode.action;\n\n// 3. Chuẩn bị dữ liệu task sạch\nconst taskStatus = {\n  is_last_task: rpcResult?.is_last_task || false,\n  finished_count: rpcResult?.finished_count || 0,\n  total_count: rpcResult?.total_count || 0,\n  next_action: nextAction\n};\n\n// 4. Logic Decision\nconst isStandardBranch = nextAction === 'create_tasks_for_branches';\nconst isLastMergeTask = ((nextAction === \"wait_for_merge\" || nextAction === \"many_to_one\") && taskStatus.is_last_task === true);\n\n// 5. Early termination: nếu không cần đi tiếp thì dừng workflow tại đây\nif (!isStandardBranch && !isLastMergeTask) {\n  return []; // Terminate: chưa đủ điều kiện để tạo task tiếp theo\n}\n\nreturn {\n  ...taskStatus,\n  should_proceed: true\n};\n"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        3264,
-        576
-      ],
-      "id": "183499de-a476-41d9-ad86-4858ef033686",
-      "name": "Finish Task & Check Merge",
-      "executeOnce": true
-    },
-    {
-      "parameters": {
-        "tableId": "ai_tasks",
-        "dataToSend": "autoMapInputData"
-      },
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        4480,
-        576
-      ],
-      "id": "19052ca3-5baa-4b69-a957-673751c864f1",
-      "name": "Create a row",
-      "credentials": {
-        "supabaseApi": {
-          "id": "tOzBo3n0Kkt5Bt41",
-          "name": "Supabase Account Tony"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "mode": "raw",
-        "jsonOutput": "={{ $json }}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        -224,
-        592
-      ],
-      "id": "5739831a-65d6-4845-8b1f-e09ab8a5cac7",
-      "name": "Final Result"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 1
-          },
-          "conditions": [
-            {
-              "id": "is-merge-action",
-              "leftValue": "={{ $('Determine Next Stage').item.json.action }}",
-              "rightValue": "wait_for_merge",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        3472,
-        576
-      ],
-      "id": "6167f066-a1ac-449f-a9e5-52e77756faf9",
-      "name": "Branch Merge vs Standard"
-    },
-    {
-      "parameters": {
-        "operation": "getAll",
-        "tableId": "ai_tasks",
-        "returnAll": true,
-        "matchType": "allFilters",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "batch_id",
-              "condition": "eq",
-              "keyValue": "={{ $('JSON Parse').item.json.batch_id }}"
-            },
-            {
-              "keyName": "stage_key",
-              "condition": "eq",
-              "keyValue": "={{ $('JSON Parse').item.json.stage_key }}"
-            },
-            {
-              "keyName": "status",
-              "condition": "eq",
-              "keyValue": "completed"
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        3888,
-        672
-      ],
-      "id": "bd59d9f0-6612-481f-b2a4-5d54eff43ac8",
-      "name": "Fetch Sibling Tasks",
-      "credentials": {
-        "supabaseApi": {
-          "id": "tOzBo3n0Kkt5Bt41",
-          "name": "Supabase Account Tony"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "// Aggregate & Prepare Merge Task - FIXED (JSON parsing + JSONB safety)\n// Input: $input.all() = completed sibling tasks from \"Fetch Sibling Tasks\" (Supabase rows)\n// Goal: aggregate their output_data, then build tasks array for \"Create Next Stage Tasks\"\n\n// 1. Get the original task context and merge config from earlier nodes\nconst originalTask = $('JSON Parse').first().json;\nconst determineResult = $('Determine Next Stage').first().json;\nconst nextStageConfigs = determineResult.next_stage_configs || [];\n\n// Get merge_path from current_stage_config\nconst currentStageConfig = originalTask.extra?.current_stage_config || {};\nconst mergePath = currentStageConfig.merge_path || null;\n\n// 2. Collect all completed sibling tasks from Fetch Sibling Tasks\nconst siblingTasks = $input.all().map(item => item.json);\nconst completedTasks = siblingTasks.filter(t => t.status === 'completed');\n\nif (completedTasks.length === 0) {\n  throw new Error('No completed sibling tasks found to merge');\n}\n\n// 3. Parse output_data safely (may be string or object from Supabase)\nconst allOutputs = completedTasks.map(t => {\n  let data = t.output_data;\n  if (typeof data === 'string') {\n    try {\n      data = JSON.parse(data);\n    } catch (e) {\n      // keep as-is if not valid JSON\n    }\n  }\n  return data;\n}).filter(d => d != null);\n\n// 4. Aggregate based on merge_path\nlet aggregatedData;\nif (mergePath) {\n  // Extract and concatenate the specific field from each output\n  aggregatedData = allOutputs.reduce((acc, curr) => {\n    const val = curr?.[mergePath];\n    if (Array.isArray(val)) {\n      return acc.concat(val);\n    } else if (val != null) {\n      acc.push(val);\n    }\n    return acc;\n  }, []);\n} else {\n  // No merge_path: just collect all outputs as an array\n  aggregatedData = allOutputs;\n}\n\n// 5. Build the merged input_data for the next stage\nconst mergedInputData = mergePath\n  ? { [mergePath]: aggregatedData }\n  : { merged_data: aggregatedData };\n\n// 6. Helper: extract stage key from template ID\nfunction extractStageKey(templateId) {\n  if (!templateId) return 'unknown_stage';\n  const stepMatch = templateId.match(/^[0-9a-fA-F-]+_(.+)_step_\\d+$/);\n  if (stepMatch) return stepMatch[1];\n  const match = templateId.match(/^[0-9a-fA-F-]+_(.+)$/);\n  return match ? match[1] : templateId;\n}\n\n// 7. Build tasks array matching what \"Create Next Stage Tasks\" expects\nconst currentStepNumber = parseInt(originalTask.step_number) || 1;\nconst rootId = originalTask.root_task_id || originalTask.supabase_task_id;\nconst hierarchyPath = [...(originalTask.hierarchy_path || []), originalTask.supabase_task_id];\nconst currentStageKey = originalTask.stage_key || 'unknown_stage';\n\nconst tasks = nextStageConfigs.map((nextCfg, idx) => {\n  const nextTplId = nextCfg.template_id || nextCfg.prompt_id;\n  const nextStageKey = extractStageKey(nextTplId);\n  const taskTypeMatch = nextTplId ? nextTplId.match(/^[0-9a-f-]+_(.+)$/) : null;\n  const taskType = taskTypeMatch ? taskTypeMatch[1] : nextStageKey;\n\n  return {\n    prompt_template_id: nextTplId,\n    task_type: taskType,\n    input_data: mergedInputData,\n    parent_task_id: originalTask.supabase_task_id,\n    root_task_id: rootId,\n    hierarchy_path: hierarchyPath,\n    user_id: originalTask.user_id || null,\n    batch_id: nextCfg.batch_grouping === 'isolated' ? null : (originalTask.batch_id || null),\n    launch_id: originalTask.launch_id || null,\n    test_mode: originalTask.test_mode || false,\n    sequence: idx + 1,\n    total_steps: nextStageConfigs.length,\n    status: 'pending',\n    stage_key: nextStageKey,\n    step_number: currentStepNumber + 1,\n    split_group_id: originalTask.split_group_id,\n    requires_approval: nextCfg.requires_approval || false,\n    extra: {\n      current_stage_config: {\n        template_id: nextTplId,\n        cardinality: nextCfg.cardinality || 'one_to_one',\n        split_path: nextCfg.split_path || null,\n        split_mode: nextCfg.split_mode || 'per_item',\n        merge_path: nextCfg.merge_path || null,\n        output_mapping: nextCfg.output_mapping || 'result'\n      },\n      parent_stage_key: currentStageKey,\n      parent_task_id: originalTask.supabase_task_id,\n      _merged_from_count: completedTasks.length\n    }\n  };\n});\n\n// 8. Return in the format that \"Create Next Stage Tasks\" expects\nreturn {\n  action: tasks.length > 0 ? 'create_tasks_for_branches' : 'terminate',\n  tasks: tasks,\n  total_count: tasks.length,\n  task_id: originalTask.supabase_task_id\n};"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        4096,
-        672
-      ],
-      "id": "a08a0b6c-a3e4-46c8-9eb6-0ad4e3869002",
-      "name": "Aggregate & Prepare Merge Task"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Call Supabase RPC: increment_finished_task\nconst task = $('JSON Parse').first().json;\nlet result = $('Input - Submit Result Phase1').first().json.result;\n\n// Ensure result is a native object for JSONB column\nif (typeof result === 'string') {\n  try { result = JSON.parse(result); } catch(e) { /* keep as string if not valid JSON */ }\n}\n\nreturn {\n  p_batch_id: task.batch_id,\n  p_task_id: task.supabase_task_id,\n  p_output_result: result\n}"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2880,
-        576
-      ],
-      "id": "c170c84d-b231-485c-a451-aaa1faee535a",
-      "name": "Prepare Package To Send",
-      "executeOnce": true
-    },
-    {
-      "parameters": {
-        "tableId": "rpc/increment_finished_task",
-        "dataToSend": "autoMapInputData"
-      },
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        3072,
-        576
-      ],
-      "id": "7c01bdcd-1938-47e0-a612-cac9443d3e5c",
-      "name": "Call RPC",
-      "credentials": {
-        "supabaseApi": {
-          "id": "tOzBo3n0Kkt5Bt41",
-          "name": "Supabase Account Tony"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "update",
-        "dataTableId": {
-          "__rl": true,
-          "value": "LT77b3PENHxZuRwj",
-          "mode": "list",
-          "cachedResultName": "n8n-task-queue",
-          "cachedResultUrl": "/projects/B8LPf0gekMWp8vZq/datatables/LT77b3PENHxZuRwj"
-        },
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "task_id",
-              "keyValue": "={{ $('Input - Submit Result Phase1').item.json.task_id }}"
-            }
-          ]
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "status": "generated",
-            "result": "={{ JSON.stringify($('Input - Submit Result Phase1').item.json.result) }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "prompt",
-              "displayName": "prompt",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "task_id",
-              "displayName": "task_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "data",
-              "displayName": "data",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "extra",
-              "displayName": "extra",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "ai_settings",
-              "displayName": "ai_settings",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "status",
-              "displayName": "status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "task_type",
-              "displayName": "task_type",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "agent_id",
-              "displayName": "agent_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "result",
-              "displayName": "result",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "related_task_id",
-              "displayName": "related_task_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "supabase_task_id",
-              "displayName": "supabase_task_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "batch_id",
-              "displayName": "batch_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "batch_priority",
-              "displayName": "batch_priority",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "user_id",
-              "displayName": "user_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "sequence",
-              "displayName": "sequence",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "test_mode",
-              "displayName": "test_mode",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "requires_approval",
-              "displayName": "requires_approval",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "split_group_id",
-              "displayName": "split_group_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "next_stage_template_id",
-              "displayName": "next_stage_template_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "prompt_template_id",
-              "displayName": "prompt_template_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "step_execution_id",
-              "displayName": "step_execution_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "orchestrator_execution_id",
-              "displayName": "orchestrator_execution_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "next_task_config",
-              "displayName": "next_task_config",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "total_steps",
-              "displayName": "total_steps",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "step_number",
-              "displayName": "step_number",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "stage_key",
-              "displayName": "stage_key",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "hierarchy_path",
-              "displayName": "hierarchy_path",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "root_task_id",
-              "displayName": "root_task_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "parent_task_id",
-              "displayName": "parent_task_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "step_id",
-              "displayName": "step_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "phase_code",
-              "displayName": "phase_code",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "lo_code",
-              "displayName": "lo_code",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "launch_id",
-              "displayName": "launch_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1,
-      "position": [
-        3264,
-        768
-      ],
-      "id": "ca28b134-b0e7-4bdd-8d45-f231a3fee327",
-      "name": "Update row(s)",
-      "executeOnce": true
-    },
-    {
-      "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "dTye2k0BhUUjRfee",
-          "mode": "list",
-          "cachedResultUrl": "/workflow/dTye2k0BhUUjRfee",
-          "cachedResultName": "[Base] Sync Back to Supabase"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {},
-          "matchingColumns": [],
-          "schema": [],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": true
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        3680,
-        672
-      ],
-      "id": "f79afce9-eef5-4c8b-8252-169c6ed7ea38",
-      "name": "Call '[Base] Sync Back to Supabase'",
-      "alwaysOutputData": true
-    },
-    {
-      "parameters": {
-        "operation": "update",
-        "tableId": "ai_tasks",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "id",
-              "condition": "eq",
-              "keyValue": "={{ $json.supabase_task_id }}"
-            }
-          ]
-        },
-        "fieldsUi": {
-          "fieldValues": [
-            {
-              "fieldId": "started_at",
-              "fieldValue": "={{ new Date().toISOString() }}"
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        -1088,
-        576
-      ],
-      "id": "b4dd6f57-a1f7-4d2b-8ac3-6fc232988355",
-      "name": "Update Started At",
-      "credentials": {
-        "supabaseApi": {
-          "id": "tOzBo3n0Kkt5Bt41",
-          "name": "Supabase Account Tony"
-        }
-      }
-    }
-  ],
-  "connections": {
-    "Get Tasks To Solve": {
-      "main": [
-        [
-          {
-            "node": "Filter A Task",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Filter A Task": {
-      "main": [
-        [
-          {
-            "node": "JSON Parse",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Add AlongWith Attributes": {
-      "main": [
-        [
-          {
-            "node": "Check Post-Process",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Convert MarkdownJSON to JSON": {
-      "main": [
-        [
-          {
-            "node": "Add AlongWith Attributes",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Report Failure",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Wait": {
-      "main": [
-        [
-          {
-            "node": "Get Active Key",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Schedule Trigger": {
-      "main": [
-        [
-          {
-            "node": "Get Tasks To Solve",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "JSON Parse": {
-      "main": [
-        [
-          {
-            "node": "Update Started At",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Active Key": {
-      "main": [
-        [
-          {
-            "node": "Gemini API Call",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Stop and Error",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Retry Logic": {
-      "main": [
-        [
-          {
-            "node": "Wait",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Report Failure": {
-      "main": [
-        [
-          {
-            "node": "Retry Logic",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Gemini API Call": {
-      "main": [
-        [
-          {
-            "node": "Convert MarkdownJSON to JSON",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Report Success",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Report Failure",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Input - Submit Result Phase1": {
-      "main": [
-        [
-          {
-            "node": "Determine Next Stage",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Determine Next Stage": {
-      "main": [
-        [
-          {
-            "node": "Prepare Package To Send",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Create Next Stage Tasks": {
-      "main": [
-        [
-          {
-            "node": "Create a row",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Check Pre-Process": {
-      "main": [
-        [
-          {
-            "node": "Execute Pre-Process Webhook",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Final Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Execute Pre-Process Webhook": {
-      "main": [
-        [
-          {
-            "node": "Merge Pre-Process Output",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Handle Pre-Process Failure",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge Pre-Process Output": {
-      "main": [
-        [
-          {
-            "node": "Final Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Handle Pre-Process Failure": {
-      "main": [
-        [
-          {
-            "node": "Final Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Check Post-Process": {
-      "main": [
-        [
-          {
-            "node": "Check Post-Process Type",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Input - Submit Result Phase1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Execute Post-Process Webhook": {
-      "main": [
-        [
-          {
-            "node": "Handle Post-Process Result",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Handle Post-Process Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Handle Post-Process Result": {
-      "main": [
-        [
-          {
-            "node": "Input - Submit Result Phase1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Check Post-Process Type": {
-      "main": [
-        [
-          {
-            "node": "Merge With Input",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Execute Post-Process Webhook",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge With Input": {
-      "main": [
-        [
-          {
-            "node": "Input - Submit Result Phase1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Finish Task & Check Merge": {
-      "main": [
-        [
-          {
-            "node": "Branch Merge vs Standard",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Final Result": {
-      "main": [
-        [
-          {
-            "node": "Get Active Key",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Branch Merge vs Standard": {
-      "main": [
-        [
-          {
-            "node": "Call '[Base] Sync Back to Supabase'",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Create Next Stage Tasks",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Fetch Sibling Tasks": {
-      "main": [
-        [
-          {
-            "node": "Aggregate & Prepare Merge Task",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Aggregate & Prepare Merge Task": {
-      "main": [
-        [
-          {
-            "node": "Create Next Stage Tasks",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Prepare Package To Send": {
-      "main": [
-        [
-          {
-            "node": "Call RPC",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Call RPC": {
-      "main": [
-        [
-          {
-            "node": "Finish Task & Check Merge",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Update row(s)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Call '[Base] Sync Back to Supabase'": {
-      "main": [
-        [
-          {
-            "node": "Fetch Sibling Tasks",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Update Started At": {
-      "main": [
-        [
-          {
-            "node": "Check Pre-Process",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
-  },
-  "pinData": {},
-  "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "3c3655861b945e2f23873d293f97337788a318f9e0823cca507f13751bd70fd7"
-  }
+	"nodes": [
+		{
+			"parameters": {
+				"content": "## Gemini Agent with Rotation Key - Gen",
+				"height": 752,
+				"width": 1568,
+				"color": 6
+			},
+			"type": "n8n-nodes-base.stickyNote",
+			"position": [128, 160],
+			"typeVersion": 1,
+			"id": "d32f80e5-1377-4aa9-a00f-8198c04bc8b8",
+			"name": "Sticky Note2"
+		},
+		{
+			"parameters": {
+				"operation": "get",
+				"dataTableId": {
+					"__rl": true,
+					"value": "LT77b3PENHxZuRwj",
+					"mode": "list",
+					"cachedResultName": "n8n-task-queue",
+					"cachedResultUrl": "/projects/B8LPf0gekMWp8vZq/datatables/LT77b3PENHxZuRwj"
+				},
+				"matchType": "allConditions",
+				"filters": {
+					"conditions": [
+						{
+							"keyName": "status",
+							"keyValue": "plan"
+						}
+					]
+				},
+				"limit": 10
+			},
+			"type": "n8n-nodes-base.dataTable",
+			"typeVersion": 1,
+			"position": [-1632, 576],
+			"id": "69b4e18d-e15f-40db-b773-791a70d8fd7a",
+			"name": "Get Tasks To Solve",
+			"executeOnce": true
+		},
+		{
+			"parameters": {
+				"jsCode": "// Priority Task Selector for Multi-Agent Queue\n// Place this Code node AFTER \"Get A Task To Solve\" node\n\n// Get all tasks from previous node\nconst tasks = $input.all().map(item => item.json);\n\n// If no tasks, return empty\nif (tasks.length === 0) {\n  return [];\n}\n\n// Sort by priority order:\n// 1. test_mode = true first (DESC)\n// 2. batch_priority earliest first (ASC)\n// 3. sequence lowest first (ASC)\n// 4. created_at earliest first (ASC) - fallback\nconst sortedTasks = tasks.sort((a, b) => {\n  // 1. Test mode first (true > false)\n  const testModeA = a.test_mode === true || a.test_mode === 'true';\n  const testModeB = b.test_mode === true || b.test_mode === 'true';\n  \n  if (testModeA && !testModeB) return -1;\n  if (!testModeA && testModeB) return 1;\n  \n  // 2. Batch priority (earlier timestamp first)\n  if (a.batch_priority && b.batch_priority) {\n    const priorityA = new Date(a.batch_priority).getTime();\n    const priorityB = new Date(b.batch_priority).getTime();\n    if (priorityA !== priorityB) return priorityA - priorityB;\n  } else if (a.batch_priority) {\n    return -1; // Has priority comes first\n  } else if (b.batch_priority) {\n    return 1;\n  }\n  \n  // 3. Sequence (lower number first)\n  const seqA = parseInt(a.sequence) || 1;\n  const seqB = parseInt(b.sequence) || 1;\n  if (seqA !== seqB) return seqA - seqB;\n  \n  // 4. Created at (fallback - earlier first)\n  if (a.created_at && b.created_at) {\n    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();\n  }\n  \n  return 0;\n});\n\n// Return only the highest priority task (first after sort)\nreturn [{ json: sortedTasks[0] }];"
+			},
+			"type": "n8n-nodes-base.code",
+			"typeVersion": 2,
+			"position": [-1424, 576],
+			"id": "63821b35-cc26-4d59-9fba-2be0620589d9",
+			"name": "Filter A Task"
+		},
+		{
+			"parameters": {
+				"jsCode": "var finalResult = $json;\nvar taskInfo = $('JSON Parse').first().json; // Fallback for standard\nif (!taskInfo || !taskInfo.supabase_task_id) {\n    // Try Consolidated mappings if standard fails\n    try { taskInfo = $('1. Parse Task').first().json; } catch(e) {}\n}\n\nvar extra = taskInfo.extra || {};\nvar data = taskInfo.data || {};\nvar returnAlongWith = (extra && extra[\"return-along-with\"]) || [];\n\nif (returnAlongWith.length > 0) { \n  for (var key of returnAlongWith) {\n    if (data.hasOwnProperty(key)) {\n        finalResult[key] = data[key];\n    }\n  }\n}\n\nreturn { \n  ...taskInfo,\n  \"result\": finalResult,\n  \"extra\": extra,\n  \"data\": data,\n  \"supabase_task_id\": taskInfo.supabase_task_id || taskInfo.id\n};"
+			},
+			"type": "n8n-nodes-base.code",
+			"typeVersion": 2,
+			"position": [1296, 288],
+			"id": "3be09b8d-1084-4c35-831e-f4f8f5dee5e4",
+			"name": "Add AlongWith Attributes"
+		},
+		{
+			"parameters": {
+				"jsCode": "function convertMarkdownJsonToJsObject(partsArray) {\n  const fullText = partsArray.map(part => part.text).join('');\n  let trimmed = fullText.trim();\n  \n  let jsonContent;\n  if (trimmed.startsWith('```json')) {\n    jsonContent = trimmed.slice(7, trimmed.lastIndexOf('```')).trim();\n  } else if (trimmed.startsWith('{') || trimmed.startsWith('[')) {\n    jsonContent = trimmed;\n  } else {\n    throw new Error('Invalid JSON format');\n  }\n  \n  // Minimal cleaning - chỉ remove control chars\n  jsonContent = jsonContent.replace(/[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F]/g, '');\n  \n  return JSON.parse(jsonContent);\n}\n\nvar partsArray = $input.first().json.candidates[0].content.parts; \nreturn convertMarkdownJsonToJsObject(partsArray);"
+			},
+			"type": "n8n-nodes-base.code",
+			"typeVersion": 2,
+			"position": [768, 240],
+			"id": "d8738137-c9a9-429f-bb2b-8a3e17fb89e7",
+			"name": "Convert MarkdownJSON to JSON",
+			"notesInFlow": true,
+			"onError": "continueErrorOutput",
+			"notes": "Check max retry, wait 1s"
+		},
+		{
+			"parameters": {
+				"amount": 1
+			},
+			"type": "n8n-nodes-base.wait",
+			"typeVersion": 1.1,
+			"position": [1504, 672],
+			"id": "90750384-8962-46bb-b666-9eeb532163d2",
+			"name": "Wait",
+			"webhookId": "1d8bacfa-5632-4b41-a63f-fee5f8faa40d"
+		},
+		{
+			"parameters": {
+				"rule": {
+					"interval": [
+						{
+							"field": "minutes"
+						}
+					]
+				}
+			},
+			"type": "n8n-nodes-base.scheduleTrigger",
+			"typeVersion": 1.2,
+			"position": [-1824, 576],
+			"id": "44fdd1ed-1cf6-4c2d-a0f9-c8b8bea4a038",
+			"name": "Schedule Trigger"
+		},
+		{
+			"parameters": {
+				"jsCode": "const item = $input.first().json;\n\n// Safe parse helper for JSON columns that might come as strings or objects\nconst parseSafe = (val, fallback) => {\n    if (val === null || val === undefined) return fallback;\n    if (typeof val === 'object') return val;\n    try {\n        let parsed = JSON.parse(val);\n        // Handle potential double-stringification\n        if (typeof parsed === 'string') parsed = JSON.parse(parsed);\n        return parsed;\n    } catch (e) {\n        console.error('Parse error:', e, val);\n        return fallback;\n    }\n};\n\nreturn {\n  task_id: item.task_id,\n  batch_id: item.batch_id,\n  user_id: item.user_id,\n  task_type: item.task_type,\n  prompt: item.prompt,\n  extra: parseSafe(item.extra, {}),\n  status: item.status,\n  data: parseSafe(item.data, {}),\n  ai_settings: parseSafe(item.ai_settings, {}),\n  supabase_task_id: item.supabase_task_id || item.id,\n  launch_id: item.launch_id || null,\n  root_task_id: item.root_task_id || null,\n  hierarchy_path: parseSafe(item.hierarchy_path, []),\n  step_number: item.step_number || 1,\n  stage_key: item.stage_key || '',\n  parent_task_id: item.parent_task_id || null,\n  split_group_id: item.split_group_id || null,\n  test_mode: item.test_mode || false,\n  requires_approval: item.requires_approval || false,\n  sequence: item.sequence || null\n};"
+			},
+			"type": "n8n-nodes-base.code",
+			"typeVersion": 2,
+			"position": [-1216, 576],
+			"id": "b80dfd5d-cc4c-46e0-8a6e-edd1aba94ac5",
+			"name": "JSON Parse",
+			"executeOnce": true
+		},
+		{
+			"parameters": {
+				"errorMessage": "[403] Key Rotation Manager has no valid key!"
+			},
+			"type": "n8n-nodes-base.stopAndError",
+			"typeVersion": 1,
+			"position": [432, 672],
+			"id": "57a178d8-7e23-44c5-a72f-f6ec99204cbf",
+			"name": "Stop and Error"
+		},
+		{
+			"parameters": {
+				"url": "https://n8n.teky.vn/webhook/get-active-key",
+				"authentication": "genericCredentialType",
+				"genericAuthType": "httpBasicAuth",
+				"options": {}
+			},
+			"type": "n8n-nodes-base.httpRequest",
+			"typeVersion": 4.3,
+			"position": [256, 576],
+			"id": "37b6f1a1-3c88-4c00-9ebe-de3e3722722a",
+			"name": "Get Active Key",
+			"notesInFlow": true,
+			"executeOnce": true,
+			"credentials": {
+				"httpBasicAuth": {
+					"id": "4STFVBW6SDzs3GJf",
+					"name": "AI Content Creator"
+				}
+			},
+			"onError": "continueErrorOutput"
+		},
+		{
+			"parameters": {
+				"jsCode": "const maxRetries = 3;\nconst currentRun = $runIndex;\n\nif (currentRun >= maxRetries - 1) {\n    throw new Error(\"Max retries reached. All available keys failed.\");\n}\n\n// Wait a bit before retrying\nreturn new Promise((resolve) => {\n  setTimeout(() => {\n    resolve([{ json: { retry: currentRun + 1 } }]);\n  }, 1000);\n});"
+			},
+			"type": "n8n-nodes-base.code",
+			"typeVersion": 2,
+			"position": [1296, 672],
+			"id": "7039161b-a1e3-411a-81ee-2369614af9d3",
+			"name": "Retry Logic",
+			"notesInFlow": true,
+			"notes": "Check max retry, wait 1s"
+		},
+		{
+			"parameters": {
+				"method": "POST",
+				"url": "https://n8n.teky.vn/webhook/set-key-state",
+				"authentication": "genericCredentialType",
+				"genericAuthType": "httpBasicAuth",
+				"sendBody": true,
+				"bodyParameters": {
+					"parameters": [
+						{
+							"name": "key_id",
+							"value": "={{ $('Get Active Key').item.json.key_id }}"
+						},
+						{
+							"name": "status",
+							"value": "fail"
+						},
+						{
+							"name": "error_code",
+							"value": "=[{{ $json.error.status}}] {{ $json.error.message || 'API_ERROR' }}"
+						}
+					]
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.httpRequest",
+			"typeVersion": 4.3,
+			"position": [1072, 672],
+			"id": "2dc158fd-cafe-4bb9-bb55-e4d4e6627c26",
+			"name": "Report Failure",
+			"notesInFlow": true,
+			"credentials": {
+				"httpBasicAuth": {
+					"id": "4STFVBW6SDzs3GJf",
+					"name": "AI Content Creator"
+				}
+			},
+			"notes": "Báo Rotator: Key hỏng, block hoặc đánh dấu lỗi"
+		},
+		{
+			"parameters": {
+				"method": "POST",
+				"url": "https://n8n.teky.vn/webhook/set-key-state",
+				"authentication": "genericCredentialType",
+				"genericAuthType": "httpBasicAuth",
+				"sendBody": true,
+				"bodyParameters": {
+					"parameters": [
+						{
+							"name": "key_id",
+							"value": "={{ $('Get Active Key').item.json.key_id }}"
+						},
+						{
+							"name": "status",
+							"value": "success"
+						}
+					]
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.httpRequest",
+			"typeVersion": 4.3,
+			"position": [768, 416],
+			"id": "bd2784c2-4ab7-4ff1-a7e3-fac314103219",
+			"name": "Report Success",
+			"notesInFlow": true,
+			"credentials": {
+				"httpBasicAuth": {
+					"id": "4STFVBW6SDzs3GJf",
+					"name": "AI Content Creator"
+				}
+			},
+			"notes": "Báo Rotator: Key này tốt, reset cooldown"
+		},
+		{
+			"parameters": {
+				"method": "POST",
+				"url": "=https://generativelanguage.googleapis.com/v1beta/models/{{$('Final Result').item.json.ai_settings.model_id}}:{{$('Final Result').item.json.ai_settings.generate_content_api}}?key={{ $json.api_key }}",
+				"sendBody": true,
+				"specifyBody": "json",
+				"jsonBody": "={{ \n  JSON.stringify({\n    \"generationConfig\": ($('Final Result').item.json.ai_settings || {}).generationConfig || {},\n    \"contents\": [\n      {\n        \"role\": \"user\",\n        \"parts\": [\n          { \"text\": $('Final Result').item.json.prompt }\n        ]\n      }\n    ]\n  })\n}}",
+				"options": {}
+			},
+			"type": "n8n-nodes-base.httpRequest",
+			"typeVersion": 4.3,
+			"position": [544, 480],
+			"id": "b8b655e6-f048-4265-a205-88dd4c403b7e",
+			"name": "Gemini API Call",
+			"notesInFlow": true,
+			"executeOnce": true,
+			"onError": "continueErrorOutput"
+		},
+		{
+			"parameters": {
+				"content": "## ## Gemini Agent with Rotation Key - Update Result Phase",
+				"height": 752,
+				"width": 2272
+			},
+			"type": "n8n-nodes-base.stickyNote",
+			"position": [2592, 160],
+			"typeVersion": 1,
+			"id": "fddef82e-a534-46fd-bfea-a27b57c18925",
+			"name": "Sticky Note3"
+		},
+		{
+			"parameters": {
+				"mode": "raw",
+				"jsonOutput": "={{ $json }}",
+				"options": {}
+			},
+			"type": "n8n-nodes-base.set",
+			"typeVersion": 3.4,
+			"position": [2656, 576],
+			"id": "f6ac5020-a8ea-45db-af67-8cbaaab3970d",
+			"name": "Input - Submit Result Phase1"
+		},
+		{
+			"parameters": {
+				"jsCode": "// ========== PHASE 5: DETERMINE & CREATE NEXT STAGE TASKS ==========\n// This node handles task chaining and parallel branching.\n// Each task carries current_stage_config and next_stage_configs from the prompt-template.\n// The child task's next_stage_configs will be populated by Load Batch via template lookup.\n\nconst task = $json;\nconst extra = task.extra || {};\n\n// Get current stage config\nconst currentStageConfig = extra.current_stage_config || null;\n\n// Get next stage configs (from prompt-template lookup in Load Batch)\nconst nextConfigs = extra.next_stage_configs || \n                   (extra.next_stage_config ? [extra.next_stage_config] : []);\n\n// === TERMINATE: No next stage ===\nif (!currentStageConfig || nextConfigs.length === 0) {\n  return {\n    action: 'terminate',\n    task_id: task.supabase_task_id,\n    message: 'No next stage configured - final stage reached'\n  };\n}\n\nconst cardinality = currentStageConfig.cardinality || 'one_to_one';\nconst result = task.result;\nconst inputData = task.data || {};\n\n// Helper: extract stage key from template ID\n// === FIXED: Sử dụng regex loại bỏ phần _step_ nếu có ===\nfunction extractStageKey(templateId) {\n  if (!templateId) return 'unknown_stage';\n  \n  // 1. Nếu có format: uuid_tênstage_step_1234\n  const stepMatch = templateId.match(/^[0-9a-fA-F-]+_(.+)_step_\\d+$/);\n  if (stepMatch) return stepMatch[1];\n  \n  // 2. Fallback: uuid_tênstage\n  const match = templateId.match(/^[0-9a-fA-F-]+_(.+)$/);\n  return match ? match[1] : templateId;\n}\n\nconst currentStageKey = task.stage_key || (currentStageConfig.template_id ? extractStageKey(currentStageConfig.template_id) : 'unknown_stage');\nconst rootId = task.root_task_id || task.supabase_task_id;\nconst hierarchyPath = [...(task.hierarchy_path || []), task.supabase_task_id];\nconst currentStepNumber = parseInt(task.step_number) || 1;\n\n// Helper: build metadata for a new child task\nfunction buildTaskMetadata(nextConfig, index, total, dataForTask) {\n  if (!nextConfig) return null;\n  const nextTplId = nextConfig.template_id || nextConfig.prompt_id;\n  const nextStageKey = extractStageKey(nextTplId);\n\n  // Parse task_type suffix\n  const taskTypeMatch = nextTplId.match(/^[0-9a-f-]+_(.+)$/);\n  const taskType = taskTypeMatch ? taskTypeMatch[1] : nextStageKey;\n\n  return {\n    prompt_template_id: nextTplId,\n    task_type: taskType,\n    input_data: dataForTask,\n    parent_task_id: task.supabase_task_id,\n    root_task_id: rootId,\n    hierarchy_path: hierarchyPath,\n    user_id: task.user_id || null,\n    batch_id: nextConfig.batch_grouping === \"isolated\" ? null : (task.batch_id || null),\n    launch_id: task.launch_id || null,\n    test_mode: task.test_mode || false,\n    sequence: index + 1,\n    total_steps: total,\n    status: 'plan',\n\n    stage_key: nextStageKey,\n    step_number: currentStepNumber + 1,\n    split_group_id: task.split_group_id,\n    requires_approval: nextConfig.requires_approval || task.requires_approval || false,\n\n    // Child's extra: current_stage_config from nextConfig\n    // next_stage_configs will be populated by Load Batch when this task is loaded\n    extra: {\n      current_stage_config: {\n        template_id: nextTplId,\n        cardinality: nextConfig.cardinality || 'one_to_one',\n        split_path: nextConfig.split_path || null,\n        split_mode: nextConfig.split_mode || 'per_item',\n        output_mapping: nextConfig.output_mapping || 'result'\n      },\n      // next_stage_configs intentionally omitted — Load Batch will hydrate\n      // from prompt_templates.next_stage_template_ids at load time\n      parent_stage_key: currentStageKey,\n      parent_task_id: task.supabase_task_id\n    }\n  };\n}\n\n// === EXECUTE BRANCHING ===\nlet finalTasks = [];\n\nif (cardinality === 'one_to_one' || cardinality === '1:1') {\n  finalTasks = nextConfigs.map((cfg, idx) => buildTaskMetadata(cfg, idx, 1, result)).filter(Boolean);\n} else if (cardinality === \"one_to_many\" || cardinality === \"1:N\") {\n  const splitPath = currentStageConfig.split_path || 'result';\n\n  const pathParts = splitPath.split('.');\n  let arrayToSplit = result;\n  for (const part of pathParts) {\n    if (part === 'result') continue;\n    arrayToSplit = arrayToSplit?.[part];\n  }\n\n  if (!Array.isArray(arrayToSplit)) {\n    return {\n      action: 'terminate',\n      task_id: task.supabase_task_id,\n      message: `split_path '${splitPath}' did not resolve to an array`\n    };\n  }\n\n  const splitMode = currentStageConfig.split_mode || 'per_item';\n  for (const nextConfig of nextConfigs) {\n    if (splitMode === 'per_item') {\n      arrayToSplit.forEach((item, idx) => {\n        finalTasks.push(buildTaskMetadata(nextConfig, idx, arrayToSplit.length, {\n          ...inputData,\n          user_id: task.user_id || null,\n          batch_id: task.batch_id || null,\n          launch_id: task.launch_id || null,\n          item: item,\n          _split_index: idx,\n          _split_total: arrayToSplit.length\n        }));\n      });\n    } else if (splitMode === 'per_batch') {\n      const batchSize = currentStageConfig.batch_size || 10;\n      for (let i = 0, bIdx = 0; i < arrayToSplit.length; i += batchSize, bIdx++) {\n        const batchItems = arrayToSplit.slice(i, i + batchSize);\n        finalTasks.push(buildTaskMetadata(nextConfig, bIdx, Math.ceil(arrayToSplit.length / batchSize), {\n          ...inputData,\n          items: batchItems,\n          _batch_index: bIdx\n        }));\n      }\n    }\n  }\n  finalTasks = finalTasks.filter(Boolean);\n} else if (cardinality === \"N:1\" || cardinality === \"many_to_one\") {\n  return {\n    action: 'wait_for_merge',\n    task_id: task.supabase_task_id,\n    cardinality: \"many_to_one\",\n    next_stage_configs: nextConfigs\n  };\n}\n\nreturn {\n  action: finalTasks.length > 0 ? 'create_tasks_for_branches' : 'terminate',\n  tasks: finalTasks,\n  total_count: finalTasks.length,\n  task_id: task.supabase_task_id\n};"
+			},
+			"type": "n8n-nodes-base.code",
+			"typeVersion": 2,
+			"position": [2848, 576],
+			"id": "c32327f4-117e-464b-9a23-64f7ebdb7b3c",
+			"name": "Determine Next Stage"
+		},
+		{
+			"parameters": {
+				"jsCode": "// Node: \"Create Next Stage Tasks\" (Always Returns Array)\nconst config = $input.first().json;\nconst next_action = config.next_action || config.action;\n\n// Handle terminate action - return empty array\nif (next_action === 'terminate') {\n  return [];  // ✅ Return empty array instead of object\n}\n\n// Handle error action\nif (next_action === 'error') {\n  throw new Error(config.message);\n}\n\n// === MỚI: Xử lý parallel branches ===\nconst tasks = config.tasks || $('Determine Next Stage').first().json.tasks || [];\nif (tasks.length === 0) return [];\n\nreturn tasks.map(task => ({\n  prompt_template_id: task.prompt_template_id,\n  task_type: task.task_type || '',\n  input_data: task.input_data,\n  parent_task_id: task.parent_task_id,\n  root_task_id: task.root_task_id,\n  hierarchy_path: task.hierarchy_path,\n  batch_id: task.batch_id || null,\n  user_id: task.user_id || null,\n  launch_id: task.launch_id || null,\n  created_at: task.created_at || null,\n  started_at: task.started_at || null,\n  completed_at: task.completed_at || null,\n  test_mode: task.test_mode,\n  sequence: task.sequence,\n  total_steps: task.total_steps,\n  status: task.status || 'plan',\n  stage_key: task.stage_key,\n  step_number: task.step_number,\n  split_group_id: task.split_group_id,\n  requires_approval: task.requires_approval,\n  extra: task.extra\n}));\n\n// Fallback - return empty array\nreturn [];\n"
+			},
+			"type": "n8n-nodes-base.code",
+			"typeVersion": 2,
+			"position": [4464, 576],
+			"id": "3acb623d-e0e5-48a9-8a18-035bd00391b5",
+			"name": "Create Next Stage Tasks"
+		},
+		{
+			"parameters": {
+				"conditions": {
+					"options": {
+						"caseSensitive": true,
+						"leftValue": "",
+						"typeValidation": "strict",
+						"version": 1
+					},
+					"conditions": [
+						{
+							"id": "pre-process-enabled",
+							"leftValue": "={{ $json.extra?.pre_process?.enabled }}",
+							"rightValue": true,
+							"operator": {
+								"type": "boolean",
+								"operation": "equals"
+							}
+						}
+					],
+					"combinator": "and"
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.if",
+			"typeVersion": 2,
+			"position": [-784, 576],
+			"id": "0d1a3bd6-6e70-4fcb-81f6-b581e25b03c6",
+			"name": "Check Pre-Process"
+		},
+		{
+			"parameters": {
+				"method": "={{ $('JSON Parse').item.json.extra?.pre_process?.webhook_method || 'POST' }}",
+				"url": "={{ $('JSON Parse').item.json.extra?.pre_process?.webhook_url }}",
+				"sendBody": true,
+				"specifyBody": "json",
+				"jsonBody": "={{ JSON.stringify($('JSON Parse').item.json.data) }}",
+				"options": {
+					"timeout": 30000
+				}
+			},
+			"type": "n8n-nodes-base.httpRequest",
+			"typeVersion": 4.3,
+			"position": [-560, 384],
+			"id": "6f07e447-1883-4775-920d-4fd444a00b44",
+			"name": "Execute Pre-Process Webhook",
+			"notesInFlow": true,
+			"onError": "continueErrorOutput",
+			"notes": "Fetch external data before AI processing"
+		},
+		{
+			"parameters": {
+				"jsCode": "// Merge Pre-Process Output into input_data\nconst task = $('JSON Parse').first().json;\nconst preOutput = $json;\nconst preConfig = task.extra?.pre_process || {};\nconst outputHandling = preConfig.output_handling || 'merge';\n\nlet mergedData = { ...task.data };\n\nif (preOutput && !preOutput.error) {\n  if (outputHandling === 'replace') {\n    mergedData = preOutput;\n  } else if (outputHandling === 'merge') {\n    mergedData = { ...mergedData, ...preOutput };\n  } else if (outputHandling === 'nested') {\n    const fieldName = preConfig.nested_field_name || 'pre_output';\n    mergedData[fieldName] = preOutput;\n  }\n}\n\nreturn {\n  ...task,\n  data: mergedData,\n  _pre_process_executed: true\n};"
+			},
+			"type": "n8n-nodes-base.code",
+			"typeVersion": 2,
+			"position": [-304, 272],
+			"id": "de9b7bf6-2a2b-4a90-a288-28504c9496b4",
+			"name": "Merge Pre-Process Output"
+		},
+		{
+			"parameters": {
+				"jsCode": "// Handle Pre-Process Failure\nconst task = $('JSON Parse').first().json;\nconst preConfig = task.extra?.pre_process || {};\nconst onFailure = preConfig.on_failure || 'continue';\n\nif (onFailure === 'abort') {\n  throw new Error('Pre-process webhook failed: ' + JSON.stringify($json.error));\n}\n\n// Continue with original data\nreturn {\n  ...task,\n  _pre_process_failed: true,\n  _pre_process_error: $json.error\n};"
+			},
+			"type": "n8n-nodes-base.code",
+			"typeVersion": 2,
+			"position": [-304, 464],
+			"id": "c08aa34b-20d1-4dad-8deb-c9251fbc461a",
+			"name": "Handle Pre-Process Failure"
+		},
+		{
+			"parameters": {
+				"conditions": {
+					"options": {
+						"caseSensitive": true,
+						"leftValue": "",
+						"typeValidation": "strict",
+						"version": 1
+					},
+					"conditions": [
+						{
+							"id": "post-process-enabled",
+							"leftValue": "={{ $('JSON Parse').item.json.extra.current_stage_config.post_process.enabled }}",
+							"rightValue": true,
+							"operator": {
+								"type": "boolean",
+								"operation": "equals"
+							}
+						}
+					],
+					"combinator": "and"
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.if",
+			"typeVersion": 2,
+			"position": [1776, 576],
+			"id": "0d61d001-e66e-43d0-a53e-5ab4680c5e6a",
+			"name": "Check Post-Process"
+		},
+		{
+			"parameters": {
+				"method": "={{ $('JSON Parse').item.json.extra?.post_process?.webhook_method || 'POST' }}",
+				"url": "={{ $('JSON Parse').item.json.extra?.post_process?.webhook_url }}",
+				"sendBody": true,
+				"specifyBody": "json",
+				"jsonBody": "={{ JSON.stringify((function() { const cfg = $('JSON Parse').item.json.extra?.post_process; const src = cfg?.input_source || 'output_only'; if (src === 'output_only') return $json.result; if (src === 'input_and_output') return { input: $('JSON Parse').item.json.data, output: $json.result }; return $json.result; })()) }}",
+				"options": {
+					"timeout": 30000
+				}
+			},
+			"type": "n8n-nodes-base.httpRequest",
+			"typeVersion": 4.3,
+			"position": [2208, 432],
+			"id": "6e5540ff-661f-4850-b0dc-5ec48bd24083",
+			"name": "Execute Post-Process Webhook",
+			"notesInFlow": true,
+			"onError": "continueErrorOutput",
+			"notes": "Push results to external system after AI processing"
+		},
+		{
+			"parameters": {
+				"jsCode": "// Handle Post-Process result\nconst originalResult = $('Add AlongWith Attributes').first().json;\nconst postConfig = $('JSON Parse').first().json.extra?.post_process || {};\nconst onFailure = postConfig.on_failure || 'continue';\n\n// If post-process failed but on_failure = 'continue', proceed with original result\nif ($json.error && onFailure === 'abort') {\n  throw new Error('Post-process webhook failed: ' + JSON.stringify($json.error));\n}\n\n// Return original result (post-process doesn't modify task output)\nreturn {\n  ...originalResult,\n  _post_process_executed: true,\n  _post_process_response: $json.error ? null : $json\n};"
+			},
+			"type": "n8n-nodes-base.code",
+			"typeVersion": 2,
+			"position": [2416, 432],
+			"id": "70eaeaa8-8818-4277-b33c-53c7ac7ecec8",
+			"name": "Handle Post-Process Result"
+		},
+		{
+			"parameters": {
+				"conditions": {
+					"options": {
+						"caseSensitive": true,
+						"leftValue": "",
+						"typeValidation": "strict",
+						"version": 1
+					},
+					"conditions": [
+						{
+							"id": "is-merge-type",
+							"leftValue": "={{ $json.extra.current_stage_config.post_process.type }}",
+							"rightValue": "merge_with_input",
+							"operator": {
+								"type": "string",
+								"operation": "equals"
+							}
+						}
+					],
+					"combinator": "and"
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.if",
+			"typeVersion": 2,
+			"position": [1984, 688],
+			"id": "2149a2e0-f148-496e-a39b-d81c4c383cea",
+			"name": "Check Post-Process Type"
+		},
+		{
+			"parameters": {
+				"jsCode": "// Merge With Input - post-process that merges AI's partial output with original input\nconst originalTask = $('JSON Parse').first().json;\nconst aiResult = $('Add AlongWith Attributes').first().json;\nconst postConfig = originalTask.extra?.post_process || {};\n\nconst mergeKey = postConfig.merge_key || 'code';\nconst outputArrayPath = postConfig.merge_array_path || 'output_data';\nconst inputArrayPath = postConfig.input_array_path || 'output_data';\n\n// 1. Get the full array from the original input_data\nconst inputData = typeof originalTask.data === 'string' \n  ? JSON.parse(originalTask.data) \n  : (originalTask.data || {});\nconst fullArray = inputData[inputArrayPath] || [];\n\n// 2. Get the partial corrections from AI output\nconst aiOutput = aiResult.result || {};\nconst corrections = aiOutput[outputArrayPath] || [];\n\n// 3. Build a lookup map from corrections\nconst correctionMap = new Map();\ncorrections.forEach(item => {\n  const key = item[mergeKey];\n  if (key) correctionMap.set(key, item);\n});\n\n// 4. Merge: replace items that have corrections, keep originals for the rest\nconst merged = fullArray.map(original => {\n  const key = original[mergeKey];\n  return correctionMap.has(key) ? correctionMap.get(key) : original;\n});\n\n// 5. Rebuild the result with the merged array\nconst mergedResult = {\n  ...aiOutput,    // Keep other AI outputs like batch_info\n  [outputArrayPath]: merged,\n  batch_info: {\n    ...(aiOutput.batch_info || {}),\n    total_items: merged.length,\n    corrected_items: corrections.length,\n    unchanged_items: merged.length - corrections.length\n  }\n};\n\nreturn {\n  ...aiResult,\n  result: mergedResult,\n  _merge_applied: true,\n  _merge_stats: {\n    total: merged.length,\n    corrected: corrections.length,\n    unchanged: merged.length - corrections.length\n  }\n};"
+			},
+			"type": "n8n-nodes-base.code",
+			"typeVersion": 2,
+			"position": [2208, 688],
+			"id": "5946d6aa-5851-44c2-ac1c-31cc69fce6d5",
+			"name": "Merge With Input"
+		},
+		{
+			"parameters": {
+				"content": "## Gemini Agent with Rotation Key - PreGen",
+				"height": 752,
+				"width": 960,
+				"color": 6
+			},
+			"type": "n8n-nodes-base.stickyNote",
+			"position": [-848, 160],
+			"typeVersion": 1,
+			"id": "943ca30e-9ac4-4970-9f75-8f8fbc3e2db7",
+			"name": "Sticky Note4"
+		},
+		{
+			"parameters": {
+				"content": "## Gemini Agent with Rotation Key - PostGen",
+				"height": 752,
+				"width": 864,
+				"color": 6
+			},
+			"type": "n8n-nodes-base.stickyNote",
+			"position": [1712, 160],
+			"typeVersion": 1,
+			"id": "75e97452-7edb-4059-bed2-18d980de8477",
+			"name": "Sticky Note5"
+		},
+		{
+			"parameters": {
+				"content": "## Get Task",
+				"height": 752,
+				"width": 1024
+			},
+			"type": "n8n-nodes-base.stickyNote",
+			"position": [-1888, 160],
+			"typeVersion": 1,
+			"id": "2dff2d81-75b3-4299-a482-008649fa901b",
+			"name": "Sticky Note6"
+		},
+		{
+			"parameters": {
+				"jsCode": "// 1. Lấy kết quả từ RPC call (Node ngay phía trước)\nconst rpcRaw = $input.first().json;\nconst rpcResult = Array.isArray(rpcRaw) ? rpcRaw[0] : rpcRaw;\n\n// 2. Lấy thông tin từ node Determine Next Stage\nconst determineNode = $('Determine Next Stage').item.json;\nconst nextAction = determineNode.action;\n\n// 3. Chuẩn bị dữ liệu task sạch\nconst taskStatus = {\n  is_last_task: rpcResult?.is_last_task || false,\n  finished_count: rpcResult?.finished_count || 0,\n  total_count: rpcResult?.total_count || 0,\n  next_action: nextAction\n};\n\n// 4. Logic Decision\nconst isStandardBranch = nextAction === 'create_tasks_for_branches';\nconst isLastMergeTask = ((nextAction === \"wait_for_merge\" || nextAction === \"many_to_one\") && taskStatus.is_last_task === true);\n\n// 5. Early termination: nếu không cần đi tiếp thì dừng workflow tại đây\nif (!isStandardBranch && !isLastMergeTask) {\n  return []; // Terminate: chưa đủ điều kiện để tạo task tiếp theo\n}\n\nreturn {\n  ...taskStatus,\n  should_proceed: true\n};\n"
+			},
+			"type": "n8n-nodes-base.code",
+			"typeVersion": 2,
+			"position": [3440, 576],
+			"id": "f8f0f47f-e2cd-44df-9572-37e2e98c95ed",
+			"name": "Finish Task & Check Merge",
+			"executeOnce": true
+		},
+		{
+			"parameters": {
+				"tableId": "ai_tasks",
+				"dataToSend": "autoMapInputData"
+			},
+			"type": "n8n-nodes-base.supabase",
+			"typeVersion": 1,
+			"position": [4656, 576],
+			"id": "8b3f2955-fc3c-41cc-b2f8-abef8c44cb58",
+			"name": "Create a row",
+			"credentials": {
+				"supabaseApi": {
+					"id": "tOzBo3n0Kkt5Bt41",
+					"name": "Supabase Account Tony"
+				}
+			}
+		},
+		{
+			"parameters": {
+				"mode": "raw",
+				"jsonOutput": "={{ $json }}",
+				"options": {}
+			},
+			"type": "n8n-nodes-base.set",
+			"typeVersion": 3.4,
+			"position": [-48, 592],
+			"id": "095128a6-5cc6-4b89-a323-1abbfdf355fa",
+			"name": "Final Result"
+		},
+		{
+			"parameters": {
+				"conditions": {
+					"options": {
+						"caseSensitive": true,
+						"leftValue": "",
+						"typeValidation": "strict",
+						"version": 1
+					},
+					"conditions": [
+						{
+							"id": "is-merge-action",
+							"leftValue": "={{ $('Determine Next Stage').item.json.action }}",
+							"rightValue": "wait_for_merge",
+							"operator": {
+								"type": "string",
+								"operation": "equals"
+							}
+						}
+					],
+					"combinator": "and"
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.if",
+			"typeVersion": 2,
+			"position": [3648, 576],
+			"id": "f08c87a3-c188-49e5-bf8f-35ac1005d478",
+			"name": "Branch Merge vs Standard"
+		},
+		{
+			"parameters": {
+				"operation": "getAll",
+				"tableId": "ai_tasks",
+				"returnAll": true,
+				"matchType": "allFilters",
+				"filters": {
+					"conditions": [
+						{
+							"keyName": "batch_id",
+							"condition": "eq",
+							"keyValue": "={{ $('JSON Parse').item.json.batch_id }}"
+						},
+						{
+							"keyName": "stage_key",
+							"condition": "eq",
+							"keyValue": "={{ $('JSON Parse').item.json.stage_key }}"
+						},
+						{
+							"keyName": "status",
+							"condition": "eq",
+							"keyValue": "completed"
+						}
+					]
+				}
+			},
+			"type": "n8n-nodes-base.supabase",
+			"typeVersion": 1,
+			"position": [4064, 672],
+			"id": "056d4560-5f70-4567-afc8-df4280c4b411",
+			"name": "Fetch Sibling Tasks",
+			"credentials": {
+				"supabaseApi": {
+					"id": "tOzBo3n0Kkt5Bt41",
+					"name": "Supabase Account Tony"
+				}
+			}
+		},
+		{
+			"parameters": {
+				"jsCode": "// Aggregate & Prepare Merge Task - FIXED (JSON parsing + JSONB safety)\n// Input: $input.all() = completed sibling tasks from \"Fetch Sibling Tasks\" (Supabase rows)\n// Goal: aggregate their output_data, then build tasks array for \"Create Next Stage Tasks\"\n\n// 1. Get the original task context and merge config from earlier nodes\nconst originalTask = $('JSON Parse').first().json;\nconst determineResult = $('Determine Next Stage').first().json;\nconst nextStageConfigs = determineResult.next_stage_configs || [];\n\n// Get merge_path from current_stage_config\nconst currentStageConfig = originalTask.extra?.current_stage_config || {};\nconst mergePath = currentStageConfig.merge_path || null;\n\n// 2. Collect all completed sibling tasks from Fetch Sibling Tasks\nconst siblingTasks = $input.all().map(item => item.json);\nconst completedTasks = siblingTasks.filter(t => t.status === 'completed');\n\nif (completedTasks.length === 0) {\n  throw new Error('No completed sibling tasks found to merge');\n}\n\n// 3. Parse output_data safely (may be string or object from Supabase)\nconst allOutputs = completedTasks.map(t => {\n  let data = t.output_data;\n  if (typeof data === 'string') {\n    try {\n      data = JSON.parse(data);\n    } catch (e) {\n      // keep as-is if not valid JSON\n    }\n  }\n  return data;\n}).filter(d => d != null);\n\n// 4. Aggregate based on merge_path\nlet aggregatedData;\nif (mergePath) {\n  // Extract and concatenate the specific field from each output\n  aggregatedData = allOutputs.reduce((acc, curr) => {\n    const val = curr?.[mergePath];\n    if (Array.isArray(val)) {\n      return acc.concat(val);\n    } else if (val != null) {\n      acc.push(val);\n    }\n    return acc;\n  }, []);\n} else {\n  // No merge_path: just collect all outputs as an array\n  aggregatedData = allOutputs;\n}\n\n// 5. Build the merged input_data for the next stage\nconst mergedInputData = mergePath\n  ? { [mergePath]: aggregatedData }\n  : { merged_data: aggregatedData };\n\n// 6. Helper: extract stage key from template ID\nfunction extractStageKey(templateId) {\n  if (!templateId) return 'unknown_stage';\n  const stepMatch = templateId.match(/^[0-9a-fA-F-]+_(.+)_step_\\d+$/);\n  if (stepMatch) return stepMatch[1];\n  const match = templateId.match(/^[0-9a-fA-F-]+_(.+)$/);\n  return match ? match[1] : templateId;\n}\n\n// 7. Build tasks array matching what \"Create Next Stage Tasks\" expects\nconst currentStepNumber = parseInt(originalTask.step_number) || 1;\nconst rootId = originalTask.root_task_id || originalTask.supabase_task_id;\nconst hierarchyPath = [...(originalTask.hierarchy_path || []), originalTask.supabase_task_id];\nconst currentStageKey = originalTask.stage_key || 'unknown_stage';\n\nconst tasks = nextStageConfigs.map((nextCfg, idx) => {\n  const nextTplId = nextCfg.template_id || nextCfg.prompt_id;\n  const nextStageKey = extractStageKey(nextTplId);\n  const taskTypeMatch = nextTplId ? nextTplId.match(/^[0-9a-f-]+_(.+)$/) : null;\n  const taskType = taskTypeMatch ? taskTypeMatch[1] : nextStageKey;\n\n  return {\n    prompt_template_id: nextTplId,\n    task_type: taskType,\n    input_data: mergedInputData,\n    parent_task_id: originalTask.supabase_task_id,\n    root_task_id: rootId,\n    hierarchy_path: hierarchyPath,\n    user_id: originalTask.user_id || null,\n    batch_id: nextCfg.batch_grouping === 'isolated' ? null : (originalTask.batch_id || null),\n    launch_id: originalTask.launch_id || null,\n    test_mode: originalTask.test_mode || false,\n    sequence: idx + 1,\n    total_steps: nextStageConfigs.length,\n    status: 'plan',\n    stage_key: nextStageKey,\n    step_number: currentStepNumber + 1,\n    split_group_id: originalTask.split_group_id,\n    requires_approval: nextCfg.requires_approval || false,\n    extra: {\n      current_stage_config: {\n        template_id: nextTplId,\n        cardinality: nextCfg.cardinality || 'one_to_one',\n        split_path: nextCfg.split_path || null,\n        split_mode: nextCfg.split_mode || 'per_item',\n        merge_path: nextCfg.merge_path || null,\n        output_mapping: nextCfg.output_mapping || 'result'\n      },\n      parent_stage_key: currentStageKey,\n      parent_task_id: originalTask.supabase_task_id,\n      _merged_from_count: completedTasks.length\n    }\n  };\n});\n\n// 8. Return in the format that \"Create Next Stage Tasks\" expects\nreturn {\n  action: tasks.length > 0 ? 'create_tasks_for_branches' : 'terminate',\n  tasks: tasks,\n  total_count: tasks.length,\n  task_id: originalTask.supabase_task_id\n};"
+			},
+			"type": "n8n-nodes-base.code",
+			"typeVersion": 2,
+			"position": [4272, 672],
+			"id": "cef38532-4d35-4b4c-8a31-101e4011b1bb",
+			"name": "Aggregate & Prepare Merge Task"
+		},
+		{
+			"parameters": {
+				"jsCode": "// Call Supabase RPC: increment_finished_task\nconst task = $('JSON Parse').first().json;\nlet result = $('Input - Submit Result Phase1').first().json.result;\n\n// Ensure result is a native object for JSONB column\nif (typeof result === 'string') {\n  try { result = JSON.parse(result); } catch(e) { /* keep as string if not valid JSON */ }\n}\n\nreturn {\n  p_batch_id: task.batch_id,\n  p_task_id: task.supabase_task_id,\n  p_output_result: result\n}"
+			},
+			"type": "n8n-nodes-base.code",
+			"typeVersion": 2,
+			"position": [3056, 576],
+			"id": "81d98ecb-2d3b-4bbc-8121-6aa6b53c98d3",
+			"name": "Prepare Package To Send",
+			"executeOnce": true
+		},
+		{
+			"parameters": {
+				"tableId": "rpc/increment_finished_task",
+				"dataToSend": "autoMapInputData"
+			},
+			"type": "n8n-nodes-base.supabase",
+			"typeVersion": 1,
+			"position": [3248, 576],
+			"id": "07838ace-716a-41f2-ba53-fa8678e12b4d",
+			"name": "Call RPC",
+			"credentials": {
+				"supabaseApi": {
+					"id": "tOzBo3n0Kkt5Bt41",
+					"name": "Supabase Account Tony"
+				}
+			}
+		},
+		{
+			"parameters": {
+				"operation": "update",
+				"dataTableId": {
+					"__rl": true,
+					"value": "LT77b3PENHxZuRwj",
+					"mode": "list",
+					"cachedResultName": "n8n-task-queue",
+					"cachedResultUrl": "/projects/B8LPf0gekMWp8vZq/datatables/LT77b3PENHxZuRwj"
+				},
+				"filters": {
+					"conditions": [
+						{
+							"keyName": "task_id",
+							"keyValue": "={{ $('Input - Submit Result Phase1').item.json.task_id }}"
+						}
+					]
+				},
+				"columns": {
+					"mappingMode": "defineBelow",
+					"value": {
+						"status": "generated",
+						"result": "={{ JSON.stringify($('Input - Submit Result Phase1').item.json.result) }}"
+					},
+					"matchingColumns": [],
+					"schema": [
+						{
+							"id": "prompt",
+							"displayName": "prompt",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "task_id",
+							"displayName": "task_id",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "data",
+							"displayName": "data",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "extra",
+							"displayName": "extra",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "ai_settings",
+							"displayName": "ai_settings",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "status",
+							"displayName": "status",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": false
+						},
+						{
+							"id": "task_type",
+							"displayName": "task_type",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "agent_id",
+							"displayName": "agent_id",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "result",
+							"displayName": "result",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": false
+						},
+						{
+							"id": "related_task_id",
+							"displayName": "related_task_id",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "supabase_task_id",
+							"displayName": "supabase_task_id",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "batch_id",
+							"displayName": "batch_id",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "batch_priority",
+							"displayName": "batch_priority",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "user_id",
+							"displayName": "user_id",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "sequence",
+							"displayName": "sequence",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "number",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "test_mode",
+							"displayName": "test_mode",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "number",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "requires_approval",
+							"displayName": "requires_approval",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "number",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "split_group_id",
+							"displayName": "split_group_id",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "next_stage_template_id",
+							"displayName": "next_stage_template_id",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "prompt_template_id",
+							"displayName": "prompt_template_id",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "step_execution_id",
+							"displayName": "step_execution_id",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "orchestrator_execution_id",
+							"displayName": "orchestrator_execution_id",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "next_task_config",
+							"displayName": "next_task_config",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "total_steps",
+							"displayName": "total_steps",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "step_number",
+							"displayName": "step_number",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "stage_key",
+							"displayName": "stage_key",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "hierarchy_path",
+							"displayName": "hierarchy_path",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "root_task_id",
+							"displayName": "root_task_id",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "parent_task_id",
+							"displayName": "parent_task_id",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "step_id",
+							"displayName": "step_id",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "phase_code",
+							"displayName": "phase_code",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "lo_code",
+							"displayName": "lo_code",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "launch_id",
+							"displayName": "launch_id",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						}
+					],
+					"attemptToConvertTypes": false,
+					"convertFieldsToString": false
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.dataTable",
+			"typeVersion": 1,
+			"position": [3440, 768],
+			"id": "21392c59-070e-45a8-b90d-85f3c651be54",
+			"name": "Update row(s)",
+			"executeOnce": true
+		},
+		{
+			"parameters": {
+				"workflowId": {
+					"__rl": true,
+					"value": "dTye2k0BhUUjRfee",
+					"mode": "list",
+					"cachedResultUrl": "/workflow/dTye2k0BhUUjRfee",
+					"cachedResultName": "[Base] Sync Back to Supabase"
+				},
+				"workflowInputs": {
+					"mappingMode": "defineBelow",
+					"value": {},
+					"matchingColumns": [],
+					"schema": [],
+					"attemptToConvertTypes": false,
+					"convertFieldsToString": true
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.executeWorkflow",
+			"typeVersion": 1.3,
+			"position": [3856, 672],
+			"id": "b3ade346-d325-4ec5-aa2c-97475a5caf85",
+			"name": "Call '[Base] Sync Back to Supabase'",
+			"alwaysOutputData": true
+		},
+		{
+			"parameters": {
+				"operation": "update",
+				"tableId": "ai_tasks",
+				"filters": {
+					"conditions": [
+						{
+							"keyName": "id",
+							"condition": "eq",
+							"keyValue": "={{ $json.supabase_task_id }}"
+						}
+					]
+				},
+				"fieldsUi": {
+					"fieldValues": [
+						{
+							"fieldId": "started_at",
+							"fieldValue": "={{ new Date().toISOString() }}"
+						},
+						{
+							"fieldId": "status",
+							"fieldValue": "processing"
+						}
+					]
+				}
+			},
+			"type": "n8n-nodes-base.supabase",
+			"typeVersion": 1,
+			"position": [-1024, 576],
+			"id": "64ba5ab6-ff04-476b-8ca2-d85d1269721a",
+			"name": "Update Started At",
+			"credentials": {
+				"supabaseApi": {
+					"id": "tOzBo3n0Kkt5Bt41",
+					"name": "Supabase Account Tony"
+				}
+			}
+		}
+	],
+	"connections": {
+		"Get Tasks To Solve": {
+			"main": [
+				[
+					{
+						"node": "Filter A Task",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Filter A Task": {
+			"main": [
+				[
+					{
+						"node": "JSON Parse",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Add AlongWith Attributes": {
+			"main": [
+				[
+					{
+						"node": "Check Post-Process",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Convert MarkdownJSON to JSON": {
+			"main": [
+				[
+					{
+						"node": "Add AlongWith Attributes",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Report Failure",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Wait": {
+			"main": [
+				[
+					{
+						"node": "Get Active Key",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Schedule Trigger": {
+			"main": [
+				[
+					{
+						"node": "Get Tasks To Solve",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"JSON Parse": {
+			"main": [
+				[
+					{
+						"node": "Update Started At",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Get Active Key": {
+			"main": [
+				[
+					{
+						"node": "Gemini API Call",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Stop and Error",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Retry Logic": {
+			"main": [
+				[
+					{
+						"node": "Wait",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Report Failure": {
+			"main": [
+				[
+					{
+						"node": "Retry Logic",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Gemini API Call": {
+			"main": [
+				[
+					{
+						"node": "Convert MarkdownJSON to JSON",
+						"type": "main",
+						"index": 0
+					},
+					{
+						"node": "Report Success",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Report Failure",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Input - Submit Result Phase1": {
+			"main": [
+				[
+					{
+						"node": "Determine Next Stage",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Determine Next Stage": {
+			"main": [
+				[
+					{
+						"node": "Prepare Package To Send",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Create Next Stage Tasks": {
+			"main": [
+				[
+					{
+						"node": "Create a row",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Check Pre-Process": {
+			"main": [
+				[
+					{
+						"node": "Execute Pre-Process Webhook",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Final Result",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Execute Pre-Process Webhook": {
+			"main": [
+				[
+					{
+						"node": "Merge Pre-Process Output",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Handle Pre-Process Failure",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Merge Pre-Process Output": {
+			"main": [
+				[
+					{
+						"node": "Final Result",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Handle Pre-Process Failure": {
+			"main": [
+				[
+					{
+						"node": "Final Result",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Check Post-Process": {
+			"main": [
+				[
+					{
+						"node": "Check Post-Process Type",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Input - Submit Result Phase1",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Execute Post-Process Webhook": {
+			"main": [
+				[
+					{
+						"node": "Handle Post-Process Result",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Handle Post-Process Result",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Handle Post-Process Result": {
+			"main": [
+				[
+					{
+						"node": "Input - Submit Result Phase1",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Check Post-Process Type": {
+			"main": [
+				[
+					{
+						"node": "Merge With Input",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Execute Post-Process Webhook",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Merge With Input": {
+			"main": [
+				[
+					{
+						"node": "Input - Submit Result Phase1",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Finish Task & Check Merge": {
+			"main": [
+				[
+					{
+						"node": "Branch Merge vs Standard",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Final Result": {
+			"main": [
+				[
+					{
+						"node": "Get Active Key",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Branch Merge vs Standard": {
+			"main": [
+				[
+					{
+						"node": "Call '[Base] Sync Back to Supabase'",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Create Next Stage Tasks",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Fetch Sibling Tasks": {
+			"main": [
+				[
+					{
+						"node": "Aggregate & Prepare Merge Task",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Aggregate & Prepare Merge Task": {
+			"main": [
+				[
+					{
+						"node": "Create Next Stage Tasks",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Prepare Package To Send": {
+			"main": [
+				[
+					{
+						"node": "Call RPC",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Call RPC": {
+			"main": [
+				[
+					{
+						"node": "Finish Task & Check Merge",
+						"type": "main",
+						"index": 0
+					},
+					{
+						"node": "Update row(s)",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Call '[Base] Sync Back to Supabase'": {
+			"main": [
+				[
+					{
+						"node": "Fetch Sibling Tasks",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Update Started At": {
+			"main": [
+				[
+					{
+						"node": "Check Pre-Process",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		}
+	},
+	"pinData": {},
+	"meta": {
+		"templateCredsSetupCompleted": true,
+		"instanceId": "3c3655861b945e2f23873d293f97337788a318f9e0823cca507f13751bd70fd7"
+	}
 }

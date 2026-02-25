@@ -289,7 +289,7 @@ export function LauncherPage() {
 
           allTasksToInsert.push({
             task_type: firstStage?.task_type || 'generic',
-            status: 'pending',
+            status: 'plan',
             input_data: processed.input_data,
             launch_id: launchId, // Grouping at Campaign level
             batch_id: batchId,   // Grouping at Row level
@@ -382,7 +382,7 @@ export function LauncherPage() {
             await storage.adapter.createBatch({
               id: execution.id,
               name: `${config.name} - ${row.lessonTitle}`,
-              status: 'pending',
+              status: 'plan',
               orchestrator_config_id: config.id,
               batch_type: 'manual_run',
               created_by: user?.id

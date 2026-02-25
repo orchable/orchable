@@ -1,158 +1,143 @@
 {
-  "nodes": [
-    {
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "minutes",
-              "minutesInterval": 15
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [
-        -720,
-        112
-      ],
-      "id": "ce03775e-c7a8-4035-9808-ac0c7e83956d",
-      "name": "Schedule Trigger (Every 15 min)",
-      "disabled": true
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT id, batch_id, lo_code, retry_count, error_message\nFROM ai_tasks\nWHERE status = 'failed'\n  AND retry_count < 3\nLIMIT 10",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.6,
-      "position": [
-        -480,
-        112
-      ],
-      "id": "2d95111c-fcc0-48a8-bc42-e7456d98a04c",
-      "name": "Get Failed Tasks (retry < 3)",
-      "credentials": {
-        "postgres": {
-          "id": "ojfbhm5YXboBqlko",
-          "name": "Postgres Supabase Tony"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 2
-          },
-          "conditions": [
-            {
-              "id": "cond-1",
-              "leftValue": "={{ $json.id }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        -240,
-        112
-      ],
-      "id": "2f8a2719-35d0-4d35-b47d-373c9b1e2d09",
-      "name": "Has Failed Tasks?"
-    },
-    {
-      "parameters": {},
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [
-        0,
-        240
-      ],
-      "id": "ecc7b004-d3a3-4c65-b61d-961a94af8bf8",
-      "name": "No Failed Tasks"
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "UPDATE ai_tasks SET\n  status = 'pending',\n  retry_count = retry_count + 1,\n  error_message = NULL,\n  started_at = NULL,\n  completed_at = NULL\nWHERE id = '{{ $json.id }}'::uuid\nRETURNING id, retry_count",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.6,
-      "position": [
-        0,
-        0
-      ],
-      "id": "03dac83e-dd9c-4473-8622-49d837a12360",
-      "name": "Reset Task for Retry",
-      "credentials": {
-        "postgres": {
-          "id": "ojfbhm5YXboBqlko",
-          "name": "Postgres Supabase Tony"
-        }
-      }
-    }
-  ],
-  "connections": {
-    "Schedule Trigger (Every 15 min)": {
-      "main": [
-        [
-          {
-            "node": "Get Failed Tasks (retry < 3)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Failed Tasks (retry < 3)": {
-      "main": [
-        [
-          {
-            "node": "Has Failed Tasks?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Has Failed Tasks?": {
-      "main": [
-        [
-          {
-            "node": "Reset Task for Retry",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "No Failed Tasks",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
-  },
-  "pinData": {},
-  "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "3c3655861b945e2f23873d293f97337788a318f9e0823cca507f13751bd70fd7"
-  }
+	"nodes": [
+		{
+			"parameters": {
+				"rule": {
+					"interval": [
+						{
+							"field": "minutes",
+							"minutesInterval": 15
+						}
+					]
+				}
+			},
+			"type": "n8n-nodes-base.scheduleTrigger",
+			"typeVersion": 1.2,
+			"position": [-720, 112],
+			"id": "ce03775e-c7a8-4035-9808-ac0c7e83956d",
+			"name": "Schedule Trigger (Every 15 min)",
+			"disabled": true
+		},
+		{
+			"parameters": {
+				"operation": "executeQuery",
+				"query": "SELECT id, batch_id, lo_code, retry_count, error_message\nFROM ai_tasks\nWHERE status = 'failed'\n  AND retry_count < 3\nLIMIT 10",
+				"options": {}
+			},
+			"type": "n8n-nodes-base.postgres",
+			"typeVersion": 2.6,
+			"position": [-480, 112],
+			"id": "2d95111c-fcc0-48a8-bc42-e7456d98a04c",
+			"name": "Get Failed Tasks (retry < 3)",
+			"credentials": {
+				"postgres": {
+					"id": "ojfbhm5YXboBqlko",
+					"name": "Postgres Supabase Tony"
+				}
+			}
+		},
+		{
+			"parameters": {
+				"conditions": {
+					"options": {
+						"caseSensitive": true,
+						"leftValue": "",
+						"typeValidation": "strict",
+						"version": 2
+					},
+					"conditions": [
+						{
+							"id": "cond-1",
+							"leftValue": "={{ $json.id }}",
+							"rightValue": "",
+							"operator": {
+								"type": "string",
+								"operation": "notEmpty"
+							}
+						}
+					],
+					"combinator": "and"
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.if",
+			"typeVersion": 2.2,
+			"position": [-240, 112],
+			"id": "2f8a2719-35d0-4d35-b47d-373c9b1e2d09",
+			"name": "Has Failed Tasks?"
+		},
+		{
+			"parameters": {},
+			"type": "n8n-nodes-base.noOp",
+			"typeVersion": 1,
+			"position": [0, 240],
+			"id": "ecc7b004-d3a3-4c65-b61d-961a94af8bf8",
+			"name": "No Failed Tasks"
+		},
+		{
+			"parameters": {
+				"operation": "executeQuery",
+				"query": "UPDATE ai_tasks SET\n  status = 'plan',\n  retry_count = retry_count + 1,\n  error_message = NULL,\n  started_at = NULL,\n  completed_at = NULL\nWHERE id = '{{ $json.id }}'::uuid\nRETURNING id, retry_count",
+				"options": {}
+			},
+			"type": "n8n-nodes-base.postgres",
+			"typeVersion": 2.6,
+			"position": [0, 0],
+			"id": "03dac83e-dd9c-4473-8622-49d837a12360",
+			"name": "Reset Task for Retry",
+			"credentials": {
+				"postgres": {
+					"id": "ojfbhm5YXboBqlko",
+					"name": "Postgres Supabase Tony"
+				}
+			}
+		}
+	],
+	"connections": {
+		"Schedule Trigger (Every 15 min)": {
+			"main": [
+				[
+					{
+						"node": "Get Failed Tasks (retry < 3)",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Get Failed Tasks (retry < 3)": {
+			"main": [
+				[
+					{
+						"node": "Has Failed Tasks?",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Has Failed Tasks?": {
+			"main": [
+				[
+					{
+						"node": "Reset Task for Retry",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "No Failed Tasks",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		}
+	},
+	"pinData": {},
+	"meta": {
+		"templateCredsSetupCompleted": true,
+		"instanceId": "3c3655861b945e2f23873d293f97337788a318f9e0823cca507f13751bd70fd7"
+	}
 }

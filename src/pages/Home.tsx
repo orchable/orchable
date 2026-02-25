@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 // ─── Feature data ────────────────────────────────────────────────────────────
 const features = [
@@ -79,6 +80,7 @@ function FeatureCell({ value }: { value: boolean | string }) {
 // ─── Component ───────────────────────────────────────────────────────────────
 export function HomePage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   return (
     <div className="min-h-full">
@@ -119,7 +121,7 @@ export function HomePage() {
                   className="h-12 px-8 bg-gradient-to-r from-primary to-accent text-white shadow-glow"
                   onClick={() => navigate('/designer')}
                 >
-                  Try Free — No Sign-up
+                  {user ? 'Go to Dashboard' : 'Try Free — No Sign-up'}
                   <ArrowRight className="w-5 h-5 ml-2" />
                 </Button>
               </motion.div>
@@ -318,7 +320,7 @@ export function HomePage() {
                 className="w-full"
                 onClick={() => navigate('/designer')}
               >
-                Start Free
+                {user ? 'Go to Dashboard' : 'Start Free'}
               </Button>
             </motion.div>
 
@@ -471,7 +473,7 @@ export function HomePage() {
               onClick={() => navigate('/designer')}
             >
               <Sparkles className="w-5 h-5 mr-2" />
-              Open Designer Free
+              {user ? 'Go to Dashboard' : 'Open Designer Free'}
             </Button>
           </motion.div>
         </motion.div>

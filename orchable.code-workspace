@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "../../../../.gemini/antigravity/brain"
+		},
+		{
+			"path": "../../pbl-asset-tools"
 		}
 	],
 	"settings": {}

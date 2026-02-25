@@ -1,7 +1,7 @@
 import { db } from "../lib/storage/IndexedDBAdapter";
 import { TaskSummary as AiTask } from "../services/executionTrackingService";
 import { PromptTemplate } from "../lib/storage/StorageAdapter";
-import { StepConfig, AISettings } from "../lib/types";
+import { StepConfig, AISettings, Execution } from "../lib/types";
 
 // Types for the worker messages
 export type WorkerMessage =
@@ -79,35 +79,30 @@ async function processTask(task: AiTask) {
 			throw new Error(`Template not found: ${task.prompt_template_id}`);
 		}
 
-		const stageConfig = template.stage_config || {};
+		const stageConfig = (template.stage_config ||
+			{}) as Partial<StepConfig>;
 		let currentInputData: Record<string, unknown> = {
 			...(task.input_data as Record<string, unknown>),
 		};
 
 		// --- PRE-PROCESS WEBHOOK ---
-		if (
-			stageConfig.pre_process?.enabled &&
-			stageConfig.pre_process?.webhook_url
-		) {
+		const preProcess = stageConfig.pre_process;
+		if (preProcess?.enabled && preProcess?.webhook_url) {
 			try {
 				const preResult = await executeWebhook(
 					{
-						webhook_url: stageConfig.pre_process.webhook_url,
-						webhook_method: stageConfig.pre_process.webhook_method,
-						webhook_headers:
-							stageConfig.pre_process.webhook_headers,
+						webhook_url: preProcess.webhook_url,
+						webhook_method: preProcess.webhook_method,
+						webhook_headers: preProcess.webhook_headers,
 					},
 					currentInputData,
 				);
-				const handling =
-					stageConfig.pre_process.output_handling || "merge";
+				const handling = preProcess.output_handling || "merge";
 
 				if (handling === "replace") {
 					currentInputData = preResult as Record<string, unknown>;
 				} else if (handling === "nested") {
-					const field =
-						stageConfig.pre_process.nested_field_name ||
-						"pre_output";
+					const field = preProcess.nested_field_name || "pre_output";
 					currentInputData[field] = preResult;
 				} else {
 					currentInputData = {
@@ -117,7 +112,7 @@ async function processTask(task: AiTask) {
 				}
 			} catch (e) {
 				const error = e as Error;
-				if (stageConfig.pre_process.on_failure === "abort") throw error;
+				if (preProcess.on_failure === "abort") throw error;
 				console.warn(
 					"[Worker] Pre-process failed, continuing:",
 					error.message,
@@ -126,36 +121,56 @@ async function processTask(task: AiTask) {
 		}
 
 		// 3. Build prompt
-		const prompt = buildPrompt(template.prompt_text, currentInputData);
+		const prompt = buildPrompt(template.template, currentInputData);
 
 		// 4. Call Gemini
-		let result = await callGemini(prompt, stageConfig);
+		const extra = (task.extra || {}) as Record<string, unknown>;
+		const taskAiSettings = (extra.ai_settings as Partial<AISettings>) || {};
+		const templateSettings =
+			(template.default_ai_settings as Partial<AISettings>) || {};
+		const mergedAiSettings = {
+			...templateSettings,
+			...taskAiSettings,
+		} as AISettings;
+
+		let result = await callGemini(prompt, mergedAiSettings);
+
+		// --- SUPPORT: return-along-with ---
+		const returnAlongWith = (extra["return-along-with"] as string[]) || [];
+		if (Array.isArray(returnAlongWith) && returnAlongWith.length > 0) {
+			const inputData =
+				(task.input_data as Record<string, unknown>) || {};
+			for (const key of returnAlongWith) {
+				if (Object.prototype.hasOwnProperty.call(inputData, key)) {
+					(result as Record<string, unknown>)[key] = inputData[key];
+				}
+			}
+		}
 
 		// --- POST-PROCESS WEBHOOK & MERGING ---
-		if (stageConfig.post_process?.enabled) {
-			const postConfig = stageConfig.post_process;
-
+		const postProcess = stageConfig.post_process;
+		if (postProcess?.enabled) {
 			// Handle Merge With Input type
-			if (postConfig.type === "merge_with_input") {
+			if (postProcess.type === "merge_with_input") {
 				result = applyMergeWithInput(
 					result as Record<string, unknown>,
 					currentInputData,
 					{
-						merge_key: postConfig.merge_key,
-						merge_array_path: postConfig.merge_array_path,
-						input_array_path: postConfig.input_array_path,
+						merge_key: postProcess.merge_key,
+						merge_array_path: postProcess.merge_array_path,
+						input_array_path: postProcess.input_array_path,
 					},
 				);
 			}
 
 			// Execute Webhook if configured
-			if (postConfig.webhook_url) {
+			if (postProcess.webhook_url) {
 				try {
 					await executeWebhook(
 						{
-							webhook_url: postConfig.webhook_url,
-							webhook_method: postConfig.webhook_method,
-							webhook_headers: postConfig.webhook_headers,
+							webhook_url: postProcess.webhook_url,
+							webhook_method: postProcess.webhook_method,
+							webhook_headers: postProcess.webhook_headers,
 						},
 						{
 							input: currentInputData,
@@ -164,7 +179,7 @@ async function processTask(task: AiTask) {
 					);
 				} catch (e) {
 					const error = e as Error;
-					if (postConfig.on_failure === "abort") throw error;
+					if (postProcess.on_failure === "abort") throw error;
 					console.warn(
 						"[Worker] Post-process failed, continuing:",
 						error.message,
@@ -179,6 +194,11 @@ async function processTask(task: AiTask) {
 			output_data: result,
 			completed_at: new Date().toISOString(),
 		});
+
+		// 5.1 Update Batch Counters
+		if (task.batch_id) {
+			await updateBatchCounters(task.batch_id, true);
+		}
 
 		self.postMessage({
 			type: "PROGRESS",
@@ -195,6 +215,11 @@ async function processTask(task: AiTask) {
 			status: "failed",
 			error_message: err.message,
 		});
+
+		// Update Batch Counters on failure
+		if (task.batch_id) {
+			await updateBatchCounters(task.batch_id, false);
+		}
 		self.postMessage({
 			type: "ERROR",
 			taskId: task.id,
@@ -210,12 +235,19 @@ function updateTaskStatus(id: string, status: string) {
 
 function buildPrompt(template: string, data: Record<string, unknown>) {
 	let prompt = template;
-	// Replace variables
-	Object.entries(data).forEach(([key, value]) => {
-		const placeholder = new RegExp(`{{${key}}}`, "g");
-		const replacement =
-			typeof value === "object" ? JSON.stringify(value) : String(value);
-		prompt = prompt.replace(placeholder, replacement);
+
+	// Support both %%key%% (n8n default) and {{key}} (legacy/codebase)
+	const regex = /%%\s*([\w_]+)\s*%%|{{\s*([\w_]+)\s*}}/g;
+
+	prompt = prompt.replace(regex, (match, key1, key2) => {
+		const key = key1 || key2;
+		if (Object.prototype.hasOwnProperty.call(data, key)) {
+			const val = data[key];
+			return typeof val === "object"
+				? JSON.stringify(val, null, 2)
+				: String(val);
+		}
+		return match;
 	});
 
 	// Also handle %%input_data%% macro if present (compatibility)
@@ -229,8 +261,7 @@ function buildPrompt(template: string, data: Record<string, unknown>) {
 	return prompt;
 }
 
-async function callGemini(prompt: string, config: Partial<StepConfig>) {
-	const aiSettings = config.ai_settings as AISettings | undefined;
+async function callGemini(prompt: string, aiSettings: AISettings) {
 	const model = aiSettings?.model_id || "gemini-2.0-flash";
 	const api = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${currentApiKey}`;
 
@@ -350,7 +381,8 @@ async function handleNextStages(
 
 	if (cardinality === "one_to_many" || cardinality === "1:N") {
 		const splitMode = stageConfig.split_mode || "per_item";
-		const splitPath = stageConfig.split_path || "result"; // n8n defaults to 'result' or split_path
+		const splitPath: string =
+			(stageConfig.split_path as string) || "result"; // n8n defaults to 'result' or split_path
 		const items = getValueByPath(result, splitPath);
 
 		if (Array.isArray(items)) {
@@ -362,7 +394,9 @@ async function handleNextStages(
 					const newTasks = items.map((item, idx) => ({
 						id: crypto.randomUUID(),
 						batch_id: task.batch_id,
-						stage_key: nextTemplate.stage_key,
+						stage_key:
+							nextTemplate.stage_key ||
+							extractStageKey(nextTemplate.id),
 						step_number: (task.step_number || 0) + 1,
 						status: "plan",
 						input_data: {
@@ -373,13 +407,31 @@ async function handleNextStages(
 						},
 						parent_task_id: task.id,
 						root_task_id: task.root_task_id || task.id,
+						hierarchy_path: [
+							...(task.hierarchy_path || []),
+							task.id,
+						],
+						launch_id:
+							task.launch_id ||
+							((task as unknown as Record<string, unknown>)
+								.launch_id as string),
+						split_group_id:
+							((task as unknown as Record<string, unknown>)
+								.split_group_id as string) || task.id,
+						task_type: extractStageKey(nextTemplate.id),
+						prompt_template_id: nextTemplate.id,
 						created_at: new Date().toISOString(),
 						sequence: idx + 1,
+						extra: {
+							current_stage_config: nextTemplate.stage_config,
+							parent_stage_key: task.stage_key,
+							parent_task_id: task.id,
+						},
 					}));
 					await db.ai_tasks.bulkAdd(newTasks as unknown as AiTask[]);
 				}
 			} else if (splitMode === "per_batch") {
-				const batchSize = stageConfig.batch_size || 10;
+				const batchSize = (stageConfig.batch_size as number) || 10;
 				for (const nextTemplateId of nextTemplateIds) {
 					const nextTemplate =
 						await db.prompt_templates.get(nextTemplateId);
@@ -395,7 +447,9 @@ async function handleNextStages(
 						newTasks.push({
 							id: crypto.randomUUID(),
 							batch_id: task.batch_id,
-							stage_key: nextTemplate.stage_key,
+							stage_key:
+								nextTemplate.stage_key ||
+								extractStageKey(nextTemplate.id),
 							step_number: (task.step_number || 0) + 1,
 							status: "plan",
 							input_data: {
@@ -405,8 +459,26 @@ async function handleNextStages(
 							},
 							parent_task_id: task.id,
 							root_task_id: task.root_task_id || task.id,
+							hierarchy_path: [
+								...(task.hierarchy_path || []),
+								task.id,
+							],
+							launch_id:
+								task.launch_id ||
+								((task as unknown as Record<string, unknown>)
+									.launch_id as string),
+							split_group_id:
+								((task as unknown as Record<string, unknown>)
+									.split_group_id as string) || task.id,
+							task_type: extractStageKey(nextTemplate.id),
+							prompt_template_id: nextTemplate.id,
 							created_at: new Date().toISOString(),
 							sequence: bIdx + 1,
+							extra: {
+								current_stage_config: nextTemplate.stage_config,
+								parent_stage_key: task.stage_key,
+								parent_task_id: task.id,
+							},
 						});
 					}
 					await db.ai_tasks.bulkAdd(newTasks as unknown as AiTask[]);
@@ -422,7 +494,8 @@ async function handleNextStages(
 			const newTask = {
 				id: crypto.randomUUID(),
 				batch_id: task.batch_id,
-				stage_key: nextTemplate.stage_key,
+				stage_key:
+					nextTemplate.stage_key || extractStageKey(nextTemplate.id),
 				step_number: (task.step_number || 0) + 1,
 				status: "plan",
 				input_data: {
@@ -432,7 +505,22 @@ async function handleNextStages(
 				},
 				parent_task_id: task.id,
 				root_task_id: task.root_task_id || task.id,
+				hierarchy_path: [...(task.hierarchy_path || []), task.id],
+				launch_id:
+					task.launch_id ||
+					((task as unknown as Record<string, unknown>)
+						.launch_id as string),
+				split_group_id:
+					((task as unknown as Record<string, unknown>)
+						.split_group_id as string) || task.id,
+				task_type: extractStageKey(nextTemplate.id),
+				prompt_template_id: nextTemplate.id,
 				created_at: new Date().toISOString(),
+				extra: {
+					current_stage_config: nextTemplate.stage_config,
+					parent_stage_key: task.stage_key,
+					parent_task_id: task.id,
+				},
 			};
 
 			await db.ai_tasks.add(newTask as unknown as AiTask);
@@ -481,8 +569,9 @@ async function handleManyToOne(task: AiTask, template: PromptTemplate) {
 		aggregatedData = allOutputs as unknown[];
 	}
 
-	const mergedInputData = mergePath
-		? { [mergePath]: aggregatedData }
+	const mergePathStr = mergePath as string | null;
+	const mergedInputData = mergePathStr
+		? { [mergePathStr]: aggregatedData }
 		: { merged_data: aggregatedData };
 
 	// 3. Create next tasks
@@ -494,7 +583,8 @@ async function handleManyToOne(task: AiTask, template: PromptTemplate) {
 		await db.ai_tasks.add({
 			id: crypto.randomUUID(),
 			batch_id: batchId,
-			stage_key: nextTemplate?.stage_key || "unknown",
+			stage_key:
+				nextTemplate?.stage_key || extractStageKey(nextTemplateId),
 			step_number: (task.step_number || 0) + 1,
 			status: "plan",
 			input_data: {
@@ -503,7 +593,22 @@ async function handleManyToOne(task: AiTask, template: PromptTemplate) {
 			},
 			parent_task_id: task.id,
 			root_task_id: task.root_task_id || task.id,
+			hierarchy_path: [...(task.hierarchy_path || []), task.id],
+			launch_id:
+				task.launch_id ||
+				((task as unknown as Record<string, unknown>)
+					.launch_id as string),
+			split_group_id:
+				((task as unknown as Record<string, unknown>)
+					.split_group_id as string) || task.id,
+			task_type: extractStageKey(nextTemplateId),
+			prompt_template_id: nextTemplateId,
 			created_at: new Date().toISOString(),
+			extra: {
+				current_stage_config: nextTemplate?.stage_config,
+				parent_stage_key: task.stage_key,
+				parent_task_id: task.id,
+			},
 		} as unknown as AiTask);
 	}
 }
@@ -518,6 +623,63 @@ function getValueByPath(obj: unknown, path: string): unknown {
 				(acc as Record<string, unknown>)[part],
 			obj,
 		);
+}
+
+function extractStageKey(templateId: string): string {
+	if (!templateId) return "unknown_stage";
+
+	// 1. Format: uuid_stageName_step_N
+	const stepMatch = templateId.match(/^[0-9a-fA-F-]+_(.+)_step_\d+$/);
+	if (stepMatch) return stepMatch[1];
+
+	// 2. Format: uuid_stageName
+	const match = templateId.match(/^[0-9a-fA-F-]+_(.+)$/);
+	return match ? match[1] : templateId;
+}
+
+async function updateBatchCounters(batchId: string, success: boolean) {
+	try {
+		await db.transaction("rw", db.task_batches, async () => {
+			const batch = await db.task_batches.get(batchId);
+			if (!batch) return;
+
+			const update: Partial<Execution> = {
+				updated_at: new Date().toISOString(),
+			};
+
+			if (success) {
+				update.completed_tasks = (batch.completed_tasks || 0) + 1;
+				update.processing_tasks = Math.max(
+					0,
+					(batch.processing_tasks || 0) - 1,
+				);
+			} else {
+				update.failed_tasks = (batch.failed_tasks || 0) + 1;
+				update.processing_tasks = Math.max(
+					0,
+					(batch.processing_tasks || 0) - 1,
+				);
+			}
+
+			// Check if all done
+			const total = batch.total_tasks || 0;
+			const done =
+				(update.completed_tasks ?? batch.completed_tasks ?? 0) +
+				(update.failed_tasks ?? batch.failed_tasks ?? 0);
+
+			if (done >= total && total > 0) {
+				update.status =
+					(update.failed_tasks ?? batch.failed_tasks ?? 0) > 0
+						? "failed"
+						: "completed";
+				update.completed_at = new Date().toISOString();
+			}
+
+			await db.task_batches.update(batchId, update);
+		});
+	} catch (err) {
+		console.error("[Worker] Failed to update batch counters:", err);
+	}
 }
 
 // --- USAGE HELPERS (Worker context) ---

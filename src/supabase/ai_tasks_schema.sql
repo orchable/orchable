@@ -1,7 +1,7 @@
 create table public.ai_tasks (
   id uuid not null default gen_random_uuid (),
   task_type character varying(50) not null,
-  status character varying(20) not null default 'pending'::character varying,
+  status public.ai_task_status not null default 'plan'::public.ai_task_status,
   input_data jsonb null default '{}'::jsonb,
   output_data jsonb null,
   error_message text null,

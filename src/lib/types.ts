@@ -124,7 +124,15 @@ export type Cardinality =
 	| "one_to_one"
 	| "one_to_many"
 	| "many_to_one";
-export type AIModel = "gemini-flash-latest" | "gemini-pro-latest";
+export type AIModel =
+	| "gemini-flash-latest"
+	| "gemini-pro-latest"
+	| "gemini-2.0-flash"
+	| "gemini-2.0-flash-lite"
+	| "gemini-2.5-flash"
+	| "gemini-2.5-flash-lite"
+	| "gemini-2.5-pro"
+	| "gemini-3-flash-preview";
 
 export interface AISettings {
 	model_id: AIModel;
@@ -136,6 +144,53 @@ export interface AISettings {
 		maxOutputTokens?: number;
 		responseMimeType?: "application/json" | "text/plain";
 	};
+}
+
+export interface AIModelCapabilities {
+	audio_generation?: boolean;
+	batch_api?: boolean;
+	caching?: boolean;
+	code_execution?: boolean;
+	file_search?: boolean;
+	function_calling?: boolean;
+	image_generation?: boolean;
+	live_api?: boolean;
+	search_grounding?: boolean;
+	structured_outputs?: boolean;
+	thinking?: boolean;
+	url_context?: boolean;
+	[key: string]: boolean | undefined;
+}
+
+export interface AIModelSetting {
+	id: string;
+	model_id: string;
+	name: string;
+	category?: string;
+	tagline?: string;
+	description?: string;
+	supported_inputs?: string[];
+	supported_outputs?: string[];
+	input_token_limit?: number;
+	output_token_limit?: number;
+	capabilities?: AIModelCapabilities;
+	thinking_config_type?: "level" | "budget" | "none";
+	recommended_thinking?: string;
+	temperature: number;
+	top_p: number;
+	top_k: number;
+	max_output_tokens: number;
+	generate_content_api?: string;
+	timeout_ms: number;
+	retries: number;
+	is_active: boolean;
+	free_tier_rpm?: number | null;
+	free_tier_tpm?: number | null;
+	free_tier_rpd?: number | null;
+	use_case_tags?: string[];
+	organization_code?: string;
+	created_at: string;
+	updated_at: string;
 }
 
 // Stage Input/Output Contract Types
@@ -250,16 +305,28 @@ export interface Resource {
 
 // Execution Types
 export type ExecutionStatus =
+	| "plan"
 	| "pending"
 	| "running"
+	| "processing"
+	| "awaiting_approval"
+	| "approved"
 	| "completed"
+	| "generated"
 	| "failed"
-	| "cancelled";
+	| "cancelled"
+	| "skipped";
 export type StepStatus =
+	| "plan"
 	| "pending"
 	| "running"
+	| "processing"
+	| "awaiting_approval"
+	| "approved"
 	| "completed"
+	| "generated"
 	| "failed"
+	| "cancelled"
 	| "skipped";
 
 export interface Execution {

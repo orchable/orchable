@@ -200,7 +200,7 @@ export class SupabaseAdapter implements IStorageAdapter {
 		const { data, error } = await supabase
 			.from("lab_orchestrator_configs")
 			.select("*")
-			.eq("created_by", user.id)
+			.or(`created_by.eq.${user.id},created_by.is.null`)
 			.order("created_at", { ascending: false });
 
 		if (error) throw error;
@@ -217,7 +217,7 @@ export class SupabaseAdapter implements IStorageAdapter {
 			.from("lab_orchestrator_configs")
 			.select("*")
 			.eq("id", id)
-			.eq("created_by", user.id)
+			.or(`created_by.eq.${user.id},created_by.is.null`)
 			.maybeSingle();
 
 		if (error) throw error;

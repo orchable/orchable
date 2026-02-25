@@ -1,10 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { configService } from "@/services/configService";
 import { OrchestratorConfig, StepConfig } from "@/lib/types";
+import { useTier } from "@/contexts/TierContext";
 
 export function useConfigs() {
+	const { tier } = useTier();
 	return useQuery({
-		queryKey: ["configs"],
+		queryKey: ["configs", tier],
 		queryFn: configService.listConfigs,
 	});
 }
@@ -108,7 +110,7 @@ export function useSaveOrchestrator() {
 
 				// AI Settings (new)
 				ai_settings: data.ai_settings || {
-					model_id: "gemini-flash-latest",
+					model_id: "gemini-2.0-flash",
 					generationConfig: {
 						temperature: 1.0,
 						topP: 0.95,
@@ -220,8 +222,14 @@ export function useSaveOrchestrator() {
 				toast.success(`Synced ${templateIdMap.size} stage templates!`);
 			} catch (syncError: unknown) {
 				console.error("Failed to sync stage templates:", syncError);
+				const errorMsg =
+					syncError instanceof Error
+						? syncError.message
+						: typeof syncError === "object"
+							? JSON.stringify(syncError)
+							: String(syncError);
 				toast.warning(
-					`Config saved, but template sync failed: ${syncError instanceof Error ? syncError.message : String(syncError)}`,
+					`Config saved, but template sync failed: ${errorMsg}`,
 				);
 			}
 
