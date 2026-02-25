@@ -38,8 +38,8 @@ export function LandingNav() {
                     className="flex items-center gap-2 cursor-pointer group"
                     onClick={() => navigate('/')}
                 >
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                        <Sparkles className="w-6 h-6 text-white" />
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform overflow-hidden">
+                        <img src="/icon.jpg" alt="Orchable Logo" className="w-full h-full object-cover" />
                     </div>
                     <span className="text-xl font-bold tracking-tight">Orchable</span>
                 </div>

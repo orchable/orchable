@@ -8,8 +8,10 @@
 		"start": "next start"
 	},
 	"dependencies": {
+		"@theguild/remark-mermaid": "^0.3.0",
 		"autoprefixer": "latest",
 		"lucide-react": "latest",
+		"mermaid": "^11.12.3",
 		"next": "15.1.6",
 		"nextra": "latest",
 		"nextra-theme-docs": "latest",

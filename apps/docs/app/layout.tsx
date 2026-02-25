@@ -9,11 +9,20 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     return (
         <html lang="en" dir="ltr" suppressHydrationWarning>
             <Head>
-                <link rel="icon" href="/favicon.ico" />
+                <link rel="icon" href="/icon.jpg" type="image/jpeg" />
             </Head>
             <body>
                 <Layout
-                    navbar={<Navbar logo={<b>Orchable Docs</b>} />}
+                    navbar={
+                        <Navbar
+                            logo={
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <img src="/icon.jpg" alt="Orchable Logo" style={{ width: '24px', height: '24px', borderRadius: '4px' }} />
+                                    <b>Orchable Docs</b>
+                                </div>
+                            }
+                        />
+                    }
                     footer={<Footer>2026 © Orchable</Footer>}
                     pageMap={pageMap}
                 >

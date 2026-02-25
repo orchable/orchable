@@ -10,7 +10,9 @@ To start the documentation development server:
 # From the project root
 pnpm run docs:dev
 ```
+
 Or specifically in the `apps/docs` directory:
+
 ```bash
 cd apps/docs
 pnpm run dev

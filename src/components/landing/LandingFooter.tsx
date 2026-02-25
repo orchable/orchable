@@ -70,7 +70,7 @@ export default function LandingFooter() {
                     {/* Logo Column */}
                     <div className="col-span-2">
                         <div className="flex items-center gap-2 font-bold text-xl mb-6">
-                            <Sparkles className="w-6 h-6 text-primary" />
+                            <img src="/icon.jpg" alt="Orchable Logo" className="w-6 h-6 rounded-md object-cover" />
                             Orchable
                         </div>
                         <p className="text-muted-foreground text-sm max-w-xs leading-relaxed">
