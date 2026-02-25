@@ -2,6 +2,7 @@
 	"name": "orchable",
 	"private": true,
 	"version": "0.0.0",
+	"author": "Thành <thanh01.pmt@gmail.com> (https://github.com/thanh01pmt)",
 	"type": "module",
 	"scripts": {
 		"dev": "vite",

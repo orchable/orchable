@@ -76,6 +76,9 @@ export default function LandingFooter() {
                         <p className="text-muted-foreground text-sm max-w-xs leading-relaxed">
                             The next generation of AI pipeline orchestration. Built for teams who want to build faster, scale further, and automate everything.
                         </p>
+                        <p className="text-sm text-gray-500 mt-4">
+                            Built solo by <span className="font-semibold text-gray-700">Thành</span> in Vietnam
+                        </p>
                         <div className="flex items-center gap-4 mt-8">
                             <a href="https://github.com/orchable/orchable" target="_blank" className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white transition-all">
                                 <Github className="w-5 h-5" />

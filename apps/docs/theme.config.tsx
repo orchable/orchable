@@ -13,12 +13,14 @@ const config = {
     docsRepositoryBase: 'https://github.com/orchable/orchable/tree/main/apps/docs',
     footer: {
         text: (
-            <span>
-                {new Date().getFullYear()} ©{' '}
-                <a href="https://orchable.app" target="_blank" rel="noopener noreferrer">
-                    Orchable
-                </a>
-            </span>
+            <div className="flex w-full flex-col items-center justify-between gap-4 md:flex-row">
+                <p className="text-sm">
+                    Made with ❤️ by <strong>Thành</strong> — an indie hacker building Orchable in public.
+                </p>
+                <p className="text-sm text-gray-500">
+                    © {new Date().getFullYear()} Orchable.
+                </p>
+            </div>
         ),
     },
     sidebar: {

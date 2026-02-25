@@ -96,4 +96,16 @@ Orchable is open-source under a **modified Apache 2.0 License**. Self-hosting fo
 
 ---
 
-<p align="center">© 2026 Orchable · Built for AI Builders</p>
+## Built by
+
+**Thành** — Indie hacker from Ho Chi Minh City, Vietnam.  
+Building Orchable in public with 2 hours every evening.
+
+- [Follow on X](https://makexyz.fun) for build updates  
+- [Open issues](https://github.com/orchable/orchable/issues) or submit PRs — every contribution counts ❤️
+
+Star ⭐ if you find it useful!
+
+---
+
+<p align="center">© 2026 Orchable · Built solo by Thành · Built for AI Builders</p>
