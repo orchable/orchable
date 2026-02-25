@@ -69,7 +69,7 @@ export function LandingNav() {
                         variant="ghost"
                         size="sm"
                         className="text-muted-foreground hover:text-foreground"
-                        onClick={() => window.open('https://github.com/MakeXYZFun/orchable', '_blank')}
+                        onClick={() => window.open('https://github.com/orchable/orchable', '_blank')}
                     >
                         <Github className="w-4 h-4 mr-2" />
                         130k {/* Mock stars like Dify */}

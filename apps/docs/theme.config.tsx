@@ -8,9 +8,9 @@ const config = {
         </div>
     ),
     project: {
-        link: 'https://github.com/MakeXYZFun/orchable',
+        link: 'https://github.com/orchable/orchable',
     },
-    docsRepositoryBase: 'https://github.com/MakeXYZFun/orchable/tree/main/apps/docs',
+    docsRepositoryBase: 'https://github.com/orchable/orchable/tree/main/apps/docs',
     footer: {
         text: (
             <span>

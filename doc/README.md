@@ -5,7 +5,9 @@ This directory contains the source documentation for Orchable. The documentation
 ## 🚀 Getting Started
 
 ### 1. Run Documentation Locally
+
 To start the documentation development server:
+
 ```bash
 # From the project root
 pnpm run docs:dev
@@ -26,7 +28,9 @@ To build the documentation for production:
 pnpm run docs:build
 ```
 
+
 ## 📂 Project Structure
+
 
 - `apps/docs`: The Next.js/Nextra application.
   - `apps/docs/content/`: All MDX content files.

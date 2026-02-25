@@ -14,7 +14,8 @@ This guide will help you get familiar with the codebase and how we work with con
 
 ### 🐛 Bug Reports
 
-Found a bug? Please [open an issue](https://github.com/MakeXYZFun/orchable/issues/new?template=bug_report.md) with:
+Found a bug? Please [open an issue](https://github.com/orchable/orchable/issues/new?template=bug_report.md) with:
+
 - A clear title and description
 - Steps to reproduce
 - Expected vs. actual behavior
@@ -22,11 +23,11 @@ Found a bug? Please [open an issue](https://github.com/MakeXYZFun/orchable/issue
 
 ### 💡 Feature Requests
 
-Have an idea? [Start a discussion](https://github.com/MakeXYZFun/orchable/discussions/categories/feature-requests) before opening a PR. We want to make sure the feature aligns with our roadmap and isn't already being worked on.
+Have an idea? [Start a discussion](https://github.com/orchable/orchable/discussions/categories/feature-requests) before opening a PR. We want to make sure the feature aligns with our roadmap and isn't already being worked on.
 
 ### 🌱 Good First Issues
 
-New to the codebase? Browse our [good first issues](https://github.com/MakeXYZFun/orchable/issues?q=label%3A%22good+first+issue%22) — these are well-scoped tasks perfect for getting started.
+New to the codebase? Browse our [good first issues](https://github.com/orchable/orchable/issues?q=label%3A%22good+first+issue%22) — these are well-scoped tasks perfect for getting started.
 
 Don't forget to **link an existing issue or open a new issue** in your PR description.
 
@@ -71,21 +72,24 @@ pnpm run docs:dev
 ## Pull Request Process
 
 1. **Fork** the repository and create your branch from `main`.
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
+
+```bash
+git checkout -b feature/your-feature-name
+```
 
 2. **Make your changes**, following the code style of the existing codebase.
 
 3. **Test your changes** manually in the browser (we're working on automated tests).
 
 4. **Commit** with a clear message:
-   ```
-   feat: add pipeline export to JSON
-   fix: correct stage config not saving on blur
-   docs: update prompt authoring guide
-   ```
-   We follow [Conventional Commits](https://www.conventionalcommits.org/).
+
+```bash
+feat: add pipeline export to JSON
+fix: correct stage config not saving on blur
+docs: update prompt authoring guide
+```
+
+We follow [Conventional Commits](https://www.conventionalcommits.org/).
 
 5. **Push** your branch and open a Pull Request against `main`.
 
@@ -109,6 +113,7 @@ pnpm run docs:dev
 ## Contributor Agreement
 
 By submitting a PR, you agree that:
+
 - Your code may be used in Orchable's cloud service.
 - Orchable may adjust the open-source license as the project evolves.
 
@@ -118,8 +123,8 @@ By submitting a PR, you agree that:
 
 Stuck? Here are your options:
 
-- 💬 **[GitHub Discussions](https://github.com/thanh01pmt/orchable/discussions)** — Ask questions, share ideas
-- 🐛 **[GitHub Issues](https://github.com/thanh01pmt/orchable/issues)** — Report bugs
+- 💬 **[GitHub Discussions](https://github.com/orchable/orchable/discussions)** — Ask questions, share ideas
+- 🐛 **[GitHub Issues](https://github.com/orchable/orchable/issues)** — Report bugs
 - 📖 **[Documentation](https://docs.orchable.app)** — Read the guides
 
 ---

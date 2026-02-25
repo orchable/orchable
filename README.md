@@ -14,8 +14,8 @@
 
 <p align="center">
   <img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-teal" />
-  <img alt="Stars" src="https://img.shields.io/github/stars/MakeXYZFun/orchable?style=flat&color=teal" />
-  <img alt="Issues" src="https://img.shields.io/github/issues/MakeXYZFun/orchable?color=teal" />
+  <img alt="Stars" src="https://img.shields.io/github/stars/orchable/orchable?style=flat&color=teal" />
+  <img alt="Issues" src="https://img.shields.io/github/issues/orchable/orchable?color=teal" />
   <img alt="PRs Welcome" src="https://img.shields.io/badge/PRs-welcome-teal" />
 </p>
 
@@ -50,7 +50,7 @@ Visit [orchable.app](https://orchable.app) and sign in with Google. No setup req
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/MakeXYZFun/orchable.git
+git clone https://github.com/orchable/orchable.git
 cd orchable
 
 # 2. Copy environment variables
@@ -83,9 +83,9 @@ Full architecture details → [docs.orchable.app/architecture/system-overview](h
 
 We love contributions! Please read our [Contributing Guide](./CONTRIBUTING.md) to get started.
 
-- Found a bug? [Open an issue](https://github.com/MakeXYZFun/orchable/issues)
-- Have a feature idea? [Start a discussion](https://github.com/MakeXYZFun/orchable/discussions)
-- Browse [good first issues](https://github.com/MakeXYZFun/orchable/issues?q=label%3A%22good+first+issue%22)
+- Found a bug? [Open an issue](https://github.com/orchable/orchable/issues)
+- Have a feature idea? [Start a discussion](https://github.com/orchable/orchable/discussions)
+- Browse [good first issues](https://github.com/orchable/orchable/issues?q=label%3A%22good+first+issue%22)
 
 ---
 
