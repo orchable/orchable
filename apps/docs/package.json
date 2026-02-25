@@ -4,10 +4,11 @@
 	"private": true,
 	"scripts": {
 		"dev": "next dev",
-		"build": "next build",
+		"build": "next build && pagefind --site out --output-path out/_pagefind",
 		"start": "next start"
 	},
 	"dependencies": {
+		"@pagefind/default-ui": "^1.4.0",
 		"@theguild/remark-mermaid": "^0.3.0",
 		"autoprefixer": "latest",
 		"lucide-react": "latest",
@@ -22,6 +23,7 @@
 	},
 	"devDependencies": {
 		"@tailwindcss/postcss": "^4.2.1",
+		"pagefind": "^1.4.0",
 		"postcss-import": "^16.1.1"
 	}
 }
