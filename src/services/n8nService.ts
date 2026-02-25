@@ -6,8 +6,8 @@ export const n8nService = {
    * Fetches list of workflows from n8n API
    */
   async listWorkflows(): Promise<{ id: string; name: string; active: boolean; tags: any[] }[]> {
-      let baseUrl = localStorage.getItem("lovable_n8n_url") || N8N_BASE_URL;
-      const apiKey = localStorage.getItem("lovable_n8n_api_key"); 
+      let baseUrl = localStorage.getItem("orchable_n8n_url") || N8N_BASE_URL;
+      const apiKey = localStorage.getItem("orchable_n8n_api_key"); 
 
       if (!baseUrl || !apiKey) {
           throw new Error("Missing n8n configuration (URL or API Key)");
@@ -47,8 +47,8 @@ export const n8nService = {
    * Fetch workflow by ID
    */
   async getWorkflow(workflowId: string): Promise<any> {
-      const baseUrl = localStorage.getItem("lovable_n8n_url") || N8N_BASE_URL;
-      const apiKey = localStorage.getItem("lovable_n8n_api_key");
+      const baseUrl = localStorage.getItem("orchable_n8n_url") || N8N_BASE_URL;
+      const apiKey = localStorage.getItem("orchable_n8n_api_key");
 
       if (!baseUrl || !apiKey) throw new Error("Missing n8n config");
 
@@ -68,8 +68,8 @@ export const n8nService = {
    * Fetches full workflow details to extract webhook URL
    */
   async getWorkflowWebhook(workflowId: string): Promise<{ url: string; method: 'GET' | 'POST' } | null> {
-      const baseUrl = localStorage.getItem("lovable_n8n_url") || N8N_BASE_URL;
-      const apiKey = localStorage.getItem("lovable_n8n_api_key");
+      const baseUrl = localStorage.getItem("orchable_n8n_url") || N8N_BASE_URL;
+      const apiKey = localStorage.getItem("orchable_n8n_api_key");
 
       if (!baseUrl || !apiKey) return null;
 
@@ -110,7 +110,7 @@ export const n8nService = {
     launchId?: string;
     batchId?: string;
   }): Promise<void> {
-    const baseUrl = localStorage.getItem("lovable_n8n_url") || N8N_BASE_URL;
+    const baseUrl = localStorage.getItem("orchable_n8n_url") || N8N_BASE_URL;
 
     // If no URL configured, warn and skip (or mock)
     if (!baseUrl) {
@@ -123,14 +123,14 @@ export const n8nService = {
     // Spec: The compiler generates webhook with path = config.id
     
     // Legacy fallback (optional, can be toggled via settings if needed)
-    const masterSlug = localStorage.getItem("lovable_n8n_master_slug");
+    const masterSlug = localStorage.getItem("orchable_n8n_master_slug");
     
     // If masterSlug is explicitly set AND it's not the default 'master-orchestrator', 
     // user might want to use it. But the new architecture favors configId.
     // Let's use configId as slug.
     const slug = data.configId; 
     
-    const useTest = localStorage.getItem("lovable_n8n_use_test_webhook") === 'true';
+    const useTest = localStorage.getItem("orchable_n8n_use_test_webhook") === 'true';
     const pathPrefix = useTest ? 'webhook-test' : 'webhook';
 
     const response = await fetch(
@@ -155,8 +155,8 @@ export const n8nService = {
    * Create a new workflow in n8n
    */
   async createWorkflow(workflowJson: any): Promise<any> {
-      const baseUrl = localStorage.getItem("lovable_n8n_url") || N8N_BASE_URL;
-      const apiKey = localStorage.getItem("lovable_n8n_api_key");
+      const baseUrl = localStorage.getItem("orchable_n8n_url") || N8N_BASE_URL;
+      const apiKey = localStorage.getItem("orchable_n8n_api_key");
       
       if (!baseUrl || !apiKey) throw new Error("Missing n8n config");
       
@@ -181,8 +181,8 @@ export const n8nService = {
    * Update existing workflow
    */
   async updateWorkflow(id: string, workflowJson: any): Promise<any> {
-      const baseUrl = localStorage.getItem("lovable_n8n_url") || N8N_BASE_URL;
-      const apiKey = localStorage.getItem("lovable_n8n_api_key");
+      const baseUrl = localStorage.getItem("orchable_n8n_url") || N8N_BASE_URL;
+      const apiKey = localStorage.getItem("orchable_n8n_api_key");
 
       if (!baseUrl || !apiKey) throw new Error("Missing n8n config");
 
@@ -207,8 +207,8 @@ export const n8nService = {
    * Activate workflow
    */
   async activateWorkflow(id: string, active: boolean = true): Promise<any> {
-    const baseUrl = localStorage.getItem("lovable_n8n_url") || N8N_BASE_URL;
-    const apiKey = localStorage.getItem("lovable_n8n_api_key");
+    const baseUrl = localStorage.getItem("orchable_n8n_url") || N8N_BASE_URL;
+    const apiKey = localStorage.getItem("orchable_n8n_api_key");
 
     if (!baseUrl || !apiKey) throw new Error("Missing n8n config");
 

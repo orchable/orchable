@@ -27,35 +27,35 @@ export default function SettingsPage() {
     useEffect(() => {
         // Load from localStorage or fall back to env/defaults
         setGeminiApiKey(localStorage.getItem("orchable_gemini_api_key") || "");
-        setN8nUrl(localStorage.getItem("lovable_n8n_url") || import.meta.env.VITE_N8N_BASE_URL || "");
-        setN8nApiKey(localStorage.getItem("lovable_n8n_api_key") || import.meta.env.VITE_N8N_API_KEY || "");
+        setN8nUrl(localStorage.getItem("orchable_n8n_url") || import.meta.env.VITE_N8N_BASE_URL || "");
+        setN8nApiKey(localStorage.getItem("orchable_n8n_api_key") || import.meta.env.VITE_N8N_API_KEY || "");
 
-        setSupabaseUrl(localStorage.getItem("lovable_supabase_url") || import.meta.env.VITE_SUPABASE_URL || "");
-        setSupabaseKey(localStorage.getItem("lovable_supabase_key") || import.meta.env.VITE_SUPABASE_ANON_KEY || "");
+        setSupabaseUrl(localStorage.getItem("orchable_supabase_url") || import.meta.env.VITE_SUPABASE_URL || "");
+        setSupabaseKey(localStorage.getItem("orchable_supabase_key") || import.meta.env.VITE_SUPABASE_ANON_KEY || "");
 
-        setDefaultTimeout(localStorage.getItem("lovable_default_timeout") || "300000");
-        setDefaultRetries(localStorage.getItem("lovable_default_retries") || "3");
+        setDefaultTimeout(localStorage.getItem("orchable_default_timeout") || "300000");
+        setDefaultRetries(localStorage.getItem("orchable_default_retries") || "3");
 
-        setMasterSlug(localStorage.getItem("lovable_n8n_master_slug") || "master-orchestrator");
-        setUseTestWebhook(localStorage.getItem("lovable_n8n_use_test_webhook") === "true");
+        setMasterSlug(localStorage.getItem("orchable_n8n_master_slug") || "master-orchestrator");
+        setUseTestWebhook(localStorage.getItem("orchable_n8n_use_test_webhook") === "true");
     }, []);
 
     const handleSave = () => {
-        const currentSupabaseUrl = localStorage.getItem("lovable_supabase_url");
-        const currentSupabaseKey = localStorage.getItem("lovable_supabase_key");
+        const currentSupabaseUrl = localStorage.getItem("orchable_supabase_url");
+        const currentSupabaseKey = localStorage.getItem("orchable_supabase_key");
 
         localStorage.setItem("orchable_gemini_api_key", geminiApiKey);
-        localStorage.setItem("lovable_n8n_url", n8nUrl);
-        localStorage.setItem("lovable_n8n_api_key", n8nApiKey);
+        localStorage.setItem("orchable_n8n_url", n8nUrl);
+        localStorage.setItem("orchable_n8n_api_key", n8nApiKey);
 
-        localStorage.setItem("lovable_supabase_url", supabaseUrl);
-        localStorage.setItem("lovable_supabase_key", supabaseKey);
+        localStorage.setItem("orchable_supabase_url", supabaseUrl);
+        localStorage.setItem("orchable_supabase_key", supabaseKey);
 
-        localStorage.setItem("lovable_default_timeout", defaultTimeout);
-        localStorage.setItem("lovable_default_retries", defaultRetries);
+        localStorage.setItem("orchable_default_timeout", defaultTimeout);
+        localStorage.setItem("orchable_default_retries", defaultRetries);
 
-        localStorage.setItem("lovable_n8n_master_slug", masterSlug);
-        localStorage.setItem("lovable_n8n_use_test_webhook", String(useTestWebhook));
+        localStorage.setItem("orchable_n8n_master_slug", masterSlug);
+        localStorage.setItem("orchable_n8n_use_test_webhook", String(useTestWebhook));
 
         toast.success("Settings saved successfully");
 
@@ -67,14 +67,14 @@ export default function SettingsPage() {
 
     const handleReset = () => {
         localStorage.removeItem("orchable_gemini_api_key");
-        localStorage.removeItem("lovable_n8n_url");
-        localStorage.removeItem("lovable_n8n_api_key");
-        localStorage.removeItem("lovable_supabase_url");
-        localStorage.removeItem("lovable_supabase_key");
-        localStorage.removeItem("lovable_default_timeout");
-        localStorage.removeItem("lovable_default_retries");
-        localStorage.removeItem("lovable_n8n_master_slug");
-        localStorage.removeItem("lovable_n8n_use_test_webhook");
+        localStorage.removeItem("orchable_n8n_url");
+        localStorage.removeItem("orchable_n8n_api_key");
+        localStorage.removeItem("orchable_supabase_url");
+        localStorage.removeItem("orchable_supabase_key");
+        localStorage.removeItem("orchable_default_timeout");
+        localStorage.removeItem("orchable_default_retries");
+        localStorage.removeItem("orchable_n8n_master_slug");
+        localStorage.removeItem("orchable_n8n_use_test_webhook");
 
         setN8nUrl(import.meta.env.VITE_N8N_BASE_URL || "");
         setN8nApiKey(import.meta.env.VITE_N8N_API_KEY || "");
