@@ -3,7 +3,10 @@
 	"version": "1.0.0",
 	"private": true,
 	"scripts": {
-		"build": "npx mintlify build",
-		"dev": "npx mintlify dev"
+		"build": "mintlify build",
+		"dev": "mintlify dev"
+	},
+	"devDependencies": {
+		"mintlify": "^4.2.384"
 	}
 }
