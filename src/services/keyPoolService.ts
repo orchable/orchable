@@ -1,0 +1,52 @@
+import { supabase } from "@/lib/supabase";
+import { UserTier } from "@/lib/storage";
+
+export interface KeyConfig {
+	type: "personal" | "pool";
+	apiKey?: string;
+	webhookUrl?: string;
+	poolType?: "free_pool" | "premium_pool";
+}
+
+export const keyPoolService = {
+	async resolveKeys(tier: UserTier): Promise<KeyConfig[]> {
+		const {
+			data: { user },
+		} = await supabase.auth.getUser();
+		if (!user) throw new Error("Authentication required to resolve keys.");
+
+		// 1. Fetch personal keys from user_api_keys
+		const { data: personalKeys, error } = await supabase
+			.from("user_api_keys")
+			.select("*")
+			.eq("user_id", user.id)
+			.eq("pool_type", "personal");
+
+		if (error) {
+			console.error("Error fetching personal keys:", error);
+		}
+
+		// 2. If user has personal keys, return them (with tier-based limits)
+		if (personalKeys && personalKeys.length > 0) {
+			const limit = tier === "premium" ? Infinity : 3;
+			return personalKeys.slice(0, limit).map((k) => ({
+				type: "personal",
+				apiKey: k.api_key_encrypted, // In a real app, this would be decrypted or use Vault secret ID
+			}));
+		}
+
+		// 3. Fallback to platform managed pools via webhook
+		// These URLs would typically come from environment variables or a global config table
+		const hubBaseUrl =
+			import.meta.env.VITE_N8N_HUB_URL ||
+			"https://n8n.lovable.dev/webhook/rotation-manager";
+
+		return [
+			{
+				type: "pool",
+				webhookUrl: `${hubBaseUrl}?pool=${tier === "premium" ? "premium_pool" : "free_pool"}`,
+				poolType: tier === "premium" ? "premium_pool" : "free_pool",
+			},
+		];
+	},
+};

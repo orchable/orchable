@@ -26,7 +26,7 @@ import { executorService } from '@/services/executorService';
 
 export function LauncherPage() {
   const { user } = useAuth();
-  const { tier, isLite } = useTier();
+  const { tier } = useTier();
   const navigate = useNavigate();
   const { data: configs, isLoading: isLoadingConfigs } = useConfigs();
   const createExecutionMutation = useCreateExecution();
@@ -338,14 +338,8 @@ export function LauncherPage() {
         // 3. Perform bulk insert of all initial tasks (Stage 1)
         await storage.adapter.createTasks(allTasksToInsert);
 
-        if (isLite) {
-          const apiKey = localStorage.getItem('lovable_gemini_api_key');
-          if (apiKey) {
-            executorService.start(apiKey, tier);
-          } else {
-            toast.warning('Please configure your Gemini API Key in Settings for local execution.');
-          }
-        }
+        // All authenticated users use unified execution path
+        executorService.start(tier);
 
         toast.success(`Successfully launched campaign with ${allTasksToInsert.length} pipelines`);
       } else {
@@ -376,32 +370,8 @@ export function LauncherPage() {
             syllabusRow: row
           });
 
-          if (isLite) {
-            // In Lite mode, we use the storage adapter for batch creation too
-            // lab_execution (execution) is already created, but we need n8n-gen compatible batch
-            await storage.adapter.createBatch({
-              id: execution.id,
-              name: `${config.name} - ${row.lessonTitle}`,
-              status: 'plan',
-              orchestrator_config_id: config.id,
-              batch_type: 'manual_run',
-              created_by: user?.id
-            });
-
-            const apiKey = localStorage.getItem('lovable_gemini_api_key');
-            if (apiKey) {
-              executorService.start(apiKey, tier);
-            }
-          } else {
-            await n8nService.triggerMasterWorkflow({
-              executionId: execution.id,
-              configId: selectedConfigId!,
-              syllabusRow: row,
-              // Pass the new grouping IDs
-              launchId: launchId,
-              batchId: execution.id // Here execution.id (lab_execution) can act as the batch_id
-            });
-          }
+          // All authenticated users use unified execution path
+          executorService.start(tier);
         }
         toast.success(`Successfully launched ${dataToProcess.length} execution(s)`);
       }

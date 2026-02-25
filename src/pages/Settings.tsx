@@ -6,6 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
+import { Settings2 } from "lucide-react";
+import { UsageDashboard } from "@/components/usage/UsageDashboard";
+import { ApiKeyManager } from "@/components/settings/ApiKeyManager";
 
 
 export default function SettingsPage() {
@@ -97,37 +100,20 @@ export default function SettingsPage() {
                 </p>
             </div>
 
-            <div className="grid gap-6">
-                <Card className="border-primary/20 bg-primary/5">
-                    <CardHeader>
-                        <CardTitle className="text-xl flex items-center gap-2">
-                            AI Execution Settings
-                        </CardTitle>
-                        <CardDescription>
-                            Configure your Gemini API key for local browser execution (Lite tier).
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="gemini-api-key">Gemini API Key</Label>
-                            <Input
-                                id="gemini-api-key"
-                                type="password"
-                                placeholder="AIza..."
-                                value={geminiApiKey}
-                                onChange={(e) => setGeminiApiKey(e.target.value)}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                Get your key from the <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-primary hover:underline">Google AI Studio</a>.
-                            </p>
-                        </div>
-                    </CardContent>
-                </Card>
+            <div className="grid gap-8">
+                {/* Usage Section */}
+                <UsageDashboard />
+
+                {/* API Key Management */}
+                <ApiKeyManager />
 
                 {user && (
                     <Card>
                         <CardHeader>
-                            <CardTitle>Infrastructure Settings (Advanced)</CardTitle>
+                            <CardTitle className="text-xl flex items-center gap-2">
+                                <Settings2 className="w-5 h-5 text-primary" />
+                                Infrastructure Settings (Advanced)
+                            </CardTitle>
                             <CardDescription>
                                 Configure connections to external services for Free and Premium tiers.
                             </CardDescription>

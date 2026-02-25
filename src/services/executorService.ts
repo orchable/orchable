@@ -1,3 +1,4 @@
+import { storage, UserTier } from "../lib/storage";
 import { WorkerMessage, WorkerStatus } from "../workers/taskExecutor.worker";
 
 class ExecutorService {
@@ -36,10 +37,13 @@ class ExecutorService {
 		}
 	}
 
-	start(apiKey: string, tier: string = "anonymous") {
+	async start(tier: UserTier) {
 		if (!this.worker) this.initWorker();
 		if (this.worker) {
-			this.worker.postMessage({ type: "START", apiKey, tier });
+			const { keyPoolService } = await import("./keyPoolService");
+			const configs = await keyPoolService.resolveKeys(tier);
+
+			this.worker.postMessage({ type: "START", configs, tier });
 			this.isProcessing = true;
 		}
 	}

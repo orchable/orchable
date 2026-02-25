@@ -25,10 +25,8 @@ export function TierGate({
     const navigate = useNavigate();
 
     const tierPriority: Record<UserTier, number> = {
-        'anonymous': 0,
-        'free': 1,
-        'premium_byok': 2,
-        'premium_managed': 2,
+        'free': 0,
+        'premium': 1,
     };
 
     const hasAccess = tierPriority[tier] >= tierPriority[minTier];

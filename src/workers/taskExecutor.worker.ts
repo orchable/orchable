@@ -5,7 +5,7 @@ import { StepConfig, AISettings, Execution } from "../lib/types";
 
 // Types for the worker messages
 export type WorkerMessage =
-	| { type: "START"; apiKey: string; tier?: string }
+	| { type: "START"; configs: any[]; tier: string }
 	| { type: "STOP" };
 
 export type WorkerStatus =
@@ -14,21 +14,25 @@ export type WorkerStatus =
 	| { type: "BATCH_COMPLETE"; batchId: string };
 
 let isRunning = false;
-let currentApiKey = "";
-let currentTier = "anonymous";
+let currentConfigs: any[] = [];
+let currentConfigIndex = 0;
+let currentTier = "free";
 
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 	const { data } = e;
 
 	if (data.type === "START") {
 		isRunning = true;
-		currentApiKey = data.apiKey;
-		currentTier = data.tier || "anonymous";
-		console.log(`[Worker] Started processing loop (Tier: ${currentTier})`);
+		currentConfigs = data.configs || [];
+		currentConfigIndex = 0;
+		currentTier = data.tier || "free";
+		console.log(
+			`[Worker] Started processing loop (Tier: ${currentTier}, Keys: ${currentConfigs.length})`,
+		);
 		runLoop();
 	} else if (data.type === "STOP") {
 		isRunning = false;
-		currentApiKey = "";
+		currentConfigs = [];
 		console.log("[Worker] Stopped");
 	}
 };
@@ -262,8 +266,34 @@ function buildPrompt(template: string, data: Record<string, unknown>) {
 }
 
 async function callGemini(prompt: string, aiSettings: AISettings) {
+	if (currentConfigs.length === 0)
+		throw new Error("No API keys or pools available.");
+
+	// Rotate keys/pools
+	const currentConfig = currentConfigs[currentConfigIndex];
+	currentConfigIndex = (currentConfigIndex + 1) % currentConfigs.length;
+
+	if (currentConfig.type === "pool") {
+		// Route to platform Key Pool via webhook
+		return await executeWebhook(
+			{
+				webhook_url: currentConfig.webhookUrl,
+				webhook_method: "POST",
+			},
+			{
+				prompt,
+				settings: aiSettings,
+				tier: currentTier,
+				// rotation manager will use poolType to filter internal keys
+				pool: currentConfig.poolType,
+			},
+		);
+	}
+
+	// Direct BYOK call
 	const model = aiSettings?.model_id || "gemini-2.0-flash";
-	const api = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${currentApiKey}`;
+	const apiKey = currentConfig.apiKey;
+	const api = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
 	const response = await fetch(api, {
 		method: "POST",
@@ -280,12 +310,10 @@ async function callGemini(prompt: string, aiSettings: AISettings) {
 		throw new Error(json.error?.message || "Gemini API Error");
 	}
 
-	// Extract JSON from response (Structured Output mode)
 	const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
 	if (!text) throw new Error("Empty response from Gemini");
 
 	try {
-		// If structured output was requested as JSON, parse it
 		if (
 			aiSettings?.generationConfig?.responseMimeType ===
 			"application/json"
@@ -684,12 +712,12 @@ async function updateBatchCounters(batchId: string, success: boolean) {
 
 // --- USAGE HELPERS (Worker context) ---
 async function checkUsage(): Promise<boolean> {
-	if (currentTier === "premium_byok" || currentTier === "premium_managed")
-		return true;
+	if (currentTier === "premium") return true;
 
 	const usage = await getUsage();
-	const limit = currentTier === "anonymous" ? 50 : 200;
-	return usage.count < limit;
+	const limit = 200; // Decision 6
+	const grace = Math.floor(limit * 0.1);
+	return usage.count < limit + grace;
 }
 
 async function getUsage() {

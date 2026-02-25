@@ -2,16 +2,11 @@ import { IStorageAdapter } from "./StorageAdapter";
 import { IndexedDBAdapter } from "./IndexedDBAdapter";
 import { SupabaseAdapter } from "./SupabaseAdapter";
 
-export type UserTier =
-	| "anonymous"
-	| "free"
-	| "premium_byok"
-	| "premium_managed";
+export type UserTier = "free" | "premium";
 
 export function getStorageAdapter(tier: UserTier): IStorageAdapter {
-	if (tier === "anonymous" || tier === "free") {
-		return new IndexedDBAdapter();
-	}
+	// In the new system, we always use Supabase for authenticated users.
+	// We keep IndexedDBAdapter only for temporary caching or offline-first sync.
 	return new SupabaseAdapter();
 }
 

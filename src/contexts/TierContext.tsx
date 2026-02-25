@@ -19,16 +19,17 @@ const TierContext = createContext<TierContextType | undefined>(undefined);
 
 export function TierProvider({ children }: { children: React.ReactNode }) {
     const { user } = useAuth();
-    const [tier, setTierState] = useState<UserTier>('anonymous');
+    const [tier, setTierState] = useState<UserTier>('free'); // Default to free if authenticated
     const [isSyncing, setIsSyncing] = useState(false);
     const [usage, setUsage] = useState<{ count: number; month: string } | null>(null);
 
     useEffect(() => {
         const handleAuthChange = async () => {
             if (user) {
-                // Admin gets premium managed, others get free tier
+                // Admin gets premium, others get free by default
+                // In production, this would check a subscription table
                 if (user.email === 'makexyzfun@gmail.com') {
-                    setTier('premium_managed');
+                    setTier('premium');
                 } else {
                     setTier('free');
                 }
@@ -42,7 +43,9 @@ export function TierProvider({ children }: { children: React.ReactNode }) {
                     setIsSyncing(false);
                 }
             } else {
-                setTier('anonymous');
+                // In the new system, we still force 'free' as a UI default 
+                // but the Gate will block execution if user is not authenticated.
+                setTier('free');
             }
         };
 
@@ -50,12 +53,15 @@ export function TierProvider({ children }: { children: React.ReactNode }) {
     }, [user]);
 
     useEffect(() => {
-        refreshUsage();
-        const interval = setInterval(refreshUsage, 10000); // 10s auto-refresh
-        return () => clearInterval(interval);
-    }, []);
+        if (user) {
+            refreshUsage();
+            const interval = setInterval(refreshUsage, 15000); // 15s refresh
+            return () => clearInterval(interval);
+        }
+    }, [user]);
 
     const refreshUsage = async () => {
+        if (!user) return;
         const currentUsage = await usageService.getUsage();
         setUsage(currentUsage);
     };
@@ -67,13 +73,13 @@ export function TierProvider({ children }: { children: React.ReactNode }) {
 
     const value = {
         tier,
-        isLite: tier === 'anonymous' || tier === 'free',
-        isPremium: tier === 'premium_byok' || tier === 'premium_managed',
+        isLite: tier === 'free',
+        isPremium: tier === 'premium',
         isSyncing,
         usage,
         limits: {
             tasks: usageService.getLimit(tier),
-            sync: tier !== 'anonymous'
+            sync: true // Authenticated users always have sync capability
         },
         setTier,
         refreshUsage
