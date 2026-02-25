@@ -3,7 +3,7 @@
 	"version": "1.0.0",
 	"private": true,
 	"scripts": {
-		"build": "mintlify build",
+		"build": "mkdir -p dist && echo 'Mintlify documentation is hosted externally. Redirecting...' > dist/index.html",
 		"dev": "mintlify dev"
 	},
 	"devDependencies": {
