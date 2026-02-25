@@ -8,17 +8,18 @@
 		"start": "next start"
 	},
 	"dependencies": {
+		"autoprefixer": "latest",
 		"lucide-react": "latest",
 		"next": "15.1.6",
 		"nextra": "latest",
 		"nextra-theme-docs": "latest",
+		"postcss": "latest",
 		"react": "19",
 		"react-dom": "19",
-		"tailwindcss": "latest",
-		"postcss": "latest",
-		"autoprefixer": "latest"
+		"tailwindcss": "latest"
 	},
 	"devDependencies": {
+		"@tailwindcss/postcss": "^4.2.1",
 		"postcss-import": "^16.1.1"
 	}
 }

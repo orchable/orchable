@@ -11,9 +11,8 @@
 		"preview": "vite preview",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"docs:dev": "cd apps/docs && npx mintlify dev",
-		"docs:build": "cd apps/docs && npx mintlify build",
-		"docs:vi": "cd apps/docs && npx mintlify dev --locale vi"
+		"docs:dev": "cd apps/docs && npx next dev",
+		"docs:build": "cd apps/docs && npx next build"
 	},
 	"dependencies": {
 		"@hookform/resolvers": "^3.10.0",

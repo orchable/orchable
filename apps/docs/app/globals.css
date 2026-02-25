@@ -1,8 +1,1 @@
-@import "tailwindcss/base";
-@import "nextra-theme-docs/dist/style.css";
-@import "tailwindcss/components";
-@import "tailwindcss/utilities";
-
-@layer base {
-	/* Site-specific base styles */
-}
+@import "tailwindcss";
