@@ -14,7 +14,7 @@ This guide will help you get familiar with the codebase and how we work with con
 
 ### 🐛 Bug Reports
 
-Found a bug? Please [open an issue](https://github.com/thanh01pmt/orchable/issues/new?template=bug_report.md) with:
+Found a bug? Please [open an issue](https://github.com/MakeXYZFun/orchable/issues/new?template=bug_report.md) with:
 - A clear title and description
 - Steps to reproduce
 - Expected vs. actual behavior
@@ -22,11 +22,11 @@ Found a bug? Please [open an issue](https://github.com/thanh01pmt/orchable/issue
 
 ### 💡 Feature Requests
 
-Have an idea? [Start a discussion](https://github.com/thanh01pmt/orchable/discussions/categories/feature-requests) before opening a PR. We want to make sure the feature aligns with our roadmap and isn't already being worked on.
+Have an idea? [Start a discussion](https://github.com/MakeXYZFun/orchable/discussions/categories/feature-requests) before opening a PR. We want to make sure the feature aligns with our roadmap and isn't already being worked on.
 
 ### 🌱 Good First Issues
 
-New to the codebase? Browse our [good first issues](https://github.com/thanh01pmt/orchable/issues?q=label%3A%22good+first+issue%22) — these are well-scoped tasks perfect for getting started.
+New to the codebase? Browse our [good first issues](https://github.com/MakeXYZFun/orchable/issues?q=label%3A%22good+first+issue%22) — these are well-scoped tasks perfect for getting started.
 
 Don't forget to **link an existing issue or open a new issue** in your PR description.
 
@@ -120,7 +120,7 @@ Stuck? Here are your options:
 
 - 💬 **[GitHub Discussions](https://github.com/thanh01pmt/orchable/discussions)** — Ask questions, share ideas
 - 🐛 **[GitHub Issues](https://github.com/thanh01pmt/orchable/issues)** — Report bugs
-- 📖 **[Documentation](https://docs.orchable.ai)** — Read the guides
+- 📖 **[Documentation](https://docs.orchable.app)** — Read the guides
 
 ---
 

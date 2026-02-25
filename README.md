@@ -6,16 +6,16 @@
 <p align="center"><strong>Orchestrate Anything. Automatically.</strong></p>
 
 <p align="center">
-  <a href="https://orchable.ai">Cloud</a> ·
-  <a href="https://docs.orchable.ai">Documentation</a> ·
-  <a href="https://orchable.ai/hub">Community Hub</a> ·
-  <a href="https://orchable.ai/pricing">Pricing</a>
+  <a href="https://orchable.app">Cloud</a> ·
+  <a href="https://docs.orchable.app">Documentation</a> ·
+  <a href="https://orchable.app/hub">Community Hub</a> ·
+  <a href="https://orchable.app/pricing">Pricing</a>
 </p>
 
 <p align="center">
   <img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-teal" />
-  <img alt="Stars" src="https://img.shields.io/github/stars/thanh01pmt/orchable?style=flat&color=teal" />
-  <img alt="Issues" src="https://img.shields.io/github/issues/thanh01pmt/orchable?color=teal" />
+  <img alt="Stars" src="https://img.shields.io/github/stars/MakeXYZFun/orchable?style=flat&color=teal" />
+  <img alt="Issues" src="https://img.shields.io/github/issues/MakeXYZFun/orchable?color=teal" />
   <img alt="PRs Welcome" src="https://img.shields.io/badge/PRs-welcome-teal" />
 </p>
 
@@ -44,13 +44,13 @@ Think of it as the **visual layer between your data and your AI models**.
 
 ### Cloud (Recommended)
 
-Visit [orchable.ai](https://orchable.ai) and sign in with Google. No setup required.
+Visit [orchable.app](https://orchable.app) and sign in with Google. No setup required.
 
 ### Self-hosting
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/thanh01pmt/orchable.git
+git clone https://github.com/MakeXYZFun/orchable.git
 cd orchable
 
 # 2. Copy environment variables
@@ -62,7 +62,7 @@ pnpm install
 pnpm run dev
 ```
 
-> See the [Self-hosting Guide](https://docs.orchable.ai/guides/operational-guide) for full instructions including Supabase setup and n8n workflow configuration.
+> See the [Self-hosting Guide](https://docs.orchable.app/guides/operational-guide) for full instructions including Supabase setup and n8n workflow configuration.
 
 ---
 
@@ -75,7 +75,7 @@ pnpm run dev
 | **AI Routing** | n8n workflows + Gemini API |
 | **Deployment** | Netlify (frontend) + Supabase Cloud |
 
-Full architecture details → [docs.orchable.ai/architecture/system-overview](https://docs.orchable.ai/architecture/system-overview)
+Full architecture details → [docs.orchable.app/architecture/system-overview](https://docs.orchable.app/architecture/system-overview)
 
 ---
 
@@ -83,9 +83,9 @@ Full architecture details → [docs.orchable.ai/architecture/system-overview](ht
 
 We love contributions! Please read our [Contributing Guide](./CONTRIBUTING.md) to get started.
 
-- Found a bug? [Open an issue](https://github.com/thanh01pmt/orchable/issues)
-- Have a feature idea? [Start a discussion](https://github.com/thanh01pmt/orchable/discussions)
-- Browse [good first issues](https://github.com/thanh01pmt/orchable/issues?q=label%3A%22good+first+issue%22)
+- Found a bug? [Open an issue](https://github.com/MakeXYZFun/orchable/issues)
+- Have a feature idea? [Start a discussion](https://github.com/MakeXYZFun/orchable/discussions)
+- Browse [good first issues](https://github.com/MakeXYZFun/orchable/issues?q=label%3A%22good+first+issue%22)
 
 ---
 
