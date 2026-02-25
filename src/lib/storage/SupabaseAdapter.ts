@@ -192,15 +192,10 @@ export class SupabaseAdapter implements IStorageAdapter {
 	}
 
 	async listConfigs(): Promise<OrchestratorConfig[]> {
-		const {
-			data: { user },
-		} = await supabase.auth.getUser();
-		if (!user) return [];
-
+		// RLS handles user isolation — no client-side filtering needed
 		const { data, error } = await supabase
 			.from("lab_orchestrator_configs")
 			.select("*")
-			.or(`created_by.eq.${user.id},created_by.is.null`)
 			.order("created_at", { ascending: false });
 
 		if (error) throw error;
@@ -208,16 +203,11 @@ export class SupabaseAdapter implements IStorageAdapter {
 	}
 
 	async getConfig(id: string): Promise<OrchestratorConfig | null> {
-		const {
-			data: { user },
-		} = await supabase.auth.getUser();
-		if (!user) return null;
-
+		// RLS handles user isolation — no client-side filtering needed
 		const { data, error } = await supabase
 			.from("lab_orchestrator_configs")
 			.select("*")
 			.eq("id", id)
-			.or(`created_by.eq.${user.id},created_by.is.null`)
 			.maybeSingle();
 
 		if (error) throw error;
