@@ -10,7 +10,10 @@
 		"lint": "eslint .",
 		"preview": "vite preview",
 		"test": "vitest run",
-		"test:watch": "vitest"
+		"test:watch": "vitest",
+		"docs:dev": "cd apps/docs && pnpm run start",
+		"docs:build": "cd apps/docs && pnpm run build",
+		"docs:vi": "cd apps/docs && pnpm run start -- --locale vi"
 	},
 	"dependencies": {
 		"@hookform/resolvers": "^3.10.0",

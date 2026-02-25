@@ -22,7 +22,7 @@ export function LandingNav() {
         { label: 'Product', href: '#features' },
         { label: 'Hub', href: '/hub' },
         { label: 'Pricing', href: '#pricing' },
-        { label: 'Docs', href: 'https://docs.dify.ai/en/' }, // Using Dify docs as per plan for now or placeholder
+        { label: 'Docs', href: 'https://docs.orchable.app' },
     ];
 
     return (
