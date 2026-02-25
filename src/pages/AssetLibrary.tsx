@@ -15,7 +15,9 @@ import {
     ExternalLink,
     ChevronRight,
     Database,
-    Sparkles
+    Sparkles,
+    Share2,
+    Globe
 } from 'lucide-react';
 import {
     Tabs,
@@ -61,6 +63,8 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import type { AIModelSetting } from '@/lib/types';
+import { ShareToHubDialog } from '@/components/hub/ShareToHubDialog';
+import { HubAssetType } from '@/services/hubService';
 
 export function AssetLibrary() {
     const [activeTab, setActiveTab] = useState('components');
@@ -85,6 +89,12 @@ export function AssetLibrary() {
     const [editingAiSetting, setEditingAiSetting] = useState<AIModelSetting | null>(null);
     const [isAiSettingEditorOpen, setIsAiSettingEditorOpen] = useState(false);
     const [isSavingAiSetting, setIsSavingAiSetting] = useState(false);
+
+    // Hub Sharing State
+    const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+    const [sharingAssetType, setSharingAssetType] = useState<HubAssetType>('template');
+    const [sharingAssetId, setSharingAssetId] = useState<string>('');
+    const [sharingAssetInitialData, setSharingAssetInitialData] = useState<{ title: string, description?: string, tags?: string[] }>({ title: '' });
 
     const { user } = useAuth();
     const navigate = useNavigate();
@@ -248,6 +258,17 @@ export function AssetLibrary() {
         }
     };
 
+    const handleShareToHub = (type: HubAssetType, asset: any) => {
+        setSharingAssetType(type);
+        setSharingAssetId(asset.id);
+        setSharingAssetInitialData({
+            title: asset.name,
+            description: asset.description,
+            tags: asset.tags || []
+        });
+        setIsShareDialogOpen(true);
+    };
+
     const filteredComponents = components.filter(c =>
         c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         c.description?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -344,6 +365,11 @@ export function AssetLibrary() {
                                                             Duplicate
                                                         </DropdownMenuItem>
                                                         <DropdownMenuSeparator />
+                                                        <DropdownMenuItem className="gap-2" onClick={() => handleShareToHub('component', comp)}>
+                                                            <Share2 className="w-4 h-4" />
+                                                            Share to Hub
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuSeparator />
                                                         <DropdownMenuItem
                                                             className="text-destructive gap-2 focus:bg-destructive/10 focus:text-destructive"
                                                             onClick={() => handleDeleteComponent(comp.id)}
@@ -361,9 +387,16 @@ export function AssetLibrary() {
                                         </CardHeader>
                                         <CardContent className="pb-4">
                                             <div className="flex gap-2">
-                                                <Badge variant="outline" className="text-[10px]">
-                                                    {comp.is_public ? 'Public' : 'Private'}
-                                                </Badge>
+                                                {comp.hub_asset_id ? (
+                                                    <Badge variant="default" className="text-[10px] bg-primary/20 text-primary border-primary/30 hover:bg-primary/20">
+                                                        <Globe className="w-3 h-3 mr-1" />
+                                                        Public on Hub
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge variant="outline" className="text-[10px]">
+                                                        {comp.is_public ? 'Public' : 'Private'}
+                                                    </Badge>
+                                                )}
                                                 <Badge variant="outline" className="text-[10px]">
                                                     TSX
                                                 </Badge>
@@ -452,6 +485,22 @@ export function AssetLibrary() {
                                                 </td>
                                                 <td className="py-3 px-4 text-right">
                                                     <div className="flex justify-end gap-1">
+                                                        {template.hub_asset_id ? (
+                                                            <Badge variant="secondary" className="h-8 px-2 bg-primary/10 text-primary border-primary/20 mr-1">
+                                                                <Globe className="w-3 h-3 mr-1" />
+                                                                Hub
+                                                            </Badge>
+                                                        ) : (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                                                onClick={() => handleShareToHub('template', template)}
+                                                                title="Share to Hub"
+                                                            >
+                                                                <Share2 className="w-4 h-4" />
+                                                            </Button>
+                                                        )}
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
@@ -505,8 +554,8 @@ export function AssetLibrary() {
                                                 key={tag}
                                                 variant={selectedAiTag === tag ? 'default' : 'outline'}
                                                 className={`cursor-pointer text-[10px] px-2 py-0 capitalize ${selectedAiTag === tag
-                                                        ? "hover:bg-primary/90 hover:text-primary-foreground"
-                                                        : "hover:bg-primary/10 hover:border-primary/50 hover:text-primary"
+                                                    ? "hover:bg-primary/90 hover:text-primary-foreground"
+                                                    : "hover:bg-primary/10 hover:border-primary/50 hover:text-primary"
                                                     }`}
                                                 onClick={() => setSelectedAiTag(selectedAiTag === tag ? null : tag)}
                                             >
@@ -664,7 +713,23 @@ export function AssetLibrary() {
                                                     )}
                                                 </CardContent>
 
-                                                <CardFooter className="pt-0 justify-end pb-4 pr-4">
+                                                <CardFooter className="pt-0 justify-end pb-4 pr-4 gap-2">
+                                                    {setting.hub_asset_id ? (
+                                                        <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
+                                                            <Globe className="w-3 h-3 mr-1" />
+                                                            Public on Hub
+                                                        </Badge>
+                                                    ) : (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="gap-2 text-muted-foreground hover:text-primary"
+                                                            onClick={() => handleShareToHub('ai_preset', setting)}
+                                                        >
+                                                            <Share2 className="w-3.5 h-3.5" />
+                                                            Share
+                                                        </Button>
+                                                    )}
                                                     <Button
                                                         variant="secondary"
                                                         size="sm"
@@ -837,6 +902,14 @@ export function AssetLibrary() {
                     </div>
                 </DialogContent>
             </Dialog>
+            <ShareToHubDialog
+                open={isShareDialogOpen}
+                onOpenChange={setIsShareDialogOpen}
+                assetType={sharingAssetType}
+                assetId={sharingAssetId}
+                initialData={sharingAssetInitialData}
+                onSuccess={fetchAssets}
+            />
         </div>
     );
 }

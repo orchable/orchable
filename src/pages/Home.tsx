@@ -1,483 +1,190 @@
 import { motion } from 'framer-motion';
 import {
-  Sparkles, ArrowRight, Boxes, Play, Activity,
-  Zap, Shield, Globe, Workflow, Check, X,
-  Download, Cloud, Users, RefreshCw, Bell, Clock,
+  Bot, Terminal, ArrowRight, Sparkles
 } from 'lucide-react';
+import { HeroSection } from '@/components/landing/HeroSection';
+import { PipelineDemo } from '@/components/landing/PipelineDemo';
+import { FeatureSection } from '@/components/landing/FeatureSection';
+import { UseCasesSection } from '@/components/landing/UseCasesSection';
+import { PricingSection } from '@/components/landing/PricingSection';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/contexts/AuthContext';
 
-// ─── Feature data ────────────────────────────────────────────────────────────
-const features = [
-  {
-    icon: Boxes,
-    title: 'Visual Pipeline Designer',
-    description:
-      'Drag-and-drop to design multi-stage AI workflows. Connect stages, configure cardinality, and define IO contracts visually.',
-    color: 'from-step-a to-step-b',
-  },
-  {
-    icon: Play,
-    title: 'Batch Launcher',
-    description:
-      'Upload CSV/Excel, choose an orchestrator config, and process thousands of AI tasks with full retry support.',
-    color: 'from-success to-primary',
-  },
-  {
-    icon: Activity,
-    title: 'Real-time Monitor',
-    description:
-      'Track every task live. View structured results, retry failures, and render output with custom TSX components.',
-    color: 'from-primary to-accent',
-  },
-];
-
-const stats = [
-  { value: 'N-Stage', label: 'Pipeline depth' },
-  { value: '∞', label: 'Tasks per batch' },
-  { value: 'Real-time', label: 'Monitoring' },
-];
-
-// ─── Pricing data ────────────────────────────────────────────────────────────
-interface PlanFeature {
-  label: string;
-  lite: boolean | string;
-  full: boolean | string;
-}
-
-const planFeatures: PlanFeature[] = [
-  { label: 'Visual Pipeline Designer', lite: true, full: true },
-  { label: 'N-stage Batch Execution', lite: true, full: true },
-  { label: 'Real-time Monitor', lite: true, full: true },
-  { label: 'Custom TSX Component Sandbox', lite: true, full: true },
-  { label: 'Token Cost Calculator', lite: true, full: true },
-  { label: 'Export CSV / JSON', lite: true, full: true },
-  { label: 'Data storage', lite: 'Local only (IndexedDB)', full: 'Cloud (Supabase)' },
-  { label: 'Cross-device sync', lite: false, full: true },
-  { label: 'Background processing (tab closed)', lite: false, full: true },
-  { label: 'API Key Pool (auto rotation)', lite: false, full: true },
-  { label: 'Team workspace & shared pipelines', lite: false, full: true },
-  { label: 'Auto retry + Webhook / Email alerts', lite: false, full: true },
-  { label: 'Persistent batch history', lite: false, full: true },
-  { label: 'Authentication required', lite: false, full: true },
-];
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-function FeatureCell({ value }: { value: boolean | string }) {
-  if (typeof value === 'string') {
-    return <span className="text-sm text-muted-foreground">{value}</span>;
-  }
-  return value ? (
-    <Check className="w-5 h-5 text-green-500 mx-auto" />
-  ) : (
-    <X className="w-4 h-4 text-muted-foreground/40 mx-auto" />
-  );
-}
-
-// ─── Component ───────────────────────────────────────────────────────────────
 export function HomePage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
 
   return (
-    <div className="min-h-full">
-      {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden py-20 px-6">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
-        <div className="absolute top-0 right-0 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-accent/10 rounded-full blur-3xl" />
+    <div className="min-h-screen bg-background">
+      {/* Hero Section */}
+      <HeroSection />
 
-        <div className="relative max-w-5xl mx-auto text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
-              <Sparkles className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium text-primary">
-                Orchable · N-Stage AI Agent Orchestrator
-              </span>
-            </div>
+      {/* Pipeline Visual Demo */}
+      <PipelineDemo />
 
-            <h1 className="text-4xl md:text-6xl font-bold mb-6">
-              <span className="gradient-text">Orchestrate Anything.</span>
-              <br />Actively.
-            </h1>
-
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-              Turn your AI agents into an actionable workforce. Design
-              multi-stage pipelines visually, run massive batches, and monitor
-              results in real time.
-            </p>
-
-            <div className="flex items-center justify-center gap-4 flex-wrap">
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button
-                  size="lg"
-                  className="h-12 px-8 bg-gradient-to-r from-primary to-accent text-white shadow-glow"
-                  onClick={() => navigate('/designer')}
-                >
-                  {user ? 'Go to Dashboard' : 'Try Free — No Sign-up'}
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </Button>
-              </motion.div>
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="h-12 px-8"
-                  onClick={() => navigate('/monitor')}
-                >
-                  See a Live Demo
-                </Button>
-              </motion.div>
-            </div>
-          </motion.div>
-
-          {/* Stats */}
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="grid grid-cols-3 gap-8 max-w-lg mx-auto mt-16"
-          >
-            {stats.map((stat, idx) => (
-              <div key={idx} className="text-center">
-                <div className="text-3xl font-bold gradient-text mb-1">{stat.value}</div>
-                <div className="text-sm text-muted-foreground">{stat.label}</div>
-              </div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ── Core Modules ─────────────────────────────────────────────────── */}
-      <section className="py-20 px-6 bg-muted/30">
-        <div className="max-w-5xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-3xl font-bold mb-4">Three Core Modules</h2>
-            <p className="text-muted-foreground">
-              Everything you need to automate AI-powered workflows at production scale
-            </p>
-          </motion.div>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            {features.map((feature, idx) => (
-              <motion.div
-                key={idx}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: idx * 0.1 }}
-                whileHover={{ y: -5 }}
-                className="p-6 rounded-2xl bg-card border shadow-lg hover:shadow-xl transition-all"
-              >
+      {/* Feature 1: Simplicity */}
+      <FeatureSection
+        tagline="Design without limits"
+        headline="One prompt. One Stage. Infinite scale."
+        description="Don't spend weeks learning complex automation tools. If you can write a prompt, you can build a multi-stage AI pipeline in Orchable. Focus on your expertise, not the infrastructure."
+        bullets={[
+          "Single node type architecture",
+          "Zero-config AI stages",
+          "Visual drag-and-drop designer",
+          "Real-time token cost estimation"
+        ]}
+        visual={
+          <div className="p-8 flex items-center justify-center bg-primary/5 h-full w-full">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+              className="relative w-48 h-48"
+            >
+              {[0, 60, 120, 180, 240, 300].map(deg => (
                 <div
-                  className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.color} flex items-center justify-center mb-4 shadow-lg`}
-                >
-                  <feature.icon className="w-6 h-6 text-white" />
+                  key={deg}
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-1 bg-gradient-to-r from-transparent via-primary/30 to-transparent"
+                  style={{ transform: `translate(-50%, -50%) rotate(${deg}deg)` }}
+                />
+              ))}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-24 h-24 rounded-3xl bg-primary flex items-center justify-center shadow-glow">
+                  <Bot className="w-12 h-12 text-white" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
-                <p className="text-muted-foreground">{feature.description}</p>
-              </motion.div>
+              </div>
+            </motion.div>
+          </div>
+        }
+      />
+
+      {/* Feature 2: Visibility & Control */}
+      <FeatureSection
+        reverse
+        tagline="Full Visibility"
+        headline="Glass box, not a black box."
+        description="Monitor every single task live as it flows through your pipeline. Orchable gives you the power to pause, approve, or retry failed tasks at any stage without restarting the whole batch."
+        bullets={[
+          "Real-time task tracking",
+          "Human-in-the-loop approvals",
+          "One-click retry for failures",
+          "Detailed execution history"
+        ]}
+        visual={
+          <div className="p-8 space-y-4 bg-muted/20 h-full w-full overflow-hidden">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="p-4 rounded-xl bg-card border shadow-sm flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "w-2 h-2 rounded-full",
+                    i === 3 ? "bg-amber-500 animate-pulse" : "bg-green-500"
+                  )} />
+                  <span className="text-sm font-medium">Task #{1204 + i}</span>
+                </div>
+                <div className="text-[10px] font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                  {i === 3 ? "STG_A → STG_B" : "COMPLETED"}
+                </div>
+              </div>
             ))}
           </div>
-        </div>
-      </section>
+        }
+      />
 
-      {/* ── Why Orchable ─────────────────────────────────────────────────── */}
-      <section className="py-20 px-6">
-        <div className="max-w-5xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <motion.div
-              initial={{ opacity: 0, x: -30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-            >
-              <h2 className="text-3xl font-bold mb-6">
-                Why <span className="gradient-text">Orchable</span>?
-              </h2>
-              <div className="space-y-4">
-                {[
-                  { icon: Zap, text: 'Save hours of manual prompt engineering and task management' },
-                  { icon: Shield, text: 'Consistent quality through structured AI output contracts' },
-                  { icon: Globe, text: 'Scale to any domain — education, marketing, data, and more' },
-                  { icon: Workflow, text: 'No-code pipeline design with full developer control' },
-                ].map((item, idx) => (
-                  <motion.div
-                    key={idx}
-                    initial={{ opacity: 0, x: -20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: idx * 0.1 }}
-                    className="flex items-center gap-3"
-                  >
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <item.icon className="w-5 h-5 text-primary" />
-                    </div>
-                    <span className="text-lg">{item.text}</span>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, x: 30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              className="relative"
-            >
-              <div className="aspect-video rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 border shadow-2xl flex items-center justify-center">
-                <div className="text-center">
-                  <div className="w-16 h-16 rounded-full bg-card shadow-lg flex items-center justify-center mx-auto mb-4">
-                    <Play className="w-8 h-8 text-primary" />
-                  </div>
-                  <p className="text-muted-foreground">Demo Video (Coming Soon)</p>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Pricing ──────────────────────────────────────────────────────── */}
-      <section className="py-20 px-6 bg-muted/30" id="pricing">
-        <div className="max-w-5xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-3xl font-bold mb-4">Simple Pricing</h2>
-            <p className="text-muted-foreground">
-              Start free, upgrade when you outgrow local.
-            </p>
-          </motion.div>
-
-          {/* Plan cards */}
-          <div className="grid md:grid-cols-2 gap-6 mb-12">
-            {/* Lite */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="rounded-2xl border bg-card p-8 shadow-lg flex flex-col"
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                  <Download className="w-5 h-5 text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="font-semibold text-lg">Lite</p>
-                  <p className="text-xs text-muted-foreground">Runs in your browser</p>
-                </div>
-                <Badge variant="secondary" className="ml-auto">Free forever</Badge>
-              </div>
-
-              <div className="mb-6">
-                <span className="text-4xl font-bold">$0</span>
-                <span className="text-muted-foreground ml-2">/ month</span>
-              </div>
-
-              <ul className="space-y-2 mb-8 flex-1">
-                {[
-                  'Full pipeline designer & executor',
-                  'Unlimited stages & tasks',
-                  'Custom TSX component sandbox',
-                  'Local storage (IndexedDB)',
-                  'No sign-up required',
-                ].map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-sm">
-                    <Check className="w-4 h-4 text-green-500 shrink-0" />
-                    {f}
-                  </li>
-                ))}
-                {[
-                  'Background processing',
-                  'Cross-device sync',
-                  'Team collaboration',
-                ].map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-sm text-muted-foreground/60">
-                    <X className="w-4 h-4 shrink-0" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-
-              <Button
-                size="lg"
-                variant="outline"
-                className="w-full"
-                onClick={() => navigate('/designer')}
-              >
-                {user ? 'Go to Dashboard' : 'Start Free'}
-              </Button>
-            </motion.div>
-
-            {/* Full / Pro */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.1 }}
-              className="rounded-2xl border-2 border-primary bg-card p-8 shadow-2xl shadow-primary/10 flex flex-col relative overflow-hidden"
-            >
-              {/* Glow */}
-              <div className="absolute top-0 right-0 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Cloud className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <p className="font-semibold text-lg">Pro</p>
-                  <p className="text-xs text-muted-foreground">Cloud-powered, always-on</p>
-                </div>
-                <Badge className="ml-auto bg-gradient-to-r from-primary to-accent text-white border-0">
-                  Most popular
-                </Badge>
-              </div>
-
-              <div className="mb-6">
-                <span className="text-4xl font-bold">$19</span>
-                <span className="text-muted-foreground ml-2">/ month</span>
-              </div>
-
-              <ul className="space-y-2 mb-8 flex-1">
-                {[
-                  'Everything in Lite',
-                  'Cloud storage (persistent history)',
-                  'Cross-device sync',
-                  'Background processing 24/7',
-                  'Auto API key rotation pool',
-                  'Auto retry + Webhook / Email alerts',
-                  'Team workspace & shared pipelines',
-                  'Priority support',
-                ].map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-sm">
-                    <Check className="w-4 h-4 text-green-500 shrink-0" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-
-              <Button
-                size="lg"
-                className="w-full bg-gradient-to-r from-primary to-accent text-white shadow-glow"
-              >
-                <Sparkles className="w-4 h-4 mr-2" />
-                Get Pro — Coming Soon
-              </Button>
-            </motion.div>
-          </div>
-
-          {/* Detailed comparison table */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="rounded-2xl border bg-card overflow-hidden shadow-lg"
-          >
-            <div className="grid grid-cols-3 bg-muted/50 px-6 py-4 text-sm font-semibold border-b">
-              <span>Feature</span>
-              <span className="text-center">Lite</span>
-              <span className="text-center text-primary">Pro</span>
+      {/* Feature 3: Custom Rendering */}
+      <FeatureSection
+        tagline="Developer Experience"
+        headline="Your output. Your renderer."
+        description="Write custom React (TSX) components directly in your browser to render AI results exactly how you need them. Perfect for creating custom dashboards, document previews, or data visualizations."
+        bullets={[
+          "Live TSX sandbox editor",
+          "In-browser code compilation",
+          "Safe, scoped execution",
+          "Reusable component library"
+        ]}
+        visual={
+          <div className="p-8 bg-slate-950 h-full w-full font-mono text-xs text-blue-400 overflow-hidden text-left">
+            <div className="flex items-center gap-2 mb-4 text-slate-500 border-b border-slate-800 pb-2">
+              <Terminal className="w-4 h-4" />
+              <span>Component.tsx</span>
             </div>
-            {planFeatures.map((row, idx) => (
-              <div
-                key={idx}
-                className={cn(
-                  'grid grid-cols-3 px-6 py-3 text-sm items-center',
-                  idx % 2 === 0 ? 'bg-background' : 'bg-muted/20',
-                )}
-              >
-                <span className="text-muted-foreground">{row.label}</span>
-                <div className="text-center">
-                  <FeatureCell value={row.lite} />
-                </div>
-                <div className="text-center">
-                  <FeatureCell value={row.full} />
-                </div>
-              </div>
-            ))}
-          </motion.div>
+            <div className="space-y-1">
+              <p><span className="text-purple-400">const</span> <span className="text-yellow-400">Component</span> = ({'{ '} data {' }'}) ={'>'} {'{'}</p>
+              <p className="pl-4 text-slate-500">// Your custom UI logic</p>
+              <p className="pl-4 text-purple-400">return</p> (
+              <p className="pl-8 text-green-400">{'<'}<span className="text-blue-400">Card</span>{' className="p-4"'}{'>'}</p>
+              <p className="pl-12 text-blue-200">{'{ '}data.summary{' }'}</p>
+              <p className="pl-8 text-green-400">{'</'}<span className="text-blue-400">Card</span>{'>'}</p>
+              <p className="pl-4">);</p>
+              <p>{'}'};</p>
+            </div>
+          </div>
+        }
+      />
 
-          {/* Upgrade triggers callout */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="mt-8 grid sm:grid-cols-3 gap-4"
-          >
-            {[
-              {
-                icon: Clock,
-                title: 'Runs 24/7',
-                desc: 'Pro processes batches even when your browser is closed.',
-              },
-              {
-                icon: Users,
-                title: 'Team-ready',
-                desc: 'Share pipelines and results with your entire team.',
-              },
-              {
-                icon: RefreshCw,
-                title: 'Never hit rate limits',
-                desc: 'Auto key rotation keeps your batches flowing uninterrupted.',
-              },
-            ].map((item, idx) => (
-              <div
-                key={idx}
-                className="flex gap-3 p-4 rounded-xl border bg-card items-start"
-              >
-                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <item.icon className="w-4 h-4 text-primary" />
-                </div>
-                <div>
-                  <p className="font-medium text-sm">{item.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
-                </div>
-              </div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
+      {/* Use Cases Section */}
+      <UseCasesSection />
 
-      {/* ── CTA ──────────────────────────────────────────────────────────── */}
-      <section className="py-20 px-6">
+      {/* Pricing Section */}
+      <PricingSection />
+
+      {/* Final CTA */}
+      <section className="py-32 px-6">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
-          className="max-w-3xl mx-auto text-center p-12 rounded-3xl bg-gradient-to-br from-primary/10 to-accent/10 border"
+          className="max-w-4xl mx-auto rounded-[3rem] bg-foreground text-background p-12 md:p-20 text-center relative overflow-hidden shadow-2xl"
         >
-          <h2 className="text-3xl font-bold mb-4">Start orchestrating for free</h2>
-          <p className="text-muted-foreground mb-8">
-            No sign-up. No credit card. Open the Designer and build your first
-            AI pipeline in minutes.
+          {/* Background Highlight */}
+          <div className="absolute top-0 left-0 w-full h-full bg-primary/20 blur-[100px] -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+
+          <h2 className="text-4xl md:text-6xl font-black mb-8 relative z-10 leading-tight">
+            Ready to Start Your <br />
+            AI Assembly Line?
+          </h2>
+          <p className="text-xl md:text-2xl text-background/70 max-w-2xl mx-auto mb-12 relative z-10">
+            Open the Designer and build your first pipeline in minutes.
+            No sign-up. No credit card. Just pure AI orchestration.
           </p>
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 relative z-10">
             <Button
               size="lg"
-              className="h-14 px-10 text-lg bg-gradient-to-r from-primary to-accent text-white shadow-glow"
+              className="h-16 px-12 text-xl font-black bg-primary hover:bg-primary/90 text-white shadow-glow transition-all"
               onClick={() => navigate('/designer')}
             >
-              <Sparkles className="w-5 h-5 mr-2" />
-              {user ? 'Go to Dashboard' : 'Open Designer Free'}
+              Start Free Today
+              <ArrowRight className="w-6 h-6 ml-3" />
             </Button>
-          </motion.div>
+            <Button
+              variant="link"
+              size="lg"
+              className="text-white hover:text-primary text-lg"
+              onClick={() => navigate('/hub')}
+            >
+              Learn from the community
+            </Button>
+          </div>
         </motion.div>
       </section>
+
+      {/* Footer (Simplified) */}
+      <footer className="py-12 border-t text-center text-muted-foreground text-sm">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-2 font-bold text-foreground">
+            <Sparkles className="w-5 h-5 text-primary" />
+            Orchable
+          </div>
+          <div className="flex items-center gap-8 text-xs font-semibold">
+            <a href="#features" className="hover:text-primary">Features</a>
+            <a href="/hub" className="hover:text-primary">Community Hub</a>
+            <a href="#pricing" className="hover:text-primary">Pricing</a>
+            <a href="https://github.com" className="hover:text-primary">GitHub</a>
+          </div>
+          <div className="text-[10px] uppercase tracking-widest font-bold opacity-50">
+            © 2026 Orchable · Built with Peace of Mind
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

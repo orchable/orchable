@@ -12,8 +12,9 @@ import { OrchestratorImportExport } from './OrchestratorImportExport';
 import { useDesignerStore } from '@/stores/designerStore';
 import { useConfigs } from '@/hooks/useConfigs';
 import { Button } from '@/components/ui/button';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, Globe } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { ShareToHubDialog } from '@/components/hub/ShareToHubDialog';
 
 export default function OrchestratorDesigner() {
     const { selectedNode, reset, config, loadConfig } = useDesignerStore();
@@ -21,6 +22,7 @@ export default function OrchestratorDesigner() {
     const configId = searchParams.get('configId');
     const { data: savedConfigs } = useConfigs();
     const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false);
+    const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
 
     useEffect(() => {
         if (configId && savedConfigs && !hasAttemptedLoad) {
@@ -55,8 +57,33 @@ export default function OrchestratorDesigner() {
                         <RotateCcw className="w-4 h-4 mr-2" />
                         Reset
                     </Button>
+                    <Separator orientation="vertical" className="h-9 bg-border" />
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!config?.id}
+                        onClick={() => setIsShareDialogOpen(true)}
+                        className="bg-card shadow-sm hover:border-primary/50 text-primary"
+                    >
+                        <Globe className="w-4 h-4 mr-2" />
+                        Share
+                    </Button>
                     <SaveConfigDialog />
                     <RunExecutionDialog disabled={!config?.id} />
+
+                    {config?.id && (
+                        <ShareToHubDialog
+                            open={isShareDialogOpen}
+                            onOpenChange={setIsShareDialogOpen}
+                            assetType="orchestration"
+                            assetId={config.id}
+                            initialData={{
+                                title: config.name,
+                                description: config.description,
+                                tags: (config as any).tags || []
+                            }}
+                        />
+                    )}
                 </div>
                 <FlowCanvas />
             </div>

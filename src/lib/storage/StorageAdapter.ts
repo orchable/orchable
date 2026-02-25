@@ -24,6 +24,8 @@ export interface PromptTemplate {
 	created_by?: string; // New: metadata
 	created_at?: string;
 	updated_at?: string;
+	is_public?: boolean;
+	hub_asset_id?: string;
 }
 
 export interface CustomComponent {
@@ -32,10 +34,11 @@ export interface CustomComponent {
 	description?: string;
 	code: string;
 	mock_data?: Record<string, unknown>;
-	is_public: boolean;
+	is_public?: boolean;
 	created_at?: string;
 	updated_at?: string;
 	created_by?: string;
+	hub_asset_id?: string;
 }
 
 export interface IStorageAdapter {

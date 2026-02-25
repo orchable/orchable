@@ -45,6 +45,9 @@ Complete guide for AI agents to write standard-compliant Prompt Templates (`%%va
 ### 12. [AI Agent: Custom View Component Authoring](./12_AI_Agent_Component_Guide.md)
 Sandbox guide for AI agents writing Custom View Components (TSX): injected globals, forbidden patterns list, and practical examples.
 
+### 17. [Community Hub](./17_Community_Hub.md)
+Complete design and implementation plan for the Orchable Hub — the community-driven asset sharing platform. Covers asset taxonomy, database schema, sharing workflows, Remix/attribution chains, UI structure, moderation model, access control matrix, monetization-ready schema, and the phased implementation roadmap.
+
 ---
 
-*Last updated: 2026-02-24*
+*Last updated: 2026-02-25*

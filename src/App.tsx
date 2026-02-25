@@ -13,6 +13,9 @@ import { AssetLibrary } from "./pages/AssetLibrary";
 import { CalculatorPage } from "./pages/Calculator";
 import SettingsPage from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import { HubBrowse } from "./pages/hub/HubBrowse";
+import { AssetDetail } from "./pages/hub/AssetDetail";
+import { CreatorProfile } from "./pages/hub/CreatorProfile";
 
 import { AuthProvider } from "./contexts/AuthContext";
 import { TierProvider } from "./contexts/TierContext";
@@ -43,6 +46,10 @@ const App = () => (
                     <Route path="/assets" element={<AssetLibrary />} />
                     <Route path="/calculator" element={<CalculatorPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/hub" element={<HubBrowse />} />
+                    <Route path="/hub/:category" element={<HubBrowse />} />
+                    <Route path="/hub/c/:type/:slug" element={<AssetDetail />} />
+                    <Route path="/hub/creators/:userId" element={<CreatorProfile />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </Layout>
