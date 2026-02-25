@@ -100,7 +100,7 @@ export function LandingNav() {
                                 className="bg-primary hover:bg-primary/90 shadow-glow"
                                 onClick={() => navigate('/designer')}
                             >
-                                Start Free — No Sign-up
+                                Start Free Today
                             </Button>
                         </>
                     )}
@@ -172,7 +172,7 @@ export function LandingNav() {
                                                 navigate('/designer');
                                             }}
                                         >
-                                            Start Free — No Sign-up
+                                            Start Free Today
                                         </Button>
                                     </>
                                 )}

@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { Check } from 'lucide-react';
 
 interface FeatureSectionProps {
+    id?: string;
     headline: string;
     tagline: string;
     description: string;
@@ -12,6 +13,7 @@ interface FeatureSectionProps {
 }
 
 export function FeatureSection({
+    id,
     headline,
     tagline,
     description,
@@ -20,7 +22,7 @@ export function FeatureSection({
     reverse
 }: FeatureSectionProps) {
     return (
-        <section className="py-24 px-6 overflow-hidden">
+        <section id={id} className="py-24 px-6 overflow-hidden">
             <div className="max-w-7xl mx-auto">
                 <div className={cn(
                     "flex flex-col lg:flex-row items-center gap-16 lg:gap-24",

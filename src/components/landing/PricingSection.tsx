@@ -10,15 +10,15 @@ export function PricingSection() {
 
     const tiers = [
         {
-            name: 'Anonymous',
+            name: 'Free',
             price: '$0',
-            description: 'Zero setup. No account. Pure privacy.',
+            description: 'Start your journey. Built for creators.',
             features: [
                 'Local Execution (Browser)',
-                'Unlimited Stages & Tasks',
+                '100 Free Monthly Tasks (Cloud)',
+                'Unlimited Stages & Tasks (Local)',
                 'Visual Pipeline Designer',
-                'Local File Imports',
-                'No signup required'
+                'Basic Hub Community Access'
             ],
             cta: 'Start Now — For Free',
             variant: 'outline'
@@ -28,7 +28,7 @@ export function PricingSection() {
             price: '$0',
             description: 'Cloud sync for serious creators.',
             features: [
-                'Everything in Anonymous',
+                'Everything in Free',
                 'Cloud-persistent history',
                 'Cross-device sync (Supabase)',
                 'Early access to Hub features',
@@ -61,7 +61,7 @@ export function PricingSection() {
                 <div className="text-center mb-16">
                     <h2 className="text-3xl md:text-5xl font-black mb-6 underline decoration-primary/30 underline-offset-8">Simple Pricing</h2>
                     <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                        Start free in your browser. Upgrade only when you outgrow your local machine.
+                        Start free today. Upgrade only when you outgrow your local machine.
                     </p>
                 </div>
 

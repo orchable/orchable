@@ -24,6 +24,7 @@ export function HomePage() {
 
       {/* Feature 1: Simplicity */}
       <FeatureSection
+        id="features"
         tagline="Design without limits"
         headline="One prompt. One Stage. Infinite scale."
         description="Don't spend weeks learning complex automation tools. If you can write a prompt, you can build a multi-stage AI pipeline in Orchable. Focus on your expertise, not the infrastructure."
@@ -143,7 +144,7 @@ export function HomePage() {
           </h2>
           <p className="text-xl md:text-2xl text-background/70 max-w-2xl mx-auto mb-12 relative z-10">
             Open the Designer and build your first pipeline in minutes.
-            No sign-up. No credit card. Just pure AI orchestration.
+            Just pure AI orchestration.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-6 relative z-10">
