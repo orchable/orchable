@@ -84,6 +84,43 @@ A list of proposed features and improvements, prioritized by impact and complexi
 
 ---
 
+## 🌐 Open Source & Community Strategy (Inspired by Mintlify)
+
+> **Background**: Research on Mintlify's OSS program and GitHub organization revealed a powerful "Commercial Open Core" growth strategy applicable to Orchable.
+
+### 11. Orchable OSS Program
+
+- **Proposal**: Free enhanced tier for **non-commercial open source AI projects** (similar to Mintlify's free Pro for OSS). Benefits: higher batch quota, unlocked analytics in Monitor, priority queue.
+- **Eligibility**: OSS license (MIT/Apache/GPL), non-VC-funded, non-profit.
+- **Page**: Add `/oss` landing page with application typeform.
+- **Difficulty**: ⭐⭐
+
+### 12. Pipeline Starter Templates (GitHub Public Repo)
+
+- **Proposal**: Create public GitHub repo `orchable/starter` with ready-made pipeline JSON configs (imported directly into Designer). Inspired by `mintlify/starter` (⭐1.7k).
+- **Example templates**:
+  - `text-summarizer` — Extract → Summarize (2 stages)
+  - `qa-generator` — Read → Generate Q&A → Format (3 stages)
+  - `content-translator` — Translate → Localize → Review
+  - `image-analyzer` — Describe → Tag → Classify
+  - `seo-optimizer` — Analyze → Rewrite → Score
+- **Mechanism**: Users click "Import Template" in Community Hub → pipeline config auto-loads into Designer.
+- **Difficulty**: ⭐⭐
+
+### 13. GitHub Discussion as Feature Requests Hub
+
+- **Proposal**: Use GitHub Discussions (category: Feature Requests) as the primary community feedback channel — link from LandingFooter, Community Hub, and Settings page.
+- **Why**: Mintlify routes all feature requests to GitHub Discussions. It keeps developer community engaged and provides free prioritization signal.
+- **Difficulty**: ⭐ (just configure GitHub repo + add links)
+
+### 14. Open-Source UI Component Library (`orchable/components`)
+
+- **Proposal**: Extract and publish reusable Custom View Components as a community-maintained public library on GitHub.
+- **Expands on**: Wishlist item #10 (Component Marketplace) — this is the OSS-friendly version.
+- **Difficulty**: ⭐⭐⭐
+
+---
+
 ## Priority Summary (Remaining)
 
 | # | Feature | Priority | Difficulty |
@@ -98,5 +135,9 @@ A list of proposed features and improvements, prioritized by impact and complexi
 | 8 | Multi-Model Support | 🟢 Low | ⭐⭐⭐⭐ |
 | 9 | Plugin System | 🟢 Low | ⭐⭐⭐⭐⭐ |
 | 10 | Component Marketplace | 🟢 Low | ⭐⭐⭐ |
+| 11 | OSS Program | 🟢 Low | ⭐⭐ |
+| 12 | Pipeline Starter Templates | 🟢 Low | ⭐⭐ |
+| 13 | GitHub Discussions Hub | 🟢 Low | ⭐ |
+| 14 | OSS Component Library | 🟢 Low | ⭐⭐⭐ |
 
-*Last Updated: 2026-02-24*
+*Last Updated: 2026-02-25*

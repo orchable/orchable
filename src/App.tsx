@@ -16,6 +16,10 @@ import NotFound from "./pages/NotFound";
 import { HubBrowse } from "./pages/hub/HubBrowse";
 import { AssetDetail } from "./pages/hub/AssetDetail";
 import { CreatorProfile } from "./pages/hub/CreatorProfile";
+import WallOfLove from './pages/WallOfLove';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
+
 
 import { AuthProvider } from "./contexts/AuthContext";
 import { TierProvider } from "./contexts/TierContext";
@@ -51,7 +55,11 @@ const App = () => (
                     <Route path="/hub/:category" element={<HubBrowse />} />
                     <Route path="/hub/c/:type/:slug" element={<AssetDetail />} />
                     <Route path="/hub/creators/:userId" element={<CreatorProfile />} />
+                    <Route path="/wall-of-love" element={<WallOfLove />} />
+                    <Route path="/privacy" element={<PrivacyPolicy />} />
+                    <Route path="/terms" element={<TermsOfService />} />
                     <Route path="*" element={<NotFound />} />
+
                   </Routes>
                 </Layout>
               } />

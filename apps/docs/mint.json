@@ -17,12 +17,12 @@
 	"topbarLinks": [
 		{
 			"name": "Support",
-			"url": "mailto:support@orchable.ai"
+			"url": "mailto:support@orchable.app"
 		}
 	],
 	"topbarCtaButton": {
 		"name": "Get Started",
-		"url": "https://orchable.ai/designer"
+		"url": "https://orchable.app/designer"
 	},
 	"anchors": [
 		{

@@ -1,0 +1,42 @@
+# Orchable Open Source License
+
+Orchable is licensed under a modified Apache License 2.0, with the following additional conditions:
+
+## 1. Permitted Uses
+
+You are freely permitted to:
+- Use, copy, and modify this software for personal or internal business purposes.
+- Self-host Orchable for your own organization's internal use.
+- Contribute improvements back to this repository.
+- Use this software for academic research, education, and non-commercial projects.
+
+## 2. Additional Restrictions
+
+The following uses **require a separate commercial license** from Orchable:
+
+**a. Competing SaaS Service**
+You may not use this source code to operate a publicly available, multi-tenant AI pipeline orchestration service that competes directly with Orchable's hosted offering, without explicit written permission from Orchable.
+
+- *Multi-tenant* is defined as: a single deployment serving multiple distinct organizations or users with isolated data environments.
+
+**b. Branding and Attribution**
+You may not remove or modify the Orchable logo, name, or copyright notices in the frontend interface or documentation when deploying a publicly accessible service.
+
+- *Frontend* refers to all components in the `src/` directory or any compiled web interface derived from this source code.
+
+## 3. Contributor Agreement
+
+By submitting a contribution (pull request, issue, or otherwise) to this repository, you agree that:
+
+a. Orchable may adjust the open-source license terms as needed (more permissive or more restrictive).
+b. Your contributed code may be used for commercial purposes, including Orchable's cloud service.
+
+## 4. All Other Terms
+
+Except for the conditions stated above, all other rights and restrictions follow the **Apache License, Version 2.0**.
+
+Full text: [http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0)
+
+---
+
+© 2026 Orchable. All rights reserved.
