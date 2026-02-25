@@ -1,0 +1,98 @@
+{
+	"name": "Orchable",
+	"logo": {
+		"light": "/images/logo.png",
+		"dark": "/images/logo.png"
+	},
+	"favicon": "/favicon.ico",
+	"colors": {
+		"primary": "#0d9488",
+		"light": "#2dd4bf",
+		"dark": "#0f172a",
+		"anchors": {
+			"from": "#0d9488",
+			"to": "#2dd4bf"
+		}
+	},
+	"topbarLinks": [
+		{
+			"name": "Support",
+			"url": "mailto:support@orchable.ai"
+		}
+	],
+	"topbarCtaButton": {
+		"name": "Get Started",
+		"url": "https://orchable.ai/designer"
+	},
+	"anchors": [
+		{
+			"name": "Community Hub",
+			"icon": "share-nodes",
+			"url": "community-hub"
+		},
+		{
+			"name": "GitHub",
+			"icon": "github",
+			"url": "https://github.com/thanh01pmt/orchable"
+		}
+	],
+	"navigation": [
+		{
+			"group": "Getting Started",
+			"pages": ["introduction", "community-hub"]
+		},
+		{
+			"group": "Architecture",
+			"pages": [
+				"architecture/system-overview",
+				"architecture/database-schema",
+				"architecture/frontend-guide",
+				"architecture/n-stage-analysis"
+			]
+		},
+		{
+			"group": "Guides",
+			"pages": [
+				"guides/operational-guide",
+				"guides/prompt-authoring",
+				"guides/prompt-conventions",
+				"guides/gemini-models",
+				"guides/gemini-api-guide",
+				"guides/gemini-free-tier",
+				"guides/pricing-tiers",
+				"guides/tiers-deep-dive",
+				"guides/custom-components",
+				"guides/community-hub"
+			]
+		},
+		{
+			"group": "Workflows",
+			"pages": [
+				"workflows/orchestration",
+				"workflows/base-agent",
+				"workflows/n8n-update-guide"
+			]
+		},
+		{
+			"group": "Reference",
+			"pages": [
+				"reference/api-keys",
+				"reference/api-key-management",
+				"reference/tiers-and-features",
+				"reference/troubleshooting",
+				"reference/operational-guide",
+				"reference/scripts",
+				"reference/n8n-scripts",
+				"reference/server-capacity",
+				"reference/server-optimization"
+			]
+		},
+		{
+			"group": "Release Info",
+			"pages": ["changelog", "wishlist"]
+		}
+	],
+	"footerSocials": {
+		"github": "https://github.com/thanh01pmt/orchable"
+	}
+}
