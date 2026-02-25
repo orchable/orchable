@@ -35,7 +35,7 @@
 
 ### ✅ No critical issues identified
 
-- Utilizes Supabase credentials (NhTaQndl4t247AxL).
+- Utilizes Supabase credentials (<SUPABASE_DB_PASSWORD>).
 - Complete transformation logic.
 - Correct status updates to 'processing'.
 

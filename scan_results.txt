@@ -596,7 +596,7 @@ FILE: /Users/tonypham/MEGA/WebApp/pbl-asset-tools/app/n8n-gen/src/n8n/workflows/
   [4]: > **Mục đích:** Ghi lại các vấn đề phát hiện trong n8n workflows và cách khắc phục
   [12]: ### ✅ Cấu trúc (OK)
   [36]: ### ✅ Không có vấn đề nghiêm trọng
-  [38]: - Sử dụng Supabase credential (NhTaQndl4t247AxL)
+  [38]: - Sử dụng Supabase credential (<SUPABASE_DB_PASSWORD>)
   [39]: - Transform logic đầy đủ
   [40]: - Update status về 'processing' đúng
   [48]: ### 🔴 Vấn đề 1: Sử dụng Anon Key thay vì Service Role Key

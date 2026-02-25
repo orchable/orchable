@@ -67,7 +67,7 @@ export function StepConfigPanel({ stepId }: { stepId: string }) {
             }
         };
         // Load only if panel is open and api key exists locally
-        if (localStorage.getItem("lovable_n8n_api_key")) {
+        if (localStorage.getItem("orchable_n8n_api_key")) {
             loadWorkflows();
         }
     }, []);
