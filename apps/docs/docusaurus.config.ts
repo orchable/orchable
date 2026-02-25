@@ -76,11 +76,6 @@ const config: Config = {
 					position: "left",
 				},
 				{
-					href: "https://orchable.app/pricing",
-					label: "Pricing",
-					position: "left",
-				},
-				{
 					href: "https://github.com/orchable/orchable",
 					label: "GitHub",
 					position: "right",
@@ -121,10 +116,6 @@ const config: Config = {
 						{
 							label: "Community Hub",
 							href: "https://orchable.app/hub",
-						},
-						{
-							label: "Pricing",
-							href: "https://orchable.app/pricing",
 						},
 					],
 				},
