@@ -1,3 +1,6 @@
+[<image-card alt="Stars" src="https://img.shields.io/github/stars/orchable/orchable" ></image-card>](https://github.com/orchable/orchable)
+[<image-card alt="License" src="https://img.shields.io/badge/License-Modified_Apache_2.0-blue" ></image-card>](LICENSE)
+
 <p align="center">
   <img src="apps/docs/images/logo.png" alt="Orchable Logo" width="80" />
 </p>
@@ -13,8 +16,6 @@
 </p>
 
 <p align="center">
-  <img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-teal" />
-  <img alt="Stars" src="https://img.shields.io/github/stars/orchable/orchable?style=flat&color=teal" />
   <img alt="Issues" src="https://img.shields.io/github/issues/orchable/orchable?color=teal" />
   <img alt="PRs Welcome" src="https://img.shields.io/badge/PRs-welcome-teal" />
 </p>
