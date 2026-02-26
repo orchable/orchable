@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { TierContext } from './TierContextObject';
-import { UserTier } from '@/lib/storage';
+import { UserTier, storage } from '@/lib/storage';
 import { syncService } from '@/services/syncService';
 import { usageService } from '@/services/usageService';
 import { supabase } from '@/lib/supabase';
@@ -43,12 +43,19 @@ export function TierProvider({ children }: { children: React.ReactNode }) {
                 // Read tier from DB profile sync
                 const userTier = (profile.tier || 'free') as UserTier;
                 setTierState(userTier);
+                storage.setTier(userTier); // Switch adapter to SupabaseAdapter
 
                 setIsSyncing(true);
                 try {
-                    await syncService.migrateAnonymousData();
+                    // Add a timeout to migration to prevent infinite loading
+                    const migrationPromise = syncService.migrateAnonymousData();
+                    const timeoutPromise = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error("Migration timeout")), 5000)
+                    );
+
+                    await Promise.race([migrationPromise, timeoutPromise]);
                 } catch (e) {
-                    console.error("Migration failed:", e);
+                    console.warn("Migration or sync failed, continuing to app:", e);
                 } finally {
                     setIsSyncing(false);
                 }

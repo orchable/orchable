@@ -15,7 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-import { useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { LandingNav } from '../landing/LandingNav';
 import { AnnouncementBar } from '../landing/AnnouncementBar';
 
@@ -26,6 +26,12 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const { user, signOut } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login');
+  };
   const isLandingPage = location.pathname === '/';
 
   return (
@@ -71,7 +77,7 @@ export function Layout({ children }: LayoutProps) {
                         </div>
                       </DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer" onClick={signOut}>
+                      <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer" onClick={handleSignOut}>
                         <LogOut className="mr-2 h-4 w-4" />
                         <span>Log out</span>
                       </DropdownMenuItem>

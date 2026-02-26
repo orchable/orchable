@@ -15,17 +15,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchProfile = async (userId: string): Promise<UserProfile | null> => {
-        const { data, error } = await supabase
-            .from('user_profiles')
-            .select('*')
-            .eq('id', userId)
-            .single();
+        try {
+            const { data, error } = await supabase
+                .from('user_profiles')
+                .select('*')
+                .eq('id', userId)
+                .maybeSingle(); // Better than .single() if profile might be missing
 
-        if (error) {
-            console.error('Error fetching profile:', error);
+            if (error) {
+                console.error('Error fetching profile for user:', userId, error);
+                return null;
+            }
+            return data;
+        } catch (err) {
+            console.error('Critical error in fetchProfile:', err);
             return null;
         }
-        return data;
     };
 
     const refreshProfile = async () => {
@@ -36,33 +41,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     useEffect(() => {
+        let isMounted = true;
+
         // Get initial session
         supabase.auth.getSession().then(async ({ data: { session } }) => {
+            if (!isMounted) return;
+
             setSession(session);
             setUser(session?.user ?? null);
             if (session?.user) {
                 const p = await fetchProfile(session.user.id);
-                setProfile(p);
+                if (isMounted) setProfile(p);
             }
-            setIsLoading(false);
+            if (isMounted) setIsLoading(false);
+        }).catch(err => {
+            console.error('Error in initial session check:', err);
+            if (isMounted) setIsLoading(false);
         });
 
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (_event, session) => {
+                if (!isMounted) return;
+
                 setSession(session);
                 setUser(session?.user ?? null);
                 if (session?.user) {
                     const p = await fetchProfile(session.user.id);
-                    setProfile(p);
+                    if (isMounted) setProfile(p);
                 } else {
-                    setProfile(null);
+                    if (isMounted) setProfile(null);
                 }
-                setIsLoading(false);
+                if (isMounted) setIsLoading(false);
             }
         );
 
-        return () => subscription.unsubscribe();
+        return () => {
+            isMounted = false;
+            subscription.unsubscribe();
+        };
     }, []);
 
     const signOut = async () => {
