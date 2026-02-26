@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { configService } from "@/services/configService";
 import { OrchestratorConfig, StepConfig } from "@/lib/types";
-import { useTier } from "@/contexts/TierContext";
+import { useTier } from "@/hooks/useTier";
 
 export function useConfigs() {
 	const { tier } = useTier();

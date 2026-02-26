@@ -22,6 +22,7 @@ import TermsOfService from './pages/TermsOfService';
 
 
 import { AuthProvider } from "./contexts/AuthContext";
+import { RoleProvider } from "./contexts/RoleContext"; // Added RoleProvider import
 import { TierProvider } from "./contexts/TierContext";
 import { Login } from "./pages/Login";
 import { AuthCallback } from "./pages/AuthCallback";
@@ -32,43 +33,45 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TierProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner duration={5000} closeButton />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
-              <Route path="/*" element={
-                <Layout>
-                  <Routes>
-                    <Route path="/" element={<HomePage />} />
-                    <Route path="/designer" element={<ProtectedRoute><DesignerPage /></ProtectedRoute>} />
-                    <Route path="/launcher" element={<ProtectedRoute><LauncherPage /></ProtectedRoute>} />
-                    <Route path="/monitor" element={<ProtectedRoute><MonitorPage /></ProtectedRoute>} />
-                    <Route path="/batch/:batchId" element={<ProtectedRoute><BatchProgress /></ProtectedRoute>} />
-                    <Route path="/assets" element={<ProtectedRoute><AssetLibrary /></ProtectedRoute>} />
-                    <Route path="/calculator" element={<ProtectedRoute><CalculatorPage /></ProtectedRoute>} />
-                    <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-                    <Route path="/hub" element={<HubBrowse />} />
-                    <Route path="/hub/:category" element={<HubBrowse />} />
-                    <Route path="/hub/c/:type/:slug" element={<AssetDetail />} />
-                    <Route path="/hub/creators/:userId" element={<CreatorProfile />} />
-                    <Route path="/wall-of-love" element={<WallOfLove />} />
-                    <Route path="/privacy" element={<PrivacyPolicy />} />
-                    <Route path="/terms" element={<TermsOfService />} />
-                    <Route path="*" element={<NotFound />} />
-
-                  </Routes>
-                </Layout>
-              } />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </TierProvider>
+      <RoleProvider>
+        <TierProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner duration={5000} closeButton />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
+                <Route path="/*" element={
+                  <Layout>
+                    <Routes>
+                      <Route path="/" element={<HomePage />} />
+                      <Route path="/designer" element={<ProtectedRoute><DesignerPage /></ProtectedRoute>} />
+                      <Route path="/launcher" element={<ProtectedRoute><LauncherPage /></ProtectedRoute>} />
+                      <Route path="/monitor" element={<ProtectedRoute><MonitorPage /></ProtectedRoute>} />
+                      <Route path="/batch/:batchId" element={<ProtectedRoute><BatchProgress /></ProtectedRoute>} />
+                      <Route path="/assets" element={<ProtectedRoute><AssetLibrary /></ProtectedRoute>} />
+                      <Route path="/calculator" element={<ProtectedRoute><CalculatorPage /></ProtectedRoute>} />
+                      <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+                      <Route path="/hub" element={<HubBrowse />} />
+                      <Route path="/hub/:category" element={<HubBrowse />} />
+                      <Route path="/hub/c/:type/:slug" element={<AssetDetail />} />
+                      <Route path="/hub/creators/:userId" element={<CreatorProfile />} />
+                      <Route path="/wall-of-love" element={<WallOfLove />} />
+                      <Route path="/privacy" element={<PrivacyPolicy />} />
+                      <Route path="/terms" element={<TermsOfService />} />
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </Layout>
+                } />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+        </TierProvider>
+      </RoleProvider>
     </AuthProvider>
   </QueryClientProvider>
 );
+
 
 export default App;

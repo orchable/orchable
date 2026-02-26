@@ -1,11 +1,19 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
+import { useRole } from '@/contexts/RoleContext';
 import { Loader2 } from 'lucide-react';
+import { UnauthorizedView } from './UnauthorizedView';
 
-export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { user, isLoading } = useAuth();
+export const ProtectedRoute: React.FC<{
+    children: React.ReactNode;
+    requiredRole?: 'user' | 'admin' | 'superadmin';
+}> = ({ children, requiredRole }) => {
+    const { user, isLoading: authLoading } = useAuth();
+    const { role, isLoading: roleLoading } = useRole();
     const location = useLocation();
+
+    const isLoading = authLoading || roleLoading;
 
     if (isLoading) {
         return (
@@ -18,6 +26,18 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!user) {
         // Redirect to login page but save the location they were trying to go to
         return <Navigate to="/login" state={{ from: location }} replace />;
+    }
+
+    if (requiredRole) {
+        const hasPermission = () => {
+            if (requiredRole === 'superadmin') return role === 'superadmin';
+            if (requiredRole === 'admin') return role === 'admin' || role === 'superadmin';
+            return true;
+        };
+
+        if (!hasPermission()) {
+            return <UnauthorizedView />;
+        }
     }
 
     return <>{children}</>;

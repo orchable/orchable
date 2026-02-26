@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { hubService, HubAssetType } from "@/services/hubService";
 import { toast } from "sonner";
 import { Globe, Share2, Tag, Info, AlertTriangle } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 
 interface ShareToHubDialogProps {

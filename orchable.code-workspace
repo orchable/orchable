@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "../../pbl-asset-tools"
+		},
+		{
+			"path": "../learnwell"
 		}
 	],
 	"settings": {}

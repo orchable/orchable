@@ -55,7 +55,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { ComponentEditor } from '@/components/batch/ComponentEditor';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { PromptEditorDialog } from '@/components/designer/PromptEditorDialog';

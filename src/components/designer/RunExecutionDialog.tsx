@@ -19,7 +19,7 @@ import { Label } from '@/components/ui/label';
 import { ExecutionMonitor } from './ExecutionMonitor';
 import { analyzeJsonStructure, isStructureCompatible } from '@/lib/jsonAnalyzer';
 import { batchService } from '@/services/batchService';
-import { useTier } from '@/contexts/TierContext';
+import { useTier } from '@/hooks/useTier';
 
 interface RunExecutionDialogProps {
     disabled?: boolean;
@@ -55,7 +55,7 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
                     }
 
                     // CHECK FOR STRUCTURAL COMPATIBILITY
-                    const savedMapping = config?.input_mapping as any;
+                    const savedMapping = config?.input_mapping as Record<string, any>;
                     const isCompatible = isStructureCompatible(savedMapping, analysis);
 
                     if (isCompatible && savedMapping) {
@@ -66,7 +66,7 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
                             jsonAnalysis: analysis,
                             fieldSelection: savedMapping.fieldSelection,
                             fieldMapping: savedMapping.fieldMapping,
-                            selectedTaskIndices: analysis.sampleTasks ? analysis.sampleTasks.map((_: any, i: number) => i) : []
+                            selectedTaskIndices: (analysis.sampleTasks as any[]) ? (analysis.sampleTasks as any[]).map((_: any, i: number) => i) : []
                         });
                         toast.success(`Structure matched! Settings restored from config.`);
                     } else {
@@ -80,7 +80,7 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
                                 perTask: analysis.perTaskFields.map((f: any) => f.path)
                             },
                             fieldMapping: {},
-                            selectedTaskIndices: analysis.sampleTasks ? analysis.sampleTasks.map((_, i) => i) : []
+                            selectedTaskIndices: (analysis.sampleTasks as any[]) ? (analysis.sampleTasks as any[]).map((_, i) => i) : []
                         });
                         if (savedMapping) {
                             toast.info(`New structure detected. Defaulting to select all.`);
@@ -134,12 +134,12 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
         try {
             // Get input items
             let inputItems: any[];
-            const currentInputData = inputData as any;
+            const currentInputData = inputData as Record<string, any>;
             if (currentInputData.mode === 'tsv') {
                 inputItems = currentInputData.syllabusData;
             } else {
                 const { processTaskData } = await import('@/lib/jsonAnalyzer');
-                inputItems = currentInputData.jsonAnalysis.sampleTasks.map((task: any) => {
+                inputItems = (currentInputData.jsonAnalysis as any).sampleTasks.map((task: any) => {
                     const processed = processTaskData(
                         task,
                         currentInputData.jsonData,
@@ -177,7 +177,7 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
             const geminiApiKey = localStorage.getItem("orchable_gemini_api_key");
             if (geminiApiKey) {
                 const { executorService } = await import('@/services/executorService');
-                executorService.start(geminiApiKey, tier);
+                executorService.start(tier);
                 toast.success("Local Task Executor started.");
             } else {
                 toast.warning("No Gemini API Key found in settings. Task processing will wait until a key is provided.");
@@ -250,7 +250,7 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
                                         <div className="bg-background/50 p-2 rounded border border-success/10">
                                             <p className="text-[10px] text-muted-foreground uppercase font-bold">Total Items</p>
                                             <p className="text-lg font-mono font-bold">
-                                                {inputData.mode === 'json' ? inputData.jsonAnalysis?.sampleTasks?.length : inputData.syllabusData.length}
+                                                {inputData.mode === 'json' ? (inputData.jsonAnalysis as any)?.sampleTasks?.length : inputData.syllabusData.length}
                                             </p>
                                         </div>
                                         <div className="bg-background/50 p-2 rounded border border-success/10">

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useTier } from '@/contexts/TierContext';
+import { useTier } from '@/hooks/useTier';
 import { UserTier } from '@/lib/storage';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Lock, Sparkles } from 'lucide-react';

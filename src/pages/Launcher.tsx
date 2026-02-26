@@ -19,8 +19,8 @@ import { TaskSelectionTable } from '@/components/launcher/TaskSelectionTable';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Link } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { useTier } from '@/contexts/TierContext';
+import { useAuth } from '@/hooks/useAuth';
+import { useTier } from '@/hooks/useTier';
 import { storage } from '@/lib/storage';
 import { executorService } from '@/services/executorService';
 

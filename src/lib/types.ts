@@ -5,13 +5,13 @@ export interface OrchestratorConfig {
 	description?: string;
 	steps: StepConfig[];
 	created_at: string;
-	updated_at: string; hub_asset_id?: string; is_public?: boolean;
+	updated_at: string;
+	hub_asset_id?: string;
+	is_public?: boolean;
 	created_by?: string;
 	viewport?: { x: number; y: number; zoom: number };
 	n8n_workflow_id?: string;
 	input_mapping?: unknown;
-	hub_asset_id?: string;
-	is_public?: boolean;
 }
 
 // Legacy Step Config - now supports both legacy webhook and new stage-based fields
@@ -192,7 +192,9 @@ export interface AIModelSetting {
 	use_case_tags?: string[];
 	organization_code?: string;
 	created_at: string;
-	updated_at: string; hub_asset_id?: string; is_public?: boolean;
+	updated_at: string;
+	hub_asset_id?: string;
+	is_public?: boolean;
 }
 
 // Stage Input/Output Contract Types
@@ -353,7 +355,9 @@ export interface Execution {
 	processing_tasks?: number; // New
 	launch_id?: string; // New
 	created_at: string;
-	updated_at: string; hub_asset_id?: string; is_public?: boolean;
+	updated_at: string;
+	hub_asset_id?: string;
+	is_public?: boolean;
 	created_by?: string; // New
 
 	// Parity with task_batches table
@@ -382,7 +386,9 @@ export interface StepExecution {
 	n8n_execution_id?: string;
 	duration_ms?: number;
 	created_at: string;
-	updated_at: string; hub_asset_id?: string; is_public?: boolean;
+	updated_at: string;
+	hub_asset_id?: string;
+	is_public?: boolean;
 }
 
 export interface StepResult {
@@ -430,4 +436,20 @@ export interface FieldMapping {
 	 * Otherwise, it's a dot-notated path from the input JSON.
 	 */
 	[contractFieldName: string]: string;
+}
+
+// Auth and Role Types
+export type UserRole = "user" | "admin" | "superadmin";
+
+export interface UserProfile {
+	id: string;
+	email: string;
+	full_name: string | null;
+	role: UserRole;
+	tier: "free" | "premium";
+	avatar_url: string | null;
+	username: string | null;
+	settings: Record<string, any>;
+	created_at: string;
+	updated_at: string;
 }

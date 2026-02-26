@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Sparkles, Play, Zap, Shield, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 
 export function HeroSection() {
     const navigate = useNavigate();

@@ -1,4 +1,4 @@
-import { useTier } from "@/contexts/TierContext";
+import { useTier } from "@/hooks/useTier";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";

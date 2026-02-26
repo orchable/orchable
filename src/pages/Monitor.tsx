@@ -22,7 +22,7 @@ import {
 import { Trash2, MoreVertical } from "lucide-react";
 import { taskActionService } from '@/services/taskActionService';
 import { toast } from 'sonner';
-import { useTier } from '@/contexts/TierContext';
+import { useTier } from '@/hooks/useTier';
 import { Cloud, CloudOff, Info } from 'lucide-react';
 
 // Subcomponent: Result Viewer
@@ -153,7 +153,8 @@ function StepMonitorItem({ step, index, expanded, onToggle }: { step: StepExecut
 }
 
 // Side Panel: Execution Detail
-function ExecutionDetailPanel({ executionData }: { executionData: any }) {
+// Side Panel: Execution Detail
+function ExecutionDetailPanel({ executionData }: { executionData: Record<string, any> }) {
   const isAiTask = executionData.task_type !== undefined;
 
   // Only query standard execution details if NOT an AI task
@@ -177,7 +178,7 @@ function ExecutionDetailPanel({ executionData }: { executionData: any }) {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-4">
             <h1 className="text-xl font-bold truncate max-w-lg">
-              {isAiTask ? displayData.task_type : displayData.syllabus_row.lessonTitle}
+              {isAiTask ? (displayData as any).task_type : (displayData as any).syllabus_row.lessonTitle}
             </h1>
             <StatusBadge status={displayData.status} size="lg" />
           </div>
@@ -190,14 +191,14 @@ function ExecutionDetailPanel({ executionData }: { executionData: any }) {
             <Clock className="w-4 h-4" />
             Created: {format(new Date(displayData.created_at), 'Pp')}
           </span>
-          {isAiTask && displayData.batch_id && (
+          {isAiTask && (displayData as any).batch_id && (
             <div className="flex items-center gap-2">
-              <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">Batch: {displayData.batch_id.slice(0, 8)}</span>
+              <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">Batch: {(displayData as any).batch_id.slice(0, 8)}</span>
               <Button
                 variant="outline"
                 size="sm"
                 className="h-7 text-[10px] gap-1 px-2 border-primary/30 text-primary hover:bg-primary/5"
-                onClick={() => window.open(`/batch/${displayData.batch_id}`, '_blank')}
+                onClick={() => window.open(`/batch/${(displayData as any).batch_id}`, '_blank')}
               >
                 <Activity className="w-3 h-3" />
                 View Batch Progress
@@ -443,27 +444,6 @@ export function MonitorPage() {
           )}
         </div>
 
-        {tier === 'anonymous' && (
-          <div className="mx-4 mt-2 mb-4 p-3 rounded-xl bg-primary/10 border border-primary/20 space-y-2">
-            <div className="flex items-start gap-2">
-              <CloudOff className="w-4 h-4 text-primary mt-0.5" />
-              <div className="flex-1">
-                <p className="text-[11px] font-semibold text-primary">Local Storage Only</p>
-                <p className="text-[10px] text-muted-foreground leading-relaxed">
-                  Sign in to sync your results to the cloud and access them anywhere.
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full h-7 text-[10px] border-primary/30 text-primary hover:bg-primary/5"
-              onClick={() => navigate('/auth')}
-            >
-              Sign in to Sync
-            </Button>
-          </div>
-        )}
 
         {isSyncing && (
           <div className="mx-4 mt-2 mb-4 p-3 rounded-xl bg-info/10 border border-info/20 flex items-center gap-3 animate-pulse">

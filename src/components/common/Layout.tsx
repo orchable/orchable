@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { AppSidebar } from './AppSidebar';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { ThemeToggle } from './ThemeToggle';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { LogOut, User } from 'lucide-react';
 import {
   DropdownMenu,
