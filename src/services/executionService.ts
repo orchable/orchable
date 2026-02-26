@@ -24,6 +24,19 @@ export const executionService = {
 	},
 
 	async listExecutions(): Promise<Execution[]> {
+		const { supabase } = await import("@/lib/supabase");
+		const {
+			data: { user },
+		} = await supabase.auth.getUser();
+		if (user) {
+			const { data } = await supabase
+				.from("task_batches")
+				.select("*")
+				.eq("created_by", user.id)
+				.order("created_at", { ascending: false })
+				.limit(40);
+			return (data || []) as unknown as Execution[];
+		}
 		return storage.adapter.listBatches() as unknown as Promise<Execution[]>;
 	},
 
@@ -65,10 +78,23 @@ export const executionService = {
 	},
 
 	async listAiTasks(): Promise<any[]> {
+		const { supabase } = await import("@/lib/supabase");
+		const {
+			data: { user },
+		} = await supabase.auth.getUser();
+		if (user) {
+			const { data } = await supabase
+				.from("ai_tasks")
+				.select(
+					"id, task_type, status, created_at, error_message, batch_id, input_data, output_data, extra, user_id",
+				)
+				.eq("user_id", user.id)
+				.order("created_at", { ascending: false })
+				.limit(100);
+			return data || [];
+		}
+		// IndexedDB fallback for unauthenticated / lite users
 		const adapter = storage.adapter;
-		// For Lite users, we can list all tasks from IndexedDB.
-		// For Premium, this is usually handled by Supabase views or specific queries,
-		// but we'll provide a local fallback if using IndexedDBAdapter.
 		if (adapter.constructor.name === "IndexedDBAdapter") {
 			const db = await import("@/lib/storage/IndexedDBAdapter").then(
 				(m) => m.db,

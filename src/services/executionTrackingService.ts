@@ -112,9 +112,11 @@ const parseSafe = (val: any): any => {
 export async function getExecutionProgress(
 	id: string,
 ): Promise<ExecutionProgress | null> {
-	const { storage } = await import("@/lib/storage");
-	const adapter = storage.adapter;
-	const isIndexedDB = adapter.constructor.name === "IndexedDBAdapter";
+	// Check Supabase session first to avoid race condition with adapter switching
+	const {
+		data: { user: sessionUser },
+	} = await supabase.auth.getUser();
+	const isIndexedDB = !sessionUser; // No session → use IndexedDB (offline/free)
 
 	let batchData: Record<string, unknown> | null = null;
 	let orchestratorConfig: {
@@ -151,7 +153,7 @@ export async function getExecutionProgress(
 		}));
 	} else {
 		// 1. Get batch info AND join with orchestration config to get expected stages
-		const { data: bb, error: batchError } = await supabase
+		let { data: bb, error: batchError } = await supabase
 			.from("task_batches")
 			.select(
 				`
@@ -166,6 +168,30 @@ export async function getExecutionProgress(
 			)
 			.eq("id", id)
 			.maybeSingle();
+
+		// If not found by batch id, try as a launch_id (campaign navigation)
+		if (!bb && !batchError) {
+			const { data: launchBatch, error: launchErr } = await supabase
+				.from("task_batches")
+				.select(
+					`
+				name, 
+				status, 
+				orchestrator_config_id,
+				lab_orchestrator_configs!task_batches_orchestrator_config_id_fkey (
+					name,
+					steps
+				)
+			`,
+				)
+				.eq("launch_id", id)
+				.order("created_at", { ascending: true })
+				.limit(1)
+				.maybeSingle();
+			if (!launchErr && launchBatch) {
+				bb = launchBatch;
+			}
+		}
 
 		if (batchError) {
 			console.error("Failed to fetch batch info:", batchError);
@@ -371,9 +397,11 @@ export async function getExecutionTasks(
 	id: string,
 	stageKey?: string,
 ): Promise<TaskSummary[]> {
-	const { storage } = await import("@/lib/storage");
-	const adapter = storage.adapter;
-	const isIndexedDB = adapter.constructor.name === "IndexedDBAdapter";
+	// Check Supabase session first to avoid race condition with adapter switching
+	const {
+		data: { user: sessionUser },
+	} = await supabase.auth.getUser();
+	const isIndexedDB = !sessionUser;
 
 	let rawTasks: Partial<TaskSummary>[] = [];
 
@@ -529,10 +557,74 @@ export interface BatchSummary {
 export async function getRecentBatches(
 	limit: number = 20,
 ): Promise<BatchSummary[]> {
+	// Always check Supabase session first — the storage adapter may not have
+	// finished switching from IndexedDB to SupabaseAdapter yet (race condition
+	// on page load for premium users).
+	const {
+		data: { user },
+	} = await supabase.auth.getUser();
+
+	if (user) {
+		// Authenticated user — query Supabase directly
+		// (covers premium users even if adapter is still IndexedDB on first render)
+		const { data, error } = await supabase
+			.from("task_batches")
+			.select(
+				`
+            *,
+            lab_orchestrator_configs!task_batches_orchestrator_config_id_fkey (
+                steps
+            )
+        `,
+			)
+			.eq("created_by", user.id)
+			.order("created_at", { ascending: false })
+			.limit(limit);
+
+		if (!error && data && data.length > 0) {
+			return data.map((b) => {
+				const total = b.total_tasks || 0;
+				const completed = b.completed_tasks || 0;
+				const failed = b.failed_tasks || 0;
+				const processing = b.processing_tasks || 0;
+
+				let calculatedStatus = b.status || "pending";
+				if (total > 0) {
+					if (completed + failed >= total) {
+						calculatedStatus = failed > 0 ? "failed" : "completed";
+					} else if (processing > 0 || completed + failed > 0) {
+						calculatedStatus = "processing";
+					}
+				}
+
+				return {
+					id: b.id,
+					orchestrator_name: b.name || "Generic Execution",
+					status:
+						b.status === "completed" || b.status === "failed"
+							? b.status
+							: calculatedStatus,
+					created_at: b.created_at,
+					task_count: total,
+					completed_tasks: completed,
+					failed_tasks: failed,
+					progress:
+						total > 0 ? Math.round((completed / total) * 100) : 0,
+					launch_id: b.launch_id,
+				};
+			});
+		}
+
+		// Supabase returned error or empty — try fallback (ai_tasks group-by)
+		if (error) {
+			console.error("Failed to fetch recent batches:", error);
+		}
+		return getRecentBatchesFallback(limit);
+	}
+
+	// No session — check if IndexedDB has anything (offline / free tier)
 	const { storage } = await import("@/lib/storage");
 	const adapter = storage.adapter;
-
-	// If using IndexedDB (Lite tiers), query there instead of Supabase
 	if (adapter.constructor.name === "IndexedDBAdapter") {
 		const batches = await adapter.listBatches(limit);
 		return batches.map((b) => ({
@@ -553,78 +645,7 @@ export async function getRecentBatches(
 		}));
 	}
 
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
-
-	if (!user) return getRecentBatchesFallback(limit);
-
-	const { data, error } = await supabase
-		.from("task_batches")
-		.select(
-			`
-            *,
-            lab_orchestrator_configs!task_batches_orchestrator_config_id_fkey (
-                steps
-            )
-        `,
-		)
-		.eq("created_by", user.id)
-		.order("created_at", { ascending: false })
-		.limit(limit);
-
-	if (error) {
-		console.error("Failed to fetch recent batches:", error);
-		return getRecentBatchesFallback(limit);
-	}
-
-	if (!data || data.length === 0) {
-		return getRecentBatchesFallback(limit);
-	}
-
-	return data.map((b) => {
-		const total = b.total_tasks || 0;
-		const completed = b.completed_tasks || 0;
-		const failed = b.failed_tasks || 0;
-		const processing = b.processing_tasks || 0;
-
-		// Calculate status from counters
-		let calculatedStatus = b.status || "pending";
-
-		if (total > 0) {
-			if (completed + failed >= total) {
-				calculatedStatus = failed > 0 ? "failed" : "completed";
-			} else if (processing > 0 || completed + failed > 0) {
-				calculatedStatus = "processing";
-			}
-		}
-
-		// STUCK DETECTION in list view
-		const orchestratorConfig = (b as Record<string, unknown>)
-			?.lab_orchestrator_configs as {
-			steps: Record<string, unknown>[];
-		} | null;
-		const expectedSteps = orchestratorConfig?.steps || [];
-
-		// We calculate "actual stages" roughly from b.completed_tasks vs b.total_tasks if we don't have task data here
-		// However, a better way is to just trust the 'completed' state ONLY if all stage logic in getExecutionProgress is happy.
-		// For list view, we'll focus on reconciling the Pending vs Completed mismatch first.
-
-		return {
-			id: b.id,
-			orchestrator_name: b.name || "Generic Execution",
-			status:
-				b.status === "completed" || b.status === "failed"
-					? b.status
-					: calculatedStatus,
-			created_at: b.created_at,
-			task_count: total,
-			completed_tasks: completed,
-			failed_tasks: failed,
-			progress: total > 0 ? Math.round((completed / total) * 100) : 0,
-			launch_id: b.launch_id,
-		};
-	});
+	return getRecentBatchesFallback(limit);
 }
 
 /**

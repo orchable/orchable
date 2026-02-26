@@ -183,7 +183,7 @@ function ExecutionDetailPanel({ executionData }: { executionData: Record<string,
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-4">
             <h1 className="text-xl font-bold truncate max-w-lg">
-              {isAiTask ? (displayData as any).task_type : (displayData as any).syllabus_row.lessonTitle}
+              {isAiTask ? (displayData as any).task_type : ((displayData as any).syllabus_row?.lessonTitle || 'Execution')}
             </h1>
             <StatusBadge status={displayData.status} size="lg" />
           </div>
