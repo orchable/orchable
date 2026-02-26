@@ -49,4 +49,21 @@ export const keyPoolService = {
 			},
 		];
 	},
+
+	async hasPersonalKeys(): Promise<boolean> {
+		const {
+			data: { user },
+		} = await supabase.auth.getUser();
+		if (!user) return false;
+
+		const { data, error } = await supabase
+			.from("user_api_keys")
+			.select("id")
+			.eq("user_id", user.id)
+			.eq("pool_type", "personal")
+			.limit(1);
+
+		if (error) return false;
+		return data && data.length > 0;
+	},
 };

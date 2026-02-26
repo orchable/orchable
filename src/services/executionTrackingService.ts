@@ -27,6 +27,8 @@ export interface ExecutionProgress {
 	stages: StageProgress[];
 }
 
+import { StepConfig } from "@/lib/types";
+
 export interface TaskSummary {
 	id: string;
 	batch_id?: string | null;
@@ -37,6 +39,7 @@ export interface TaskSummary {
 	status: string;
 	lo_code?: string | null;
 	created_at: string;
+	updated_at?: string | null;
 	started_at?: string | null;
 	completed_at?: string | null;
 	error_message?: string | null;
@@ -70,6 +73,13 @@ export interface TaskSummary {
 	extra?: Record<string, unknown> | null;
 	split_group_id?: string | null;
 	launch_id?: string | null;
+	tier_source?:
+		| "free_pool"
+		| "free_byok"
+		| "premium_pool"
+		| "premium_byok"
+		| null;
+	synced_to_client?: boolean;
 }
 
 /**
@@ -102,52 +112,94 @@ const parseSafe = (val: any): any => {
 export async function getExecutionProgress(
 	id: string,
 ): Promise<ExecutionProgress | null> {
-	// 1. Get batch info AND join with orchestration config to get expected stages
-	const { data: batchData, error: batchError } = await supabase
-		.from("task_batches")
-		.select(
-			`
-            name, 
-            status, 
-            orchestrator_config_id,
-            lab_orchestrator_configs!task_batches_orchestrator_config_id_fkey (
-                name,
-                steps
-            )
-        `,
-		)
-		.eq("id", id)
-		.maybeSingle();
+	const { storage } = await import("@/lib/storage");
+	const adapter = storage.adapter;
+	const isIndexedDB = adapter.constructor.name === "IndexedDBAdapter";
 
-	if (batchError) {
-		console.error("Failed to fetch batch info:", batchError);
-	}
-
-	// Helper: Supabase FK joins return a single object (not array)
-	const orchestratorConfig = (batchData as Record<string, unknown>)
-		?.lab_orchestrator_configs as {
+	let batchData: Record<string, unknown> | null = null;
+	let orchestratorConfig: {
 		name: string;
-		steps: Record<string, unknown>[];
-	} | null;
+		steps: StepConfig[];
+	} | null = null;
+	let safeTasks: TaskSummary[] = [];
 
-	// 2. Get all tasks for this batch OR launch (campaign)
-	const { data: tasks, error: tasksError } = await supabase
-		.from("ai_tasks")
-		.select(
-			"id, stage_key, step_number, status, created_at, started_at, completed_at, input_data",
-		)
-		.or(`batch_id.eq.${id},launch_id.eq.${id}`);
+	if (isIndexedDB) {
+		const { db } = await import("@/lib/storage/IndexedDBAdapter");
+		// 1. Get batch info
+		const batch = await db.task_batches.get(id);
+		batchData =
+			batch ||
+			(await db.task_batches.where("launch_id").equals(id).first());
 
-	if (tasksError) {
-		console.error("Failed to fetch tasks:", tasksError);
-		return null;
+		if (batchData && batchData.orchestrator_config_id) {
+			orchestratorConfig = await db.orchestrator_configs.get(
+				batchData.orchestrator_config_id,
+			);
+		}
+
+		// 2. Get tasks
+		const rawTasks = await db.ai_tasks
+			.where("batch_id")
+			.equals(id)
+			.or("launch_id")
+			.equals(id)
+			.toArray();
+
+		safeTasks = rawTasks.map((t) => ({
+			...(t as unknown as TaskSummary),
+			input_data: parseSafe(t.input_data) as Record<string, unknown>,
+		}));
+	} else {
+		// 1. Get batch info AND join with orchestration config to get expected stages
+		const { data: bb, error: batchError } = await supabase
+			.from("task_batches")
+			.select(
+				`
+				name, 
+				status, 
+				orchestrator_config_id,
+				lab_orchestrator_configs!task_batches_orchestrator_config_id_fkey (
+					name,
+					steps
+				)
+			`,
+			)
+			.eq("id", id)
+			.maybeSingle();
+
+		if (batchError) {
+			console.error("Failed to fetch batch info:", batchError);
+		}
+
+		batchData = bb as Record<string, unknown>;
+		const configData = (batchData as Record<string, unknown>)
+			?.lab_orchestrator_configs as Record<string, unknown> | null;
+		if (configData) {
+			orchestratorConfig = {
+				name: configData.name as string,
+				steps: (configData.steps as unknown as StepConfig[]) || [],
+			};
+		}
+
+		// 2. Get all tasks for this batch OR launch (campaign)
+		const { data: tasks, error: tasksError } = await supabase
+			.from("ai_tasks")
+			.select(
+				"id, stage_key, step_number, status, created_at, started_at, completed_at, input_data",
+			)
+			.or(`batch_id.eq.${id},launch_id.eq.${id}`);
+
+		if (tasksError) {
+			console.error("Failed to fetch tasks:", tasksError);
+			return null;
+		}
+
+		// Apply parseSafe to all tasks data
+		safeTasks = (tasks || []).map((t) => ({
+			...(t as unknown as TaskSummary),
+			input_data: parseSafe(t.input_data) as Record<string, unknown>,
+		}));
 	}
-
-	// Apply parseSafe to all tasks data
-	const safeTasks = (tasks || []).map((t) => ({
-		...t,
-		input_data: parseSafe(t.input_data),
-	}));
 
 	if (!safeTasks || safeTasks.length === 0) {
 		// If batch exists but no tasks yet, it's pending
@@ -156,8 +208,8 @@ export async function getExecutionProgress(
 				orchestrator_execution_id: id,
 				orchestrator_name:
 					orchestratorConfig?.name || "Initializing...",
-				batch_name: batchData.name,
-				status: batchData.status || "pending",
+				batch_name: batchData.name as string,
+				status: (batchData.status as string) || "pending",
 				started_at: null,
 				completed_at: null,
 				total_stages: 0,
@@ -319,29 +371,62 @@ export async function getExecutionTasks(
 	id: string,
 	stageKey?: string,
 ): Promise<TaskSummary[]> {
-	let query = supabase
-		.from("ai_tasks")
-		.select(
-			"id, stage_key, step_number, task_type, status, lo_code, created_at, started_at, completed_at, error_message, user_id, parent_task_id, root_task_id, hierarchy_path, input_data, output_data, prompt_template_id",
-		)
-		.or(
-			`batch_id.eq.${id},launch_id.eq.${id},orchestrator_execution_id.eq.${id}`,
-		)
-		.order("step_number")
-		.order("created_at");
+	const { storage } = await import("@/lib/storage");
+	const adapter = storage.adapter;
+	const isIndexedDB = adapter.constructor.name === "IndexedDBAdapter";
 
-	if (stageKey) {
-		query = query.eq("stage_key", stageKey);
+	let rawTasks: Partial<TaskSummary>[] = [];
+
+	if (isIndexedDB) {
+		const { db } = await import("@/lib/storage/IndexedDBAdapter");
+		let tasks = await db.ai_tasks
+			.where("batch_id")
+			.equals(id)
+			.or("launch_id")
+			.equals(id)
+			.toArray();
+
+		if (stageKey) {
+			tasks = tasks.filter((t) => t.stage_key === stageKey);
+		}
+
+		tasks.sort((a, b) => {
+			if ((a.step_number || 0) !== (b.step_number || 0)) {
+				return (a.step_number || 0) - (b.step_number || 0);
+			}
+			return (
+				new Date(a.created_at).getTime() -
+				new Date(b.created_at).getTime()
+			);
+		});
+
+		rawTasks = tasks as unknown as Partial<TaskSummary>[];
+	} else {
+		let query = supabase
+			.from("ai_tasks")
+			.select(
+				"id, stage_key, step_number, task_type, status, lo_code, created_at, started_at, completed_at, error_message, user_id, parent_task_id, root_task_id, hierarchy_path, input_data, output_data, prompt_template_id",
+			)
+			.or(
+				`batch_id.eq.${id},launch_id.eq.${id},orchestrator_execution_id.eq.${id}`,
+			)
+			.order("step_number")
+			.order("created_at");
+
+		if (stageKey) {
+			query = query.eq("stage_key", stageKey);
+		}
+
+		const { data, error } = await query;
+
+		if (error) {
+			console.error("Failed to fetch tasks:", error);
+			return [];
+		}
+		rawTasks = (data as unknown as Partial<TaskSummary>[]) || [];
 	}
 
-	const { data, error } = await query;
-
-	if (error) {
-		console.error("Failed to fetch tasks:", error);
-		return [];
-	}
-
-	return (data || []).map((task) => ({
+	return rawTasks.map((task) => ({
 		id: task.id,
 		stage_key: task.stage_key || `stage_${task.step_number || 1}`,
 		stage_number: task.step_number || 1,

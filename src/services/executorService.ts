@@ -38,12 +38,24 @@ class ExecutorService {
 	}
 
 	async start(tier: UserTier) {
-		if (!this.worker) this.initWorker();
-		if (this.worker) {
-			const { keyPoolService } = await import("./keyPoolService");
-			const configs = await keyPoolService.resolveKeys(tier);
+		const { getExecutionPath } =
+			await import("../lib/storage/executionRouter");
+		const path = await getExecutionPath(tier);
 
-			this.worker.postMessage({ type: "START", configs, tier });
+		if (path === "web-worker") {
+			if (!this.worker) this.initWorker();
+			if (this.worker) {
+				const { keyPoolService } = await import("./keyPoolService");
+				const configs = await keyPoolService.resolveKeys(tier);
+
+				this.worker.postMessage({ type: "START", configs, tier });
+				this.isProcessing = true;
+			}
+		} else {
+			// Supabase + n8n path
+			// The tasks are already created on Supabase via the storage adapter (SupabaseAdapter)
+			// We just need to mark as processing so the UI shows the status
+			console.log("[ExecutorService] Execution routed to Supabase + n8n");
 			this.isProcessing = true;
 		}
 	}

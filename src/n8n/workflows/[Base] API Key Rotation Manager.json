@@ -1,947 +1,896 @@
 {
-  "nodes": [
-    {
-      "parameters": {
-        "operation": "update",
-        "dataTableId": {
-          "__rl": true,
-          "value": "LvnTXSwSXluKpJYk",
-          "mode": "list",
-          "cachedResultName": "Gemini API Key Pool",
-          "cachedResultUrl": "/projects/B8LPf0gekMWp8vZq/datatables/LvnTXSwSXluKpJYk"
-        },
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "api_key",
-              "keyValue": "={{ $('Get Fail Keys').item.json.api_key }}"
-            }
-          ]
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "key_id": "={{ $json.key_id }}",
-            "last_checked_at": "={{ $json.last_checked_at }}",
-            "health_status": "={{ $json.health_status }}",
-            "last_success_at": "={{ $json.last_success_at }}",
-            "is_active": "={{ $json.is_active }}",
-            "error_code": "={{ $json.error_code }}",
-            "blocked_until": "={{ $json.blocked_until }}",
-            "consecutive_failures": "={{ $json.consecutive_failures }}",
-            "health_check_failures": "={{ $json.health_check_failures }}",
-            "remaining_requests": "={ $json.remaining_requests }",
-            "remaining_tokens": "={ $json.remaining_tokens }",
-            "quota_reset_requests_at": "={ $json.quota_reset_requests_at }",
-            "quota_reset_tokens_at": "={ $json.quota_reset_tokens_at }",
-            "last_quota_check_at": "={ $json.last_quota_check_at }",
-            "retry_after": "={ $json.retry_after }"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "key_id",
-              "displayName": "key_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "api_key",
-              "displayName": "api_key",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "owner",
-              "displayName": "owner",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "allocate_for",
-              "displayName": "allocate_for",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "is_active",
-              "displayName": "is_active",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "boolean",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "health_status",
-              "displayName": "health_status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "health_check_failures",
-              "displayName": "health_check_failures",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "priority",
-              "displayName": "priority",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "last_checked_at",
-              "displayName": "last_checked_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "last_used_at",
-              "displayName": "last_used_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "last_success_at",
-              "displayName": "last_success_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "last_failure_at",
-              "displayName": "last_failure_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "error_code",
-              "displayName": "error_code",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "consecutive_failures",
-              "displayName": "consecutive_failures",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "blocked_until",
-              "displayName": "blocked_until",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "remaining_requests",
-              "displayName": "remaining_requests",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "remaining_tokens",
-              "displayName": "remaining_tokens",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "quota_reset_requests_at",
-              "displayName": "quota_reset_requests_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "quota_reset_tokens_at",
-              "displayName": "quota_reset_tokens_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "last_quota_check_at",
-              "displayName": "last_quota_check_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "retry_after",
-              "displayName": "retry_after",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "readOnly": false,
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1,
-      "position": [
-        1520,
-        864
-      ],
-      "id": "7d835e6d-f5d2-4854-8d26-89241a40cbdb",
-      "name": "Update Health Status"
-    },
-    {
-      "parameters": {
-        "operation": "get",
-        "dataTableId": {
-          "__rl": true,
-          "value": "LvnTXSwSXluKpJYk",
-          "mode": "list",
-          "cachedResultName": "Gemini API Key Pool",
-          "cachedResultUrl": "/projects/B8LPf0gekMWp8vZq/datatables/LvnTXSwSXluKpJYk"
-        },
-        "matchType": "allConditions",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "is_active",
-              "condition": "isFalse"
-            }
-          ]
-        },
-        "returnAll": true
-      },
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1,
-      "position": [
-        912,
-        864
-      ],
-      "id": "c5cb2103-c2df-4197-b3ac-2d7aecd2ec07",
-      "name": "Get Fail Keys"
-    },
-    {
-      "parameters": {
-        "operation": "update",
-        "dataTableId": {
-          "__rl": true,
-          "value": "LvnTXSwSXluKpJYk",
-          "mode": "list",
-          "cachedResultName": "Gemini API Key Pool",
-          "cachedResultUrl": "/projects/B8LPf0gekMWp8vZq/datatables/LvnTXSwSXluKpJYk"
-        },
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "api_key",
-              "keyValue": "={{ $json.api_key }}"
-            }
-          ]
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "last_used_at": "={{ $json.last_used_at }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "key_id",
-              "displayName": "key_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "api_key",
-              "displayName": "api_key",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "owner",
-              "displayName": "owner",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "allocate_for",
-              "displayName": "allocate_for",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "is_active",
-              "displayName": "is_active",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "boolean",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "health_status",
-              "displayName": "health_status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "health_check_failures",
-              "displayName": "health_check_failures",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "priority",
-              "displayName": "priority",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "last_checked_at",
-              "displayName": "last_checked_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "last_used_at",
-              "displayName": "last_used_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "last_success_at",
-              "displayName": "last_success_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "last_failure_at",
-              "displayName": "last_failure_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "error_code",
-              "displayName": "error_code",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "consecutive_failures",
-              "displayName": "consecutive_failures",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "blocked_until",
-              "displayName": "blocked_until",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "remaining_requests",
-              "displayName": "remaining_requests",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "remaining_tokens",
-              "displayName": "remaining_tokens",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "quota_reset_requests_at",
-              "displayName": "quota_reset_requests_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "quota_reset_tokens_at",
-              "displayName": "quota_reset_tokens_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "last_quota_check_at",
-              "displayName": "last_quota_check_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "retry_after",
-              "displayName": "retry_after",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "readOnly": false,
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1,
-      "position": [
-        1520,
-        528
-      ],
-      "id": "a74ca368-7cab-439b-8543-a94ddf79b51f",
-      "name": "Update row(s)"
-    },
-    {
-      "parameters": {
-        "operation": "get",
-        "dataTableId": {
-          "__rl": true,
-          "value": "LvnTXSwSXluKpJYk",
-          "mode": "list",
-          "cachedResultName": "Gemini API Key Pool",
-          "cachedResultUrl": "/projects/B8LPf0gekMWp8vZq/datatables/LvnTXSwSXluKpJYk"
-        },
-        "returnAll": true
-      },
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1,
-      "position": [
-        1104,
-        528
-      ],
-      "id": "a6cb8ece-b126-4cf8-824f-04d0d30e541d",
-      "name": "Get Keys"
-    },
-    {
-      "parameters": {
-        "mode": "raw",
-        "jsonOutput": "{\n  \"COOLDOWN_MINUTES\": 5,\n  \"MAX_CONSECUTIVE_FAILS\": 3,\n  \"BLOCK_DURATION_HOURS\": 2,\n  \"RETRY_MAX_ATTEMPTS\": 3\n}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        896,
-        528
-      ],
-      "id": "4b3beac9-d58f-4163-b40f-739caa465fa3",
-      "name": "CONFIGS"
-    },
-    {
-      "parameters": {
-        "inputSource": "passthrough"
-      },
-      "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1.1,
-      "position": [
-        672,
-        1056
-      ],
-      "id": "f0892327-eba0-4cdf-b7f7-9a69b0f8c946",
-      "name": "Force Check Recover"
-    },
-    {
-      "parameters": {
-        "errorMessage": "[403] Key Rotation Manager has no valid key!"
-      },
-      "type": "n8n-nodes-base.stopAndError",
-      "typeVersion": 1,
-      "position": [
-        1744,
-        704
-      ],
-      "id": "dbf737d2-ed42-485b-8969-3cc6628b02a8",
-      "name": "Stop and Error"
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ $json }}",
-        "options": {
-          "responseCode": 403
-        }
-      },
-      "id": "d1b1ba33-1b44-452a-9d49-f58f0c43f5e6",
-      "name": "Respond to Webhook - Error",
-      "position": [
-        1520,
-        704
-      ],
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1
-    },
-    {
-      "parameters": {
-        "content": "## API Key Rotation Manager ",
-        "height": 912,
-        "width": 1664,
-        "color": 6
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "position": [
-        544,
-        336
-      ],
-      "typeVersion": 1,
-      "id": "bd43d3e9-ae26-4aa6-af7a-526303de2009",
-      "name": "Sticky Note1"
-    },
-    {
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "minutes",
-              "minutesInterval": 30
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1,
-      "position": [
-        672,
-        864
-      ],
-      "id": "40f4fdb1-13a2-4ce6-889d-8786fec6292d",
-      "name": "Check Trigger (Every 30mins)"
-    },
-    {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "set-key-state",
-        "responseMode": "responseNode",
-        "options": {
-          "allowedOrigins": "*"
-        }
-      },
-      "id": "55651f4d-8d51-4058-a9e6-2369ae26c9a7",
-      "name": "Webhook Set Key State",
-      "position": [
-        672,
-        640
-      ],
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
-      "webhookId": "25dc6c02-fe9c-468b-8119-66189100f118"
-    },
-    {
-      "parameters": {
-        "path": "get-active-key",
-        "responseMode": "responseNode",
-        "options": {
-          "allowedOrigins": "*"
-        }
-      },
-      "id": "a7475639-f4b0-4705-a8c7-cf84d044b18c",
-      "name": "Webhook Get Key",
-      "position": [
-        672,
-        432
-      ],
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
-      "webhookId": "a0c7719c-c27b-48aa-9706-7bcee76b6285"
-    },
-    {
-      "parameters": {
-        "jsCode": "// ============================================================\n// GENERATE SUMMARY AFTER BATCH UPDATE\n// Đặt node này SAU Batch Update\n// ============================================================\n\nconst items = $input.all();\n\nconst summary = {\n    timestamp: new Date().toISOString(),\n    total_updated: items.length,\n    healthy: items.filter(i => i.json.health_status === 'healthy').length,\n    degraded: items.filter(i => i.json.health_status === 'degraded').length,\n    disabled: items.filter(i => i.json.health_status === 'disabled').length,\n    failed_keys: items\n        .filter(i => i.json.health_status !== 'healthy')\n        .map(i => ({\n            key_id: i.json.key_id,\n            status: i.json.health_status,\n            failures: i.json.health_check_failures,\n            error: i.json.error_code\n        }))\n};\n\nconsole.log('=== HEALTH CHECK SUMMARY ===');\nconsole.log(JSON.stringify(summary, null, 2));\n\n// Trả về items gốc để tiếp tục batch update\nreturn { summary };"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1744,
-        864
-      ],
-      "id": "ab9dd954-fc19-4892-be03-2d999fe498df",
-      "name": "Generate Summary",
-      "executeOnce": true
-    },
-    {
-      "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "// === HEALTH CHECK LOGIC v2.0 – PARSE RATE LIMIT HEADERS ===\n\nfunction getVietnamTime(date) {\n    const d = date || new Date();\n    const vietnamTime = new Date(d.getTime() + (7 * 60 * 60 * 1000));\n    const year = vietnamTime.getUTCFullYear();\n    const month = String(vietnamTime.getUTCMonth() + 1).padStart(2, '0');\n    const day = String(vietnamTime.getUTCDate()).padStart(2, '0');\n    const hours = String(vietnamTime.getUTCHours()).padStart(2, '0');\n    const minutes = String(vietnamTime.getUTCMinutes()).padStart(2, '0');\n    const seconds = String(vietnamTime.getUTCSeconds()).padStart(2, '0');\n    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;\n}\n\nconst keyData = $('Get Fail Keys').item.json;\nconst checkResult = $('Check Gemini').item.json;   // full response\n\nconst now = getVietnamTime();\n\nlet result = {\n    key_id: keyData.key_id,\n    last_checked_at: now,\n    last_quota_check_at: now\n};\n\n// ============================================================\n// PARSE HEADERS + BODY (mới)\n// ============================================================\nconst headers = checkResult.headers || checkResult.response?.headers || {};\nconst body = checkResult.body || checkResult || {};\n\nconst httpStatus = checkResult.statusCode || checkResult.status || 0;\n\n// === PARSE RATE LIMIT HEADERS ===\nconst rl = {\n    remaining_requests: parseInt(headers['x-ratelimit-remaining-requests'] || headers['X-RateLimit-Remaining'] || 0),\n    remaining_tokens: parseInt(headers['x-ratelimit-remaining-tokens'] || 0),\n    reset_requests: headers['x-ratelimit-reset-requests'] || '',\n    reset_tokens: headers['x-ratelimit-reset-tokens'] || '',\n    retry_after: parseInt(headers['retry-after'] || 0)\n};\n\nresult.remaining_requests = rl.remaining_requests;\nresult.remaining_tokens = rl.remaining_tokens;\nresult.quota_reset_requests_at = rl.reset_requests;\nresult.quota_reset_tokens_at = rl.reset_tokens;\nresult.retry_after = rl.retry_after;\n\n// ============================================================\n// STEP 2: Classify error type and determine response\n// ============================================================\n// ERROR CLASSIFICATION TABLE (from Gemini API docs):\n// ┌──────────┬──────────────────────────┬───────────────┬──────────────────────────┐\n// │ HTTP     │ gRPC Status              │ Key's Fault?  │ Response                 │\n// ├──────────┼──────────────────────────┼───────────────┼──────────────────────────┤\n// │ 200      │ OK                       │ -             │ ✅ Healthy               │\n// │ 400      │ INVALID_ARGUMENT         │ ❌ No         │ 🟡 Degraded (transient)  │\n// │ 403      │ PERMISSION_DENIED        │ ✅ Yes        │ 🔴 Block 24h            │\n// │ 404      │ NOT_FOUND                │ ❌ No         │ 🟡 Ignore (model issue)  │\n// │ 429      │ RESOURCE_EXHAUSTED       │ ✅ Yes        │ 🔴 Block (timed)         │\n// │ 500      │ INTERNAL                 │ ❌ No         │ 🟡 Degraded (transient)  │\n// │ 503      │ UNAVAILABLE              │ ❌ No         │ 🟡 Degraded (transient)  │\n// └──────────┴──────────────────────────┴───────────────┴──────────────────────────┘\n\n// Extract gRPC status if available\nconst grpcStatus = body?.error?.status || '';\n\n// Extract error message\nlet errorMessage = '';\nif (checkResult?.error) {\n    const err = checkResult.error;\n    errorMessage = err.message || err.error?.message || (typeof err === 'string' ? err : JSON.stringify(err).substring(0, 300));\n} else if (body?.error) {\n    const err = body.error;\n    errorMessage = err.message || JSON.stringify(err).substring(0, 300);\n}\n\nconst hasModels = body?.models && Array.isArray(body.models) && body.models.length > 0;\n\nlet errorType = 'UNKNOWN';\nlet action = 'degraded';    // Default: mark as degraded\nlet blockMinutes = 0;\nlet isKeyFault = false;     // Whether the error is caused by the key itself\n\n// ---- Check for Rate Limit / Quota (429 RESOURCE_EXHAUSTED) ----\nconst isRateLimit = httpStatus === 429 ||\n    grpcStatus === 'RESOURCE_EXHAUSTED' ||\n    errorMessage.toLowerCase().includes('resource exhausted') ||\n    errorMessage.toLowerCase().includes('rate limit') ||\n    errorMessage.toLowerCase().includes('quota exceeded') ||\n    errorMessage.toLowerCase().includes('spacing your requests') ||\n    errorMessage.toLowerCase().includes('too many requests');\n\nif (httpStatus === 200 && hasModels) {\n    // ✅ KEY IS HEALTHY\n    action = 'healthy';\n    console.log(`✅ ${keyData.key_id}: HEALTHY`);\n\n} else if (isRateLimit) {\n    // 🔴 429 RESOURCE_EXHAUSTED — Most dangerous error\n    errorType = 'RATE_LIMIT_429';\n    action = 'block';\n    isKeyFault = true;\n\n    // Determine block duration based on error message\n    if (errorMessage.toLowerCase().includes('per day') || errorMessage.toLowerCase().includes('daily')) {\n        blockMinutes = 720; // 12 hours max\n        console.log(`🔴 ${keyData.key_id}: DAILY QUOTA EXHAUSTED → block 12h`);\n    } else {\n        blockMinutes = 15; // 15 minutes\n        console.log(`🔴 ${keyData.key_id}: RATE LIMITED (RPM/TPM) → block 15min`);\n    }\n\n} else if (httpStatus === 403 || grpcStatus === 'PERMISSION_DENIED') {\n    // 🔴 403 PERMISSION_DENIED\n    errorType = 'PERMISSION_DENIED_403';\n    action = 'block';\n    isKeyFault = true;\n    blockMinutes = 1440; // 24 hours\n    console.log(`🚫 ${keyData.key_id}: PERMISSION DENIED → block 24h`);\n\n} else if (httpStatus === 401 || grpcStatus === 'UNAUTHENTICATED') {\n    // 🔴 401 UNAUTHENTICATED\n    errorType = 'UNAUTHENTICATED_401';\n    action = 'disable';\n    isKeyFault = true;\n    console.log(`❌ ${keyData.key_id}: INVALID/EXPIRED KEY → disabled`);\n\n} else if (httpStatus === 404 || grpcStatus === 'NOT_FOUND') {\n    // 🟢 404 NOT_FOUND — Not key issue\n    errorType = 'NOT_FOUND_404';\n    action = 'ignore';\n    console.log(`ℹ️ ${keyData.key_id}: Model not found (not key issue)`);\n\n} else if (httpStatus === 400 || grpcStatus === 'INVALID_ARGUMENT' || grpcStatus === 'FAILED_PRECONDITION') {\n    // 🟡 400 INVALID_ARGUMENT\n    errorType = 'BAD_REQUEST_400';\n\n    if (errorMessage.toLowerCase().includes('billing') || errorMessage.toLowerCase().includes('free tier') || errorMessage.toLowerCase().includes('not available')) {\n        action = 'block';\n        isKeyFault = true;\n        blockMinutes = 1440;\n        console.log(`🔴 ${keyData.key_id}: BILLING/REGION ISSUE → block 24h`);\n    } else {\n        action = 'ignore';\n        console.log(`ℹ️ ${keyData.key_id}: BAD REQUEST (not key issue)`);\n    }\n\n} else if (httpStatus === 500 || grpcStatus === 'INTERNAL') {\n    // 🟡 500 INTERNAL\n    errorType = 'SERVER_ERROR_500';\n    action = 'degraded';\n    console.log(`🟡 ${keyData.key_id}: SERVER ERROR 500 (transient, not key fault)`);\n\n} else if (httpStatus === 503 || grpcStatus === 'UNAVAILABLE') {\n    // 🟡 503 UNAVAILABLE\n    errorType = 'UNAVAILABLE_503';\n    action = 'degraded';\n    console.log(`🟡 ${keyData.key_id}: SERVICE UNAVAILABLE 503 (transient, not key fault)`);\n\n} else if (httpStatus === 0 || !httpStatus) {\n    // Network error\n    errorType = 'NETWORK_ERROR';\n    action = 'degraded';\n    console.log(`🟡 ${keyData.key_id}: NETWORK ERROR (couldn't reach API)`);\n\n} else {\n    // Unknown error code\n    errorType = `UNKNOWN_${httpStatus}`;\n    action = 'degraded';\n    console.log(`❓ ${keyData.key_id}: UNKNOWN ERROR (HTTP ${httpStatus})`);\n}\n\n// ============================================================\n// STEP 3: Apply action to key state\n// ============================================================\\nconst currentConsecutiveFailures = parseInt(keyData.consecutive_failures || 0);\nconst currentHealthCheckFailures = parseInt(keyData.health_check_failures || 0);\n\nif (action === 'healthy') {\n    result.health_status = 'healthy';\n    result.last_success_at = now;\n    result.health_check_failures = 0;\n    result.consecutive_failures = 0;\n    result.is_active = true;\n    result.error_code = '';\n    result.blocked_until = '';\n\n} else if (action === 'block') {\n    const blockedUntilDate = new Date(new Date().getTime() + blockMinutes * 60 * 1000);\n    result.health_status = errorType.includes('RATE_LIMIT') ? 'rate_limited' : 'blocked';\n    result.is_active = false;\n    result.consecutive_failures = currentConsecutiveFailures + 1;\n    result.health_check_failures = currentHealthCheckFailures + 1;\n    result.last_failure_at = now;\n    result.error_code = `${errorType}: ${errorMessage.substring(0, 200)}`;\n    result.blocked_until = getVietnamTime(blockedUntilDate);\n    console.log(`   → blocked_until: ${result.blocked_until}`);\n\n} else if (action === 'disable') {\n    result.health_status = 'disabled';\n    result.is_active = false;\n    result.consecutive_failures = currentConsecutiveFailures + 1;\n    result.health_check_failures = currentHealthCheckFailures + 1;\n    result.last_failure_at = now;\n    result.error_code = `${errorType}: ${errorMessage.substring(0, 200)}`;\n    result.blocked_until = '';\n\n} else if (action === 'ignore') {\n    result.health_status = keyData.health_status || 'healthy';\n    result.is_active = keyData.is_active;\n    result.consecutive_failures = currentConsecutiveFailures;\n    result.health_check_failures = currentHealthCheckFailures;\n    result.error_code = `${errorType}: ${errorMessage.substring(0, 200)}`;\n    result.blocked_until = keyData.blocked_until || '';\n\n} else {\n    // action === 'degraded'\n    const MAX_DEGRADED_FAILURES = 5;\n    result.consecutive_failures = currentConsecutiveFailures + 1;\n    result.health_check_failures = currentHealthCheckFailures + 1;\n    result.last_failure_at = now;\n    result.error_code = `${errorType}: ${errorMessage.substring(0, 200)}`;\n\n    if (result.consecutive_failures >= MAX_DEGRADED_FAILURES) {\n        result.is_active = false;\n        result.health_status = 'degraded_disabled';\n        result.blocked_until = '';\n        console.log(`🔴 ${keyData.key_id}: ${result.consecutive_failures} transient errors → disabled`);\n    } else {\n        result.is_active = keyData.is_active !== undefined ? keyData.is_active : true;\n        result.health_status = 'degraded';\n        result.blocked_until = keyData.blocked_until || '';\n        console.log(`🟡 ${keyData.key_id}: ${result.consecutive_failures}/${MAX_DEGRADED_FAILURES} transient errors`);\n    }\n}\n\n// Bổ sung quota từ header cho healthy/degraded status\nif (action === 'healthy' || action === 'degraded') {\n    if (result.health_status === 'healthy' || result.health_status === 'degraded') {\n        // (Quota fields đã được thêm vào result object ở đầu script)\n    }\n}\n\nreturn { json: result };\n"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1296,
-        864
-      ],
-      "id": "e4245fef-69bd-4e9a-8117-db375cbfc872",
-      "name": "Health Check Logic"
-    },
-    {
-      "parameters": {
-        "url": "https://generativelanguage.googleapis.com/v1/models?pageSize=1",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "key",
-              "value": "={{ $json.api_key }}"
-            }
-          ]
-        },
-        "options": {
-          "response": {
-            "response": {
-              "fullResponse": true,
-              "neverError": true
-            }
-          }
-        }
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [
-        1088,
-        864
-      ],
-      "id": "37f62f21-63d2-4c13-af28-69306062463f",
-      "name": "Check Gemini",
-      "continueOnFail": true
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ $json }}",
-        "options": {
-          "responseCode": 200
-        }
-      },
-      "id": "f61ebccc-df5e-415c-ac5a-55f1fdd7db1f",
-      "name": "Respond to Webhook",
-      "position": [
-        1744,
-        528
-      ],
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1
-    },
-    {
-      "parameters": {
-        "jsCode": "// === UNIVERSAL API KEY ROTATOR v2.0 – FULL RATE LIMIT HEADERS ===\n// Tích hợp proactive quota tracking + improved sorting\n\n// ============================================================\n// VIETNAM TIMEZONE HELPERS\n// ============================================================\nfunction getVietnamTime(date) {\n    const d = date || new Date();\n    const vietnamTime = new Date(d.getTime() + (7 * 60 * 60 * 1000));\n    const year = vietnamTime.getUTCFullYear();\n    const month = String(vietnamTime.getUTCMonth() + 1).padStart(2, '0');\n    const day = String(vietnamTime.getUTCDate()).padStart(2, '0');\n    const hours = String(vietnamTime.getUTCHours()).padStart(2, '0');\n    const minutes = String(vietnamTime.getUTCMinutes()).padStart(2, '0');\n    const seconds = String(vietnamTime.getUTCSeconds()).padStart(2, '0');\n    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;\n}\n\nfunction parseDate(dateStr) {\n    if (!dateStr || dateStr === '' || dateStr === 'Empty' || dateStr === 'Null') return null;\n    const isoStr = dateStr.replace(' ', 'T') + '+07:00';\n    const d = new Date(isoStr);\n    return isNaN(d.getTime()) ? null : d;\n}\n\n// ============================================================\n// ERROR CLASSIFICATION\n// Maps error_code strings from callers to proper handling strategy\n// ============================================================\nconst ERROR_STRATEGIES = {\n    // === 429: RESOURCE_EXHAUSTED — Most dangerous ===\n    'RATE_LIMIT': { type: 'rate_limit', blockMinutes: 15, shouldBlock: true },\n    'RESOURCE_EXHAUSTED': { type: 'rate_limit', blockMinutes: 15, shouldBlock: true },\n    'QUOTA_EXCEEDED': { type: 'rate_limit', blockMinutes: 60, shouldBlock: true },\n    '429': { type: 'rate_limit', blockMinutes: 15, shouldBlock: true },\n\n    // === 403: PERMISSION_DENIED — Key issue, long block ===\n    'PERMISSION_DENIED': { type: 'auth', blockMinutes: 1440, shouldBlock: true },\n    'FORBIDDEN': { type: 'auth', blockMinutes: 1440, shouldBlock: true },\n    '403': { type: 'auth', blockMinutes: 1440, shouldBlock: true },\n\n    // === 401: Invalid key — Very long block ===\n    'INVALID_KEY': { type: 'auth', blockMinutes: 10080, shouldBlock: true },\n    'UNAUTHENTICATED': { type: 'auth', blockMinutes: 10080, shouldBlock: true },\n    '401': { type: 'auth', blockMinutes: 10080, shouldBlock: true },\n\n    // === 400: Bad request — Not key's fault, transient ===\n    'INVALID_ARGUMENT': { type: 'bad_request', blockMinutes: 0, shouldBlock: false },\n    'BAD_REQUEST': { type: 'bad_request', blockMinutes: 0, shouldBlock: false },\n    '400': { type: 'bad_request', blockMinutes: 0, shouldBlock: false },\n\n    // === 404: Not found — Not key's fault ===\n    'NOT_FOUND': { type: 'not_found', blockMinutes: 0, shouldBlock: false },\n    '404': { type: 'not_found', blockMinutes: 0, shouldBlock: false },\n\n    // === 500/503: Server errors — Transient, retry ===\n    'INTERNAL': { type: 'server', blockMinutes: 0, shouldBlock: false },\n    'SERVER_ERROR': { type: 'server', blockMinutes: 0, shouldBlock: false },\n    '500': { type: 'server', blockMinutes: 0, shouldBlock: false },\n    'UNAVAILABLE': { type: 'server', blockMinutes: 0, shouldBlock: false },\n    'SERVICE_UNAVAILABLE': { type: 'server', blockMinutes: 0, shouldBlock: false },\n    '503': { type: 'server', blockMinutes: 0, shouldBlock: false },\n\n    // === Safety filter — Not key's fault ===\n    'SAFETY': { type: 'safety', blockMinutes: 0, shouldBlock: false },\n    'RECITATION': { type: 'safety', blockMinutes: 0, shouldBlock: false },\n};\n\nfunction classifyError(errorCode) {\n    if (!errorCode) return null;\n    const upper = errorCode.toUpperCase();\n\n    // Check for exact match first\n    for (const [key, strategy] of Object.entries(ERROR_STRATEGIES)) {\n        if (upper.includes(key.toUpperCase())) return strategy;\n    }\n\n    // Check for HTTP status code pattern: \"[429] ...\" or \"429:\"\n    const statusMatch = upper.match(/\\[?(\\d{3})\\]?/);\n    if (statusMatch) {\n        const code = statusMatch[1];\n        if (ERROR_STRATEGIES[code]) return ERROR_STRATEGIES[code];\n    }\n\n    return null; // Unknown error\n}\n\n// ============================================================\n// QUOTA CONFIGS (New)\n// ============================================================\nconst config = $(\"CONFIGS\").first().json;\nconst LOW_REQUESTS_THRESHOLD = parseInt(config.LOW_REQUESTS_THRESHOLD || '100', 10);\nconst LOW_TOKENS_THRESHOLD = parseInt(config.LOW_TOKENS_THRESHOLD || '50000', 10);\nconst COOLDOWN_MINUTES = parseInt(config.COOLDOWN_MINUTES || '5', 10);\nconst MAX_CONSECUTIVE_FAILS = parseInt(config.MAX_CONSECUTIVE_FAILS || '3', 10);\nconst BLOCK_DURATION_HOURS = parseInt(config.BLOCK_DURATION_HOURS || '2', 10);\n\n// ============================================================\n// MAIN LOGIC\n// ============================================================\nconst keyItems = $('Get Keys').all();\nconst now = new Date();\n\nlet triggerData = null;\ntry {\n    const setNode = $('Webhook Set Key State');\n    if (setNode && setNode.first() && setNode.first().json.body) {\n        triggerData = setNode.first().json.body;\n    }\n} catch (e) { }\n\nif (triggerData) {\n    // ====================== SET KEY STATE (với rate_limit) ======================\n    const { key_id, status, error_code, rate_limit } = triggerData;\n\n    const keyItem = keyItems.find(i => i.json.key_id === key_id);\n    if (!keyItem) throw new Error(`Key ${key_id} not found`);\n\n    const key = { ...keyItem.json };\n    const currentTime = getVietnamTime();\n    key.last_used_at = currentTime;\n    key.last_quota_check_at = currentTime;\n\n    if (status === 'success') {\n        key.last_success_at = currentTime;\n        key.consecutive_failures = 0;\n        key.blocked_until = '';\n        key.error_code = '';\n        key.health_status = 'healthy';\n        key.is_active = true;\n\n        // === TÍCH HỢP RATE LIMIT HEADERS ===\n        if (rate_limit && typeof rate_limit === 'object') {\n            key.remaining_requests = parseInt(rate_limit.remaining_requests || 0);\n            key.remaining_tokens = parseInt(rate_limit.remaining_tokens || 0);\n            key.quota_reset_requests_at = rate_limit.reset_requests || '';\n            key.quota_reset_tokens_at = rate_limit.reset_tokens || '';\n            key.retry_after = parseInt(rate_limit.retry_after || 0);\n\n            // Nếu quota rất thấp → tự động mark low\n            if (key.remaining_requests < LOW_REQUESTS_THRESHOLD || key.remaining_tokens < LOW_TOKENS_THRESHOLD) {\n                key.health_status = 'rate_limited';\n                const blockUntil = new Date(now.getTime() + 10 * 60 * 1000); // block nhẹ 10 phút\n                key.blocked_until = getVietnamTime(blockUntil);\n                key.is_active = false;\n            }\n        }\n    } else if (status === 'fail') {\n        key.last_failure_at = currentTime;\n        key.error_code = error_code || 'UNKNOWN';\n\n        // Classify the error to determine response strategy\n        const strategy = classifyError(error_code);\n\n        // Cập nhật quota nếu có trong fail response\n        if (rate_limit) {\n            key.remaining_requests = parseInt(rate_limit.remaining_requests || 0);\n            key.remaining_tokens = parseInt(rate_limit.remaining_tokens || 0);\n            // ... các trường quota khác nếu cần\n        }\n\n        if (strategy && strategy.shouldBlock) {\n            // === IMMEDIATE BLOCK (429, 403, 401) ===\n            const blockUntil = new Date(now.getTime() + strategy.blockMinutes * 60 * 1000);\n            key.blocked_until = getVietnamTime(blockUntil);\n            key.is_active = false;\n            key.consecutive_failures = (parseInt(key.consecutive_failures) || 0) + 1;\n\n            if (strategy.type === 'rate_limit') {\n                key.health_status = 'rate_limited';\n            } else {\n                key.health_status = 'blocked';\n            }\n\n            console.log(`🔴 ${key_id}: ${strategy.type.toUpperCase()} → blocked ${strategy.blockMinutes}min until ${key.blocked_until}`);\n\n        } else if (strategy && (strategy.type === 'server' || strategy.type === 'bad_request' || strategy.type === 'not_found' || strategy.type === 'safety')) {\n            // === NOT KEY'S FAULT — don't punish the key ===\n            key.health_status = 'degraded';\n            console.log(`🟡 ${key_id}: ${strategy.type.toUpperCase()} → not key's fault, keeping active`);\n\n        } else {\n            // === UNKNOWN ERROR — use counter-based approach ===\n            key.consecutive_failures = (parseInt(key.consecutive_failures) || 0) + 1;\n\n            if (key.consecutive_failures >= MAX_CONSECUTIVE_FAILS) {\n                const blockUntil = new Date(now.getTime() + BLOCK_DURATION_HOURS * 60 * 60 * 1000);\n                key.blocked_until = getVietnamTime(blockUntil);\n                key.is_active = false;\n                key.health_status = 'blocked';\n                console.log(`🔴 ${key_id}: UNKNOWN error × ${key.consecutive_failures} → blocked`);\n            } else {\n                key.health_status = 'degraded';\n                console.log(`🟡 ${key_id}: UNKNOWN error × ${key.consecutive_failures}/${MAX_CONSECUTIVE_FAILS}`);\n            }\n        }\n    }\n\n    return { json: key };\n\n} else {\n    // ====================== GET ACTIVE KEY (với quota filter + sorting) ======================\n    const allKeys = keyItems.map(item => ({ ...item.json }));\n\n    const candidates = allKeys.filter(key => {\n        if (!key.is_active) return false;\n        if (!key.api_key || key.api_key.trim() === '') return false;\n\n        const blockedUntil = parseDate(key.blocked_until);\n        if (blockedUntil && blockedUntil > now) return false;\n\n        if ((parseInt(key.consecutive_failures) || 0) >= MAX_CONSECUTIVE_FAILS) return false;\n\n        // === PROACTIVE QUOTA FILTER ===\n        const reqLeft = parseInt(key.remaining_requests) || 999999;\n        const tokLeft = parseInt(key.remaining_tokens) || 999999999;\n        if (reqLeft < LOW_REQUESTS_THRESHOLD || tokLeft < LOW_TOKENS_THRESHOLD) return false;\n\n        // cooldown logic giữ nguyên...\n        if (key.last_used_at && key.health_status !== 'degraded') {\n            const lastUsed = parseDate(key.last_used_at);\n            if (lastUsed) {\n                const minutesAgo = (now - lastUsed) / 1000 / 60;\n                if (minutesAgo < COOLDOWN_MINUTES) return false;\n            }\n        }\n        return true;\n    });\n\n    if (candidates.length === 0) {\n        throw new Error('No healthy API keys available (all blocked or quota low).');\n    }\n\n    // === SORTING MỚI: Ưu tiên quota cao nhất ===\n    candidates.sort((a, b) => {\n        if (a.priority !== b.priority) return a.priority - b.priority;\n\n        // Health\n        const healthPriority = { 'healthy': 0, 'recovered': 1, 'degraded': 2, 'rate_limited': 3 };\n        const aH = healthPriority[a.health_status] || 4;\n        const bH = healthPriority[b.health_status] || 4;\n        if (aH !== bH) return aH - bH;\n\n        // QUOTA – cao nhất ưu tiên\n        const aTok = parseInt(a.remaining_tokens) || 0;\n        const bTok = parseInt(b.remaining_tokens) || 0;\n        if (aTok !== bTok) return bTok - aTok;   // cao → thấp\n\n        // Never used / LRU giữ nguyên...\n        const aNever = !a.last_used_at;\n        const bNever = !b.last_used_at;\n        if (aNever && !bNever) return -1;\n        if (!aNever && bNever) return 1;\n\n        const aTime = a.last_used_at ? (parseDate(a.last_used_at)?.getTime() || 0) : 0;\n        const bTime = b.last_used_at ? (parseDate(b.last_used_at)?.getTime() || 0) : 0;\n        return aTime - bTime;\n    });\n\n    const topCandidates = candidates.slice(0, Math.min(3, candidates.length));\n    const selected = topCandidates[Math.floor(Math.random() * topCandidates.length)];\n\n    const result = { ...selected };\n    result.last_used_at = getVietnamTime();\n    result.health_status = result.health_status || 'healthy';\n\n    return { json: result };\n}\n"
-      },
-      "id": "cb5be586-f84c-4cc4-9811-fa7f3b55d02c",
-      "name": "Universal Logic",
-      "position": [
-        1296,
-        528
-      ],
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "executeOnce": true,
-      "onError": "continueErrorOutput"
-    }
-  ],
-  "connections": {
-    "Update Health Status": {
-      "main": [
-        [
-          {
-            "node": "Generate Summary",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Fail Keys": {
-      "main": [
-        [
-          {
-            "node": "Check Gemini",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Update row(s)": {
-      "main": [
-        [
-          {
-            "node": "Respond to Webhook",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Keys": {
-      "main": [
-        [
-          {
-            "node": "Universal Logic",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "CONFIGS": {
-      "main": [
-        [
-          {
-            "node": "Get Keys",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Force Check Recover": {
-      "main": [
-        [
-          {
-            "node": "Get Fail Keys",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Respond to Webhook - Error": {
-      "main": [
-        [
-          {
-            "node": "Stop and Error",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Check Trigger (Every 30mins)": {
-      "main": [
-        [
-          {
-            "node": "Get Fail Keys",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Webhook Set Key State": {
-      "main": [
-        [
-          {
-            "node": "CONFIGS",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Webhook Get Key": {
-      "main": [
-        [
-          {
-            "node": "CONFIGS",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Health Check Logic": {
-      "main": [
-        [
-          {
-            "node": "Update Health Status",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Check Gemini": {
-      "main": [
-        [
-          {
-            "node": "Health Check Logic",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Universal Logic": {
-      "main": [
-        [
-          {
-            "node": "Update row(s)",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Respond to Webhook - Error",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
-  },
-  "pinData": {},
-  "meta": {
-    "instanceId": "3c3655861b945e2f23873d293f97337788a318f9e0823cca507f13751bd70fd7"
-  }
+	"nodes": [
+		{
+			"parameters": {
+				"operation": "update",
+				"dataTableId": {
+					"__rl": true,
+					"value": "LvnTXSwSXluKpJYk",
+					"mode": "list",
+					"cachedResultName": "Gemini API Key Pool",
+					"cachedResultUrl": "/projects/B8LPf0gekMWp8vZq/datatables/LvnTXSwSXluKpJYk"
+				},
+				"filters": {
+					"conditions": [
+						{
+							"keyName": "api_key",
+							"keyValue": "={{ $('Get Fail Keys').item.json.api_key }}"
+						}
+					]
+				},
+				"columns": {
+					"mappingMode": "defineBelow",
+					"value": {
+						"key_id": "={{ $json.key_id }}",
+						"last_checked_at": "={{ $json.last_checked_at }}",
+						"health_status": "={{ $json.health_status }}",
+						"last_success_at": "={{ $json.last_success_at }}",
+						"is_active": "={{ $json.is_active }}",
+						"error_code": "={{ $json.error_code }}",
+						"blocked_until": "={{ $json.blocked_until }}",
+						"consecutive_failures": "={{ $json.consecutive_failures }}",
+						"health_check_failures": "={{ $json.health_check_failures }}",
+						"remaining_requests": "={ $json.remaining_requests }",
+						"remaining_tokens": "={ $json.remaining_tokens }",
+						"quota_reset_requests_at": "={ $json.quota_reset_requests_at }",
+						"quota_reset_tokens_at": "={ $json.quota_reset_tokens_at }",
+						"last_quota_check_at": "={ $json.last_quota_check_at }",
+						"retry_after": "={ $json.retry_after }"
+					},
+					"matchingColumns": [],
+					"schema": [
+						{
+							"id": "key_id",
+							"displayName": "key_id",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": false
+						},
+						{
+							"id": "api_key",
+							"displayName": "api_key",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "owner",
+							"displayName": "owner",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "allocate_for",
+							"displayName": "allocate_for",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "is_active",
+							"displayName": "is_active",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "boolean",
+							"readOnly": false,
+							"removed": false
+						},
+						{
+							"id": "health_status",
+							"displayName": "health_status",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": false
+						},
+						{
+							"id": "health_check_failures",
+							"displayName": "health_check_failures",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "number",
+							"readOnly": false,
+							"removed": false
+						},
+						{
+							"id": "priority",
+							"displayName": "priority",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "number",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "last_checked_at",
+							"displayName": "last_checked_at",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": false
+						},
+						{
+							"id": "last_used_at",
+							"displayName": "last_used_at",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "last_success_at",
+							"displayName": "last_success_at",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": false
+						},
+						{
+							"id": "last_failure_at",
+							"displayName": "last_failure_at",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "error_code",
+							"displayName": "error_code",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": false
+						},
+						{
+							"id": "consecutive_failures",
+							"displayName": "consecutive_failures",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "number",
+							"readOnly": false,
+							"removed": false
+						},
+						{
+							"id": "blocked_until",
+							"displayName": "blocked_until",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": false
+						},
+						{
+							"id": "remaining_requests",
+							"displayName": "remaining_requests",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "number",
+							"readOnly": false,
+							"removed": false
+						},
+						{
+							"id": "remaining_tokens",
+							"displayName": "remaining_tokens",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "number",
+							"readOnly": false,
+							"removed": false
+						},
+						{
+							"id": "quota_reset_requests_at",
+							"displayName": "quota_reset_requests_at",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": false
+						},
+						{
+							"id": "quota_reset_tokens_at",
+							"displayName": "quota_reset_tokens_at",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": false
+						},
+						{
+							"id": "last_quota_check_at",
+							"displayName": "last_quota_check_at",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": false
+						},
+						{
+							"id": "retry_after",
+							"displayName": "retry_after",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "number",
+							"readOnly": false,
+							"removed": false
+						}
+					],
+					"attemptToConvertTypes": false,
+					"convertFieldsToString": false
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.dataTable",
+			"typeVersion": 1,
+			"position": [1520, 864],
+			"id": "345f6e7d-54d3-4e75-90a0-447adb705b5a",
+			"name": "Update Health Status"
+		},
+		{
+			"parameters": {
+				"operation": "get",
+				"dataTableId": {
+					"__rl": true,
+					"value": "LvnTXSwSXluKpJYk",
+					"mode": "list",
+					"cachedResultName": "Gemini API Key Pool",
+					"cachedResultUrl": "/projects/B8LPf0gekMWp8vZq/datatables/LvnTXSwSXluKpJYk"
+				},
+				"matchType": "allConditions",
+				"filters": {
+					"conditions": [
+						{
+							"keyName": "is_active",
+							"condition": "isFalse"
+						}
+					]
+				},
+				"returnAll": true
+			},
+			"type": "n8n-nodes-base.dataTable",
+			"typeVersion": 1,
+			"position": [912, 864],
+			"id": "bbe0ac33-297b-4e71-b898-dae8cd129907",
+			"name": "Get Fail Keys"
+		},
+		{
+			"parameters": {
+				"operation": "update",
+				"dataTableId": {
+					"__rl": true,
+					"value": "LvnTXSwSXluKpJYk",
+					"mode": "list",
+					"cachedResultName": "Gemini API Key Pool",
+					"cachedResultUrl": "/projects/B8LPf0gekMWp8vZq/datatables/LvnTXSwSXluKpJYk"
+				},
+				"filters": {
+					"conditions": [
+						{
+							"keyName": "api_key",
+							"keyValue": "={{ $json.api_key }}"
+						}
+					]
+				},
+				"columns": {
+					"mappingMode": "defineBelow",
+					"value": {
+						"last_used_at": "={{ $json.last_used_at }}"
+					},
+					"matchingColumns": [],
+					"schema": [
+						{
+							"id": "key_id",
+							"displayName": "key_id",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "api_key",
+							"displayName": "api_key",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "owner",
+							"displayName": "owner",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "allocate_for",
+							"displayName": "allocate_for",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "is_active",
+							"displayName": "is_active",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "boolean",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "health_status",
+							"displayName": "health_status",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "health_check_failures",
+							"displayName": "health_check_failures",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "number",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "priority",
+							"displayName": "priority",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "number",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "last_checked_at",
+							"displayName": "last_checked_at",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "last_used_at",
+							"displayName": "last_used_at",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": false
+						},
+						{
+							"id": "last_success_at",
+							"displayName": "last_success_at",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "last_failure_at",
+							"displayName": "last_failure_at",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "error_code",
+							"displayName": "error_code",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "consecutive_failures",
+							"displayName": "consecutive_failures",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "number",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "blocked_until",
+							"displayName": "blocked_until",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": true
+						},
+						{
+							"id": "remaining_requests",
+							"displayName": "remaining_requests",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "number",
+							"readOnly": false,
+							"removed": false
+						},
+						{
+							"id": "remaining_tokens",
+							"displayName": "remaining_tokens",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "number",
+							"readOnly": false,
+							"removed": false
+						},
+						{
+							"id": "quota_reset_requests_at",
+							"displayName": "quota_reset_requests_at",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": false
+						},
+						{
+							"id": "quota_reset_tokens_at",
+							"displayName": "quota_reset_tokens_at",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": false
+						},
+						{
+							"id": "last_quota_check_at",
+							"displayName": "last_quota_check_at",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "string",
+							"readOnly": false,
+							"removed": false
+						},
+						{
+							"id": "retry_after",
+							"displayName": "retry_after",
+							"required": false,
+							"defaultMatch": false,
+							"display": true,
+							"type": "number",
+							"readOnly": false,
+							"removed": false
+						}
+					],
+					"attemptToConvertTypes": false,
+					"convertFieldsToString": false
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.dataTable",
+			"typeVersion": 1,
+			"position": [1520, 528],
+			"id": "f682d177-3aa7-414f-90e9-b23cb7dfdf98",
+			"name": "Update row(s)"
+		},
+		{
+			"parameters": {
+				"operation": "get",
+				"dataTableId": {
+					"__rl": true,
+					"value": "LvnTXSwSXluKpJYk",
+					"mode": "list",
+					"cachedResultName": "Gemini API Key Pool",
+					"cachedResultUrl": "/projects/B8LPf0gekMWp8vZq/datatables/LvnTXSwSXluKpJYk"
+				},
+				"returnAll": true
+			},
+			"type": "n8n-nodes-base.dataTable",
+			"typeVersion": 1,
+			"position": [1104, 528],
+			"id": "e907bf96-65cd-48d5-bdd2-3140c655421e",
+			"name": "Get Keys"
+		},
+		{
+			"parameters": {
+				"mode": "raw",
+				"jsonOutput": "{\n  \"COOLDOWN_MINUTES\": 5,\n  \"MAX_CONSECUTIVE_FAILS\": 3,\n  \"BLOCK_DURATION_HOURS\": 2,\n  \"RETRY_MAX_ATTEMPTS\": 3\n}",
+				"options": {}
+			},
+			"type": "n8n-nodes-base.set",
+			"typeVersion": 3.4,
+			"position": [896, 528],
+			"id": "997b1b44-3ef5-48b4-87fa-8927ca7b8b0a",
+			"name": "CONFIGS"
+		},
+		{
+			"parameters": {
+				"inputSource": "passthrough"
+			},
+			"type": "n8n-nodes-base.executeWorkflowTrigger",
+			"typeVersion": 1.1,
+			"position": [672, 1056],
+			"id": "2c13f8d6-d2b1-48d2-a920-6e3f7a6032db",
+			"name": "Force Check Recover"
+		},
+		{
+			"parameters": {
+				"errorMessage": "[403] Key Rotation Manager has no valid key!"
+			},
+			"type": "n8n-nodes-base.stopAndError",
+			"typeVersion": 1,
+			"position": [1744, 704],
+			"id": "8723cea1-1fe2-4413-91f3-9434ca5c76fb",
+			"name": "Stop and Error"
+		},
+		{
+			"parameters": {
+				"respondWith": "json",
+				"responseBody": "={{ $json }}",
+				"options": {
+					"responseCode": 403
+				}
+			},
+			"id": "fa553eb7-b889-40f8-aa89-f1e989db736d",
+			"name": "Respond to Webhook - Error",
+			"position": [1520, 704],
+			"type": "n8n-nodes-base.respondToWebhook",
+			"typeVersion": 1
+		},
+		{
+			"parameters": {
+				"content": "## API Key Rotation Manager ",
+				"height": 912,
+				"width": 1664,
+				"color": 6
+			},
+			"type": "n8n-nodes-base.stickyNote",
+			"position": [544, 336],
+			"typeVersion": 1,
+			"id": "21ef606f-6690-401b-92d4-56abe2000df1",
+			"name": "Sticky Note1"
+		},
+		{
+			"parameters": {
+				"rule": {
+					"interval": [
+						{
+							"field": "minutes",
+							"minutesInterval": 30
+						}
+					]
+				}
+			},
+			"type": "n8n-nodes-base.scheduleTrigger",
+			"typeVersion": 1,
+			"position": [672, 864],
+			"id": "647cb914-ba1b-499e-80d9-dac7d18f7744",
+			"name": "Check Trigger (Every 30mins)"
+		},
+		{
+			"parameters": {
+				"httpMethod": "POST",
+				"path": "set-key-state",
+				"responseMode": "responseNode",
+				"options": {
+					"allowedOrigins": "*"
+				}
+			},
+			"id": "cbd76d88-8a38-4360-a253-1bf7d1f3236f",
+			"name": "Webhook Set Key State",
+			"position": [672, 640],
+			"type": "n8n-nodes-base.webhook",
+			"typeVersion": 1,
+			"webhookId": "25dc6c02-fe9c-468b-8119-66189100f118"
+		},
+		{
+			"parameters": {
+				"path": "get-active-key",
+				"responseMode": "responseNode",
+				"options": {
+					"allowedOrigins": "*"
+				}
+			},
+			"id": "42154ac6-1e76-4dc6-9790-f7156a36e26b",
+			"name": "Webhook Get Key",
+			"position": [672, 432],
+			"type": "n8n-nodes-base.webhook",
+			"typeVersion": 1,
+			"webhookId": "a0c7719c-c27b-48aa-9706-7bcee76b6285"
+		},
+		{
+			"parameters": {
+				"jsCode": "// ============================================================\n// GENERATE SUMMARY AFTER BATCH UPDATE\n// Đặt node này SAU Batch Update\n// ============================================================\n\nconst items = $input.all();\n\nconst summary = {\n    timestamp: new Date().toISOString(),\n    total_updated: items.length,\n    healthy: items.filter(i => i.json.health_status === 'healthy').length,\n    degraded: items.filter(i => i.json.health_status === 'degraded').length,\n    disabled: items.filter(i => i.json.health_status === 'disabled').length,\n    failed_keys: items\n        .filter(i => i.json.health_status !== 'healthy')\n        .map(i => ({\n            key_id: i.json.key_id,\n            status: i.json.health_status,\n            failures: i.json.health_check_failures,\n            error: i.json.error_code\n        }))\n};\n\nconsole.log('=== HEALTH CHECK SUMMARY ===');\nconsole.log(JSON.stringify(summary, null, 2));\n\n// Trả về items gốc để tiếp tục batch update\nreturn { summary };"
+			},
+			"type": "n8n-nodes-base.code",
+			"typeVersion": 2,
+			"position": [1744, 864],
+			"id": "abf4ce9b-ab85-4e18-abb1-371ed69146e5",
+			"name": "Generate Summary",
+			"executeOnce": true
+		},
+		{
+			"parameters": {
+				"mode": "runOnceForEachItem",
+				"jsCode": "// === HEALTH CHECK LOGIC v2.0 – PARSE RATE LIMIT HEADERS ===\n\nfunction getVietnamTime(date) {\n    const d = date || new Date();\n    const vietnamTime = new Date(d.getTime() + (7 * 60 * 60 * 1000));\n    const year = vietnamTime.getUTCFullYear();\n    const month = String(vietnamTime.getUTCMonth() + 1).padStart(2, '0');\n    const day = String(vietnamTime.getUTCDate()).padStart(2, '0');\n    const hours = String(vietnamTime.getUTCHours()).padStart(2, '0');\n    const minutes = String(vietnamTime.getUTCMinutes()).padStart(2, '0');\n    const seconds = String(vietnamTime.getUTCSeconds()).padStart(2, '0');\n    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;\n}\n\nconst keyData = $('Get Fail Keys').item.json;\nconst checkResult = $('Check Gemini').item.json;   // full response\n\nconst now = getVietnamTime();\n\nlet result = {\n    key_id: keyData.key_id,\n    last_checked_at: now,\n    last_quota_check_at: now\n};\n\n// ============================================================\n// PARSE HEADERS + BODY (mới)\n// ============================================================\nconst headers = checkResult.headers || checkResult.response?.headers || {};\nconst body = checkResult.body || checkResult || {};\n\nconst httpStatus = checkResult.statusCode || checkResult.status || 0;\n\n// === PARSE RATE LIMIT HEADERS ===\nconst rl = {\n    remaining_requests: parseInt(headers['x-ratelimit-remaining-requests'] || headers['X-RateLimit-Remaining'] || 0),\n    remaining_tokens: parseInt(headers['x-ratelimit-remaining-tokens'] || 0),\n    reset_requests: headers['x-ratelimit-reset-requests'] || '',\n    reset_tokens: headers['x-ratelimit-reset-tokens'] || '',\n    retry_after: parseInt(headers['retry-after'] || 0)\n};\n\nresult.remaining_requests = rl.remaining_requests;\nresult.remaining_tokens = rl.remaining_tokens;\nresult.quota_reset_requests_at = rl.reset_requests;\nresult.quota_reset_tokens_at = rl.reset_tokens;\nresult.retry_after = rl.retry_after;\n\n// ============================================================\n// STEP 2: Classify error type and determine response\n// ============================================================\n// ERROR CLASSIFICATION TABLE (from Gemini API docs):\n// ┌──────────┬──────────────────────────┬───────────────┬──────────────────────────┐\n// │ HTTP     │ gRPC Status              │ Key's Fault?  │ Response                 │\n// ├──────────┼──────────────────────────┼───────────────┼──────────────────────────┤\n// │ 200      │ OK                       │ -             │ ✅ Healthy               │\n// │ 400      │ INVALID_ARGUMENT         │ ❌ No         │ 🟡 Degraded (transient)  │\n// │ 403      │ PERMISSION_DENIED        │ ✅ Yes        │ 🔴 Block 24h            │\n// │ 404      │ NOT_FOUND                │ ❌ No         │ 🟡 Ignore (model issue)  │\n// │ 429      │ RESOURCE_EXHAUSTED       │ ✅ Yes        │ 🔴 Block (timed)         │\n// │ 500      │ INTERNAL                 │ ❌ No         │ 🟡 Degraded (transient)  │\n// │ 503      │ UNAVAILABLE              │ ❌ No         │ 🟡 Degraded (transient)  │\n// └──────────┴──────────────────────────┴───────────────┴──────────────────────────┘\n\n// Extract gRPC status if available\nconst grpcStatus = body?.error?.status || '';\n\n// Extract error message\nlet errorMessage = '';\nif (checkResult?.error) {\n    const err = checkResult.error;\n    errorMessage = err.message || err.error?.message || (typeof err === 'string' ? err : JSON.stringify(err).substring(0, 300));\n} else if (body?.error) {\n    const err = body.error;\n    errorMessage = err.message || JSON.stringify(err).substring(0, 300);\n}\n\nconst hasModels = body?.models && Array.isArray(body.models) && body.models.length > 0;\n\nlet errorType = 'UNKNOWN';\nlet action = 'degraded';    // Default: mark as degraded\nlet blockMinutes = 0;\nlet isKeyFault = false;     // Whether the error is caused by the key itself\n\n// ---- Check for Rate Limit / Quota (429 RESOURCE_EXHAUSTED) ----\nconst isRateLimit = httpStatus === 429 ||\n    grpcStatus === 'RESOURCE_EXHAUSTED' ||\n    errorMessage.toLowerCase().includes('resource exhausted') ||\n    errorMessage.toLowerCase().includes('rate limit') ||\n    errorMessage.toLowerCase().includes('quota exceeded') ||\n    errorMessage.toLowerCase().includes('spacing your requests') ||\n    errorMessage.toLowerCase().includes('too many requests');\n\nif (httpStatus === 200 && hasModels) {\n    // ✅ KEY IS HEALTHY\n    action = 'healthy';\n    console.log(`✅ ${keyData.key_id}: HEALTHY`);\n\n} else if (isRateLimit) {\n    // 🔴 429 RESOURCE_EXHAUSTED — Most dangerous error\n    errorType = 'RATE_LIMIT_429';\n    action = 'block';\n    isKeyFault = true;\n\n    // Determine block duration based on error message\n    if (errorMessage.toLowerCase().includes('per day') || errorMessage.toLowerCase().includes('daily')) {\n        blockMinutes = 720; // 12 hours max\n        console.log(`🔴 ${keyData.key_id}: DAILY QUOTA EXHAUSTED → block 12h`);\n    } else {\n        blockMinutes = 15; // 15 minutes\n        console.log(`🔴 ${keyData.key_id}: RATE LIMITED (RPM/TPM) → block 15min`);\n    }\n\n} else if (httpStatus === 403 || grpcStatus === 'PERMISSION_DENIED') {\n    // 🔴 403 PERMISSION_DENIED\n    errorType = 'PERMISSION_DENIED_403';\n    action = 'block';\n    isKeyFault = true;\n    blockMinutes = 1440; // 24 hours\n    console.log(`🚫 ${keyData.key_id}: PERMISSION DENIED → block 24h`);\n\n} else if (httpStatus === 401 || grpcStatus === 'UNAUTHENTICATED') {\n    // 🔴 401 UNAUTHENTICATED\n    errorType = 'UNAUTHENTICATED_401';\n    action = 'disable';\n    isKeyFault = true;\n    console.log(`❌ ${keyData.key_id}: INVALID/EXPIRED KEY → disabled`);\n\n} else if (httpStatus === 404 || grpcStatus === 'NOT_FOUND') {\n    // 🟢 404 NOT_FOUND — Not key issue\n    errorType = 'NOT_FOUND_404';\n    action = 'ignore';\n    console.log(`ℹ️ ${keyData.key_id}: Model not found (not key issue)`);\n\n} else if (httpStatus === 400 || grpcStatus === 'INVALID_ARGUMENT' || grpcStatus === 'FAILED_PRECONDITION') {\n    // 🟡 400 INVALID_ARGUMENT\n    errorType = 'BAD_REQUEST_400';\n\n    if (errorMessage.toLowerCase().includes('billing') || errorMessage.toLowerCase().includes('free tier') || errorMessage.toLowerCase().includes('not available')) {\n        action = 'block';\n        isKeyFault = true;\n        blockMinutes = 1440;\n        console.log(`🔴 ${keyData.key_id}: BILLING/REGION ISSUE → block 24h`);\n    } else {\n        action = 'ignore';\n        console.log(`ℹ️ ${keyData.key_id}: BAD REQUEST (not key issue)`);\n    }\n\n} else if (httpStatus === 500 || grpcStatus === 'INTERNAL') {\n    // 🟡 500 INTERNAL\n    errorType = 'SERVER_ERROR_500';\n    action = 'degraded';\n    console.log(`🟡 ${keyData.key_id}: SERVER ERROR 500 (transient, not key fault)`);\n\n} else if (httpStatus === 503 || grpcStatus === 'UNAVAILABLE') {\n    // 🟡 503 UNAVAILABLE\n    errorType = 'UNAVAILABLE_503';\n    action = 'degraded';\n    console.log(`🟡 ${keyData.key_id}: SERVICE UNAVAILABLE 503 (transient, not key fault)`);\n\n} else if (httpStatus === 0 || !httpStatus) {\n    // Network error\n    errorType = 'NETWORK_ERROR';\n    action = 'degraded';\n    console.log(`🟡 ${keyData.key_id}: NETWORK ERROR (couldn't reach API)`);\n\n} else {\n    // Unknown error code\n    errorType = `UNKNOWN_${httpStatus}`;\n    action = 'degraded';\n    console.log(`❓ ${keyData.key_id}: UNKNOWN ERROR (HTTP ${httpStatus})`);\n}\n\n// ============================================================\n// STEP 3: Apply action to key state\n// ============================================================\\nconst currentConsecutiveFailures = parseInt(keyData.consecutive_failures || 0);\nconst currentHealthCheckFailures = parseInt(keyData.health_check_failures || 0);\n\nif (action === 'healthy') {\n    result.health_status = 'healthy';\n    result.last_success_at = now;\n    result.health_check_failures = 0;\n    result.consecutive_failures = 0;\n    result.is_active = true;\n    result.error_code = '';\n    result.blocked_until = '';\n\n} else if (action === 'block') {\n    const blockedUntilDate = new Date(new Date().getTime() + blockMinutes * 60 * 1000);\n    result.health_status = errorType.includes('RATE_LIMIT') ? 'rate_limited' : 'blocked';\n    result.is_active = false;\n    result.consecutive_failures = currentConsecutiveFailures + 1;\n    result.health_check_failures = currentHealthCheckFailures + 1;\n    result.last_failure_at = now;\n    result.error_code = `${errorType}: ${errorMessage.substring(0, 200)}`;\n    result.blocked_until = getVietnamTime(blockedUntilDate);\n    console.log(`   → blocked_until: ${result.blocked_until}`);\n\n} else if (action === 'disable') {\n    result.health_status = 'disabled';\n    result.is_active = false;\n    result.consecutive_failures = currentConsecutiveFailures + 1;\n    result.health_check_failures = currentHealthCheckFailures + 1;\n    result.last_failure_at = now;\n    result.error_code = `${errorType}: ${errorMessage.substring(0, 200)}`;\n    result.blocked_until = '';\n\n} else if (action === 'ignore') {\n    result.health_status = keyData.health_status || 'healthy';\n    result.is_active = keyData.is_active;\n    result.consecutive_failures = currentConsecutiveFailures;\n    result.health_check_failures = currentHealthCheckFailures;\n    result.error_code = `${errorType}: ${errorMessage.substring(0, 200)}`;\n    result.blocked_until = keyData.blocked_until || '';\n\n} else {\n    // action === 'degraded'\n    const MAX_DEGRADED_FAILURES = 5;\n    result.consecutive_failures = currentConsecutiveFailures + 1;\n    result.health_check_failures = currentHealthCheckFailures + 1;\n    result.last_failure_at = now;\n    result.error_code = `${errorType}: ${errorMessage.substring(0, 200)}`;\n\n    if (result.consecutive_failures >= MAX_DEGRADED_FAILURES) {\n        result.is_active = false;\n        result.health_status = 'degraded_disabled';\n        result.blocked_until = '';\n        console.log(`🔴 ${keyData.key_id}: ${result.consecutive_failures} transient errors → disabled`);\n    } else {\n        result.is_active = keyData.is_active !== undefined ? keyData.is_active : true;\n        result.health_status = 'degraded';\n        result.blocked_until = keyData.blocked_until || '';\n        console.log(`🟡 ${keyData.key_id}: ${result.consecutive_failures}/${MAX_DEGRADED_FAILURES} transient errors`);\n    }\n}\n\n// Bổ sung quota từ header cho healthy/degraded status\nif (action === 'healthy' || action === 'degraded') {\n    if (result.health_status === 'healthy' || result.health_status === 'degraded') {\n        // (Quota fields đã được thêm vào result object ở đầu script)\n    }\n}\n\nreturn { json: result };\n"
+			},
+			"type": "n8n-nodes-base.code",
+			"typeVersion": 2,
+			"position": [1296, 864],
+			"id": "955691dc-2f43-4ae8-b9bc-adc0dbb4b3e0",
+			"name": "Health Check Logic"
+		},
+		{
+			"parameters": {
+				"url": "https://generativelanguage.googleapis.com/v1/models?pageSize=1",
+				"sendQuery": true,
+				"queryParameters": {
+					"parameters": [
+						{
+							"name": "key",
+							"value": "={{ $json.api_key }}"
+						}
+					]
+				},
+				"options": {
+					"response": {
+						"response": {
+							"fullResponse": true,
+							"neverError": true
+						}
+					}
+				}
+			},
+			"type": "n8n-nodes-base.httpRequest",
+			"typeVersion": 4.3,
+			"position": [1088, 864],
+			"id": "746b5e32-9874-4c00-a626-1992f5bfab2a",
+			"name": "Check Gemini",
+			"continueOnFail": true
+		},
+		{
+			"parameters": {
+				"respondWith": "json",
+				"responseBody": "={{ $json }}",
+				"options": {
+					"responseCode": 200
+				}
+			},
+			"id": "c0047d2a-9715-48aa-9695-241d230c7dc9",
+			"name": "Respond to Webhook",
+			"position": [1744, 528],
+			"type": "n8n-nodes-base.respondToWebhook",
+			"typeVersion": 1
+		},
+		{
+			"parameters": {
+				"jsCode": "// === UNIVERSAL API KEY ROTATOR v2.0 – FULL RATE LIMIT HEADERS ===\n// Tích hợp proactive quota tracking + improved sorting\n\n// ============================================================\n// VIETNAM TIMEZONE HELPERS\n// ============================================================\nfunction getVietnamTime(date) {\n    const d = date || new Date();\n    const vietnamTime = new Date(d.getTime() + (7 * 60 * 60 * 1000));\n    const year = vietnamTime.getUTCFullYear();\n    const month = String(vietnamTime.getUTCMonth() + 1).padStart(2, '0');\n    const day = String(vietnamTime.getUTCDate()).padStart(2, '0');\n    const hours = String(vietnamTime.getUTCHours()).padStart(2, '0');\n    const minutes = String(vietnamTime.getUTCMinutes()).padStart(2, '0');\n    const seconds = String(vietnamTime.getUTCSeconds()).padStart(2, '0');\n    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;\n}\n\nfunction parseDate(dateStr) {\n    if (!dateStr || dateStr === '' || dateStr === 'Empty' || dateStr === 'Null') return null;\n    const isoStr = dateStr.replace(' ', 'T') + '+07:00';\n    const d = new Date(isoStr);\n    return isNaN(d.getTime()) ? null : d;\n}\n\n// ============================================================\n// ERROR CLASSIFICATION\n// Maps error_code strings from callers to proper handling strategy\n// ============================================================\nconst ERROR_STRATEGIES = {\n    // === 429: RESOURCE_EXHAUSTED — Most dangerous ===\n    'RATE_LIMIT': { type: 'rate_limit', blockMinutes: 15, shouldBlock: true },\n    'RESOURCE_EXHAUSTED': { type: 'rate_limit', blockMinutes: 15, shouldBlock: true },\n    'QUOTA_EXCEEDED': { type: 'rate_limit', blockMinutes: 60, shouldBlock: true },\n    '429': { type: 'rate_limit', blockMinutes: 15, shouldBlock: true },\n\n    // === 403: PERMISSION_DENIED — Key issue, long block ===\n    'PERMISSION_DENIED': { type: 'auth', blockMinutes: 1440, shouldBlock: true },\n    'FORBIDDEN': { type: 'auth', blockMinutes: 1440, shouldBlock: true },\n    '403': { type: 'auth', blockMinutes: 1440, shouldBlock: true },\n\n    // === 401: Invalid key — Very long block ===\n    'INVALID_KEY': { type: 'auth', blockMinutes: 10080, shouldBlock: true },\n    'UNAUTHENTICATED': { type: 'auth', blockMinutes: 10080, shouldBlock: true },\n    '401': { type: 'auth', blockMinutes: 10080, shouldBlock: true },\n\n    // === 400: Bad request — Not key's fault, transient ===\n    'INVALID_ARGUMENT': { type: 'bad_request', blockMinutes: 0, shouldBlock: false },\n    'BAD_REQUEST': { type: 'bad_request', blockMinutes: 0, shouldBlock: false },\n    '400': { type: 'bad_request', blockMinutes: 0, shouldBlock: false },\n\n    // === 404: Not found — Not key's fault ===\n    'NOT_FOUND': { type: 'not_found', blockMinutes: 0, shouldBlock: false },\n    '404': { type: 'not_found', blockMinutes: 0, shouldBlock: false },\n\n    // === 500/503: Server errors — Transient, retry ===\n    'INTERNAL': { type: 'server', blockMinutes: 0, shouldBlock: false },\n    'SERVER_ERROR': { type: 'server', blockMinutes: 0, shouldBlock: false },\n    '500': { type: 'server', blockMinutes: 0, shouldBlock: false },\n    'UNAVAILABLE': { type: 'server', blockMinutes: 0, shouldBlock: false },\n    'SERVICE_UNAVAILABLE': { type: 'server', blockMinutes: 0, shouldBlock: false },\n    '503': { type: 'server', blockMinutes: 0, shouldBlock: false },\n\n    // === Safety filter — Not key's fault ===\n    'SAFETY': { type: 'safety', blockMinutes: 0, shouldBlock: false },\n    'RECITATION': { type: 'safety', blockMinutes: 0, shouldBlock: false },\n};\n\nfunction classifyError(errorCode) {\n    if (!errorCode) return null;\n    const upper = errorCode.toUpperCase();\n\n    // Check for exact match first\n    for (const [key, strategy] of Object.entries(ERROR_STRATEGIES)) {\n        if (upper.includes(key.toUpperCase())) return strategy;\n    }\n\n    // Check for HTTP status code pattern: \"[429] ...\" or \"429:\"\n    const statusMatch = upper.match(/\\[?(\\d{3})\\]?/);\n    if (statusMatch) {\n        const code = statusMatch[1];\n        if (ERROR_STRATEGIES[code]) return ERROR_STRATEGIES[code];\n    }\n\n    return null; // Unknown error\n}\n\n// ============================================================\n// QUOTA CONFIGS (New)\n// ============================================================\nconst config = $(\"CONFIGS\").first().json;\nconst LOW_REQUESTS_THRESHOLD = parseInt(config.LOW_REQUESTS_THRESHOLD || '100', 10);\nconst LOW_TOKENS_THRESHOLD = parseInt(config.LOW_TOKENS_THRESHOLD || '50000', 10);\nconst COOLDOWN_MINUTES = parseInt(config.COOLDOWN_MINUTES || '5', 10);\nconst MAX_CONSECUTIVE_FAILS = parseInt(config.MAX_CONSECUTIVE_FAILS || '3', 10);\nconst BLOCK_DURATION_HOURS = parseInt(config.BLOCK_DURATION_HOURS || '2', 10);\n\n// ============================================================\n// MAIN LOGIC\n// ============================================================\nconst keyItems = $('Get Keys').all();\nconst now = new Date();\n\nlet triggerData = null;\ntry {\n    const setNode = $('Webhook Set Key State');\n    if (setNode && setNode.first() && setNode.first().json.body) {\n        triggerData = setNode.first().json.body;\n    }\n} catch (e) { }\n\nif (triggerData) {\n    // ====================== SET KEY STATE (với rate_limit) ======================\n    const { key_id, status, error_code, rate_limit } = triggerData;\n\n    const keyItem = keyItems.find(i => i.json.key_id === key_id);\n    if (!keyItem) throw new Error(`Key ${key_id} not found`);\n\n    const key = { ...keyItem.json };\n    const currentTime = getVietnamTime();\n    key.last_used_at = currentTime;\n    key.last_quota_check_at = currentTime;\n\n    if (status === 'success') {\n        key.last_success_at = currentTime;\n        key.consecutive_failures = 0;\n        key.blocked_until = '';\n        key.error_code = '';\n        key.health_status = 'healthy';\n        key.is_active = true;\n\n        // === TÍCH HỢP RATE LIMIT HEADERS ===\n        if (rate_limit && typeof rate_limit === 'object') {\n            key.remaining_requests = parseInt(rate_limit.remaining_requests || 0);\n            key.remaining_tokens = parseInt(rate_limit.remaining_tokens || 0);\n            key.quota_reset_requests_at = rate_limit.reset_requests || '';\n            key.quota_reset_tokens_at = rate_limit.reset_tokens || '';\n            key.retry_after = parseInt(rate_limit.retry_after || 0);\n\n            // Nếu quota rất thấp → tự động mark low\n            if (key.remaining_requests < LOW_REQUESTS_THRESHOLD || key.remaining_tokens < LOW_TOKENS_THRESHOLD) {\n                key.health_status = 'rate_limited';\n                const blockUntil = new Date(now.getTime() + 10 * 60 * 1000); // block nhẹ 10 phút\n                key.blocked_until = getVietnamTime(blockUntil);\n                key.is_active = false;\n            }\n        }\n    } else if (status === 'fail') {\n        key.last_failure_at = currentTime;\n        key.error_code = error_code || 'UNKNOWN';\n\n        // Classify the error to determine response strategy\n        const strategy = classifyError(error_code);\n\n        // Cập nhật quota nếu có trong fail response\n        if (rate_limit) {\n            key.remaining_requests = parseInt(rate_limit.remaining_requests || 0);\n            key.remaining_tokens = parseInt(rate_limit.remaining_tokens || 0);\n            // ... các trường quota khác nếu cần\n        }\n\n        if (strategy && strategy.shouldBlock) {\n            // === IMMEDIATE BLOCK (429, 403, 401) ===\n            const blockUntil = new Date(now.getTime() + strategy.blockMinutes * 60 * 1000);\n            key.blocked_until = getVietnamTime(blockUntil);\n            key.is_active = false;\n            key.consecutive_failures = (parseInt(key.consecutive_failures) || 0) + 1;\n\n            if (strategy.type === 'rate_limit') {\n                key.health_status = 'rate_limited';\n            } else {\n                key.health_status = 'blocked';\n            }\n\n            console.log(`🔴 ${key_id}: ${strategy.type.toUpperCase()} → blocked ${strategy.blockMinutes}min until ${key.blocked_until}`);\n\n        } else if (strategy && (strategy.type === 'server' || strategy.type === 'bad_request' || strategy.type === 'not_found' || strategy.type === 'safety')) {\n            // === NOT KEY'S FAULT — don't punish the key ===\n            key.health_status = 'degraded';\n            console.log(`🟡 ${key_id}: ${strategy.type.toUpperCase()} → not key's fault, keeping active`);\n\n        } else {\n            // === UNKNOWN ERROR — use counter-based approach ===\n            key.consecutive_failures = (parseInt(key.consecutive_failures) || 0) + 1;\n\n            if (key.consecutive_failures >= MAX_CONSECUTIVE_FAILS) {\n                const blockUntil = new Date(now.getTime() + BLOCK_DURATION_HOURS * 60 * 60 * 1000);\n                key.blocked_until = getVietnamTime(blockUntil);\n                key.is_active = false;\n                key.health_status = 'blocked';\n                console.log(`🔴 ${key_id}: UNKNOWN error × ${key.consecutive_failures} → blocked`);\n            } else {\n                key.health_status = 'degraded';\n                console.log(`🟡 ${key_id}: UNKNOWN error × ${key.consecutive_failures}/${MAX_CONSECUTIVE_FAILS}`);\n            }\n        }\n    }\n\n    return { json: key };\n\n} else {\n    // ====================== GET ACTIVE KEY (với quota filter + sorting) ======================\n    const allKeys = keyItems.map(item => ({ ...item.json }));\n\n    const candidates = allKeys.filter(key => {\n        if (!key.is_active) return false;\n        if (!key.api_key || key.api_key.trim() === '') return false;\n\n        const blockedUntil = parseDate(key.blocked_until);\n        if (blockedUntil && blockedUntil > now) return false;\n\n        if ((parseInt(key.consecutive_failures) || 0) >= MAX_CONSECUTIVE_FAILS) return false;\n\n        // === PROACTIVE QUOTA FILTER ===\n        const reqLeft = parseInt(key.remaining_requests) || 999999;\n        const tokLeft = parseInt(key.remaining_tokens) || 999999999;\n        if (reqLeft < LOW_REQUESTS_THRESHOLD || tokLeft < LOW_TOKENS_THRESHOLD) return false;\n\n        // cooldown logic giữ nguyên...\n        if (key.last_used_at && key.health_status !== 'degraded') {\n            const lastUsed = parseDate(key.last_used_at);\n            if (lastUsed) {\n                const minutesAgo = (now - lastUsed) / 1000 / 60;\n                if (minutesAgo < COOLDOWN_MINUTES) return false;\n            }\n        }\n        return true;\n    });\n\n    if (candidates.length === 0) {\n        throw new Error('No healthy API keys available (all blocked or quota low).');\n    }\n\n    // === SORTING MỚI: Ưu tiên quota cao nhất ===\n    candidates.sort((a, b) => {\n        if (a.priority !== b.priority) return a.priority - b.priority;\n\n        // Health\n        const healthPriority = { 'healthy': 0, 'recovered': 1, 'degraded': 2, 'rate_limited': 3 };\n        const aH = healthPriority[a.health_status] || 4;\n        const bH = healthPriority[b.health_status] || 4;\n        if (aH !== bH) return aH - bH;\n\n        // QUOTA – cao nhất ưu tiên\n        const aTok = parseInt(a.remaining_tokens) || 0;\n        const bTok = parseInt(b.remaining_tokens) || 0;\n        if (aTok !== bTok) return bTok - aTok;   // cao → thấp\n\n        // Never used / LRU giữ nguyên...\n        const aNever = !a.last_used_at;\n        const bNever = !b.last_used_at;\n        if (aNever && !bNever) return -1;\n        if (!aNever && bNever) return 1;\n\n        const aTime = a.last_used_at ? (parseDate(a.last_used_at)?.getTime() || 0) : 0;\n        const bTime = b.last_used_at ? (parseDate(b.last_used_at)?.getTime() || 0) : 0;\n        return aTime - bTime;\n    });\n\n    const topCandidates = candidates.slice(0, Math.min(3, candidates.length));\n    const selected = topCandidates[Math.floor(Math.random() * topCandidates.length)];\n\n    const result = { ...selected };\n    result.last_used_at = getVietnamTime();\n    result.health_status = result.health_status || 'healthy';\n\n    return { json: result };\n}\n"
+			},
+			"id": "0d3b6545-abae-4be5-87c1-bd21876d3074",
+			"name": "Universal Logic",
+			"position": [1296, 528],
+			"type": "n8n-nodes-base.code",
+			"typeVersion": 2,
+			"executeOnce": true,
+			"onError": "continueErrorOutput"
+		}
+	],
+	"connections": {
+		"Update Health Status": {
+			"main": [
+				[
+					{
+						"node": "Generate Summary",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Get Fail Keys": {
+			"main": [
+				[
+					{
+						"node": "Check Gemini",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Update row(s)": {
+			"main": [
+				[
+					{
+						"node": "Respond to Webhook",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Get Keys": {
+			"main": [
+				[
+					{
+						"node": "Universal Logic",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"CONFIGS": {
+			"main": [
+				[
+					{
+						"node": "Get Keys",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Force Check Recover": {
+			"main": [
+				[
+					{
+						"node": "Get Fail Keys",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Respond to Webhook - Error": {
+			"main": [
+				[
+					{
+						"node": "Stop and Error",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Check Trigger (Every 30mins)": {
+			"main": [
+				[
+					{
+						"node": "Get Fail Keys",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Webhook Set Key State": {
+			"main": [
+				[
+					{
+						"node": "CONFIGS",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Webhook Get Key": {
+			"main": [
+				[
+					{
+						"node": "CONFIGS",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Health Check Logic": {
+			"main": [
+				[
+					{
+						"node": "Update Health Status",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Check Gemini": {
+			"main": [
+				[
+					{
+						"node": "Health Check Logic",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Universal Logic": {
+			"main": [
+				[
+					{
+						"node": "Update row(s)",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Respond to Webhook - Error",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		}
+	},
+	"pinData": {},
+	"meta": {
+		"instanceId": "3c3655861b945e2f23873d293f97337788a318f9e0823cca507f13751bd70fd7"
+	}
 }

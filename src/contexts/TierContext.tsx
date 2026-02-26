@@ -1,32 +1,47 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { TierContext } from './TierContextObject';
 import { UserTier, storage } from '@/lib/storage';
 import { syncService } from '@/services/syncService';
 import { usageService } from '@/services/usageService';
 import { supabase } from '@/lib/supabase';
+import { executorService } from '@/services/executorService';
 
 const SYNC_DONE_KEY = 'orchable_sync_done';
 
 export function TierProvider({ children }: { children: React.ReactNode }) {
     const { user, profile } = useAuth();
-    const [tier, setTierState] = useState<UserTier>('free');
+    const [tierState, setTierState] = useState<UserTier>('free');
     const [isSyncing, setIsSyncing] = useState(false);
     const [usage, setUsage] = useState<{ count: number; month: string } | null>(null);
     const hasHandledProfile = useRef(false);
 
+    // Derive tier from profile role/tier
+    const tier = useMemo<UserTier>(() => {
+        if (!profile) return 'free';
+        const userRole = profile.role;
+        const isAdmin = userRole === 'admin' || userRole === 'superadmin';
+        return (isAdmin ? 'premium' : (profile.tier || 'free')) as UserTier;
+    }, [profile]);
+
+    // DEBUG: Remove after confirming fix
+    console.log('[TierProvider] profile:', profile?.role, profile?.tier, '→ tier:', tier);
+
     const refreshUsage = useCallback(async () => {
         if (user) {
             try {
-                // Try to get server-side usage
-                const { data, error } = await supabase.rpc('get_user_usage', {
-                    p_user_id: user.id
-                });
+                const { keyPoolService } = await import('@/services/keyPoolService');
+                const userHasKeys = await keyPoolService.hasPersonalKeys();
+                const { freeTierService } = await import('@/services/freeTierService');
 
-                if (!error && data) {
-                    setUsage(data);
+                if (tier === 'free' && !userHasKeys) {
+                    const serverUsage = await freeTierService.getUsage();
+                    setUsage({
+                        count: serverUsage.used,
+                        month: new Date().toISOString().slice(0, 7) // YYYY-MM
+                    });
                 } else {
-                    // Fallback to local usage service if RPC fails
+                    // Fallback to local usage service or other logic for BYOK/Premium
                     const currentUsage = await usageService.getUsage();
                     setUsage(currentUsage);
                 }
@@ -38,56 +53,65 @@ export function TierProvider({ children }: { children: React.ReactNode }) {
         } else {
             setUsage(null);
         }
-    }, [user]);
+    }, [user, tier]);
 
+    // 1. Sync tier status to state and storage
     useEffect(() => {
-        const handleAuthChange = async () => {
-            if (profile) {
-                // Prevent duplicate runs (e.g. if profile object reference changes)
-                if (hasHandledProfile.current) return;
-                hasHandledProfile.current = true;
+        if (tierState !== tier) {
+            setTierState(tier);
+            storage.refreshAdapter(tier).then(path => {
+                console.log('[TierProvider] Adapter refreshed for path:', path);
+            });
+        } else {
+            // Even if tier hasn't changed, keys might have changed, so refresh
+            storage.refreshAdapter(tier);
+        }
+    }, [tier, tierState]);
 
-                // Always switch adapter to Supabase for authenticated users
-                const userTier = (profile.tier || 'free') as UserTier;
-                setTierState(userTier);
-                storage.setTier(userTier);
+    // 2. Handle Migration & Sync (once per login)
+    useEffect(() => {
+        if (profile) {
+            if (hasHandledProfile.current) return;
+            hasHandledProfile.current = true;
 
-                // Only run migration on FIRST login in this browser session.
-                // On reload, the data is already in Supabase — no need to re-push
-                // from IndexedDB (which causes INSERT conflicts).
-                const alreadySynced = sessionStorage.getItem(SYNC_DONE_KEY);
-                if (!alreadySynced) {
-                    setIsSyncing(true);
-                    try {
-                        const migrationPromise = syncService.migrateAnonymousData();
-                        const timeoutPromise = new Promise((_, reject) =>
-                            setTimeout(() => reject(new Error("Migration timeout")), 5000)
-                        );
-                        await Promise.race([migrationPromise, timeoutPromise]);
+            const alreadySynced = sessionStorage.getItem(SYNC_DONE_KEY);
+            if (!alreadySynced) {
+                setIsSyncing(true);
+                syncService.migrateAnonymousData()
+                    .then(() => sessionStorage.setItem(SYNC_DONE_KEY, '1'))
+                    .catch(e => {
+                        console.warn("Migration or sync failed:", e);
                         sessionStorage.setItem(SYNC_DONE_KEY, '1');
-                    } catch (e) {
-                        console.warn("Migration or sync failed, continuing to app:", e);
-                        // Mark as done even on failure to prevent retry loops
-                        sessionStorage.setItem(SYNC_DONE_KEY, '1');
-                    } finally {
-                        setIsSyncing(false);
-                    }
-                }
-            } else {
-                setTierState('free');
-                hasHandledProfile.current = false;
-                // Clear sync flag on logout so next login triggers migration
-                sessionStorage.removeItem(SYNC_DONE_KEY);
+                    })
+                    .finally(() => setIsSyncing(false));
             }
-        };
-
-        handleAuthChange();
+        } else {
+            hasHandledProfile.current = false;
+            sessionStorage.removeItem(SYNC_DONE_KEY);
+        }
     }, [profile]);
 
+    // 3. Worker Auto-Start (Only for Free + Key path)
+    useEffect(() => {
+        import('@/lib/storage/executionRouter').then(async ({ getExecutionPath }) => {
+            const path = await getExecutionPath(tier);
+            if (path === 'web-worker') {
+                import('@/lib/storage/IndexedDBAdapter').then(({ db }) => {
+                    db.ai_tasks.where('status').equals('plan').count().then(pending => {
+                        if (pending > 0) {
+                            executorService.start('free');
+                        }
+                    });
+                }).catch(e => console.warn('Worker auto-start check failed', e));
+            }
+        });
+    }, [tier]);
+
+    // 4. Usage Refresh Polling
     useEffect(() => {
         if (user) {
             refreshUsage();
-            const interval = setInterval(refreshUsage, 30000); // 30s refresh
+            const interval = setInterval(refreshUsage, 30000);
             return () => clearInterval(interval);
         }
     }, [user, refreshUsage]);
@@ -99,7 +123,7 @@ export function TierProvider({ children }: { children: React.ReactNode }) {
         usage,
         limits: {
             tasks: usageService.getLimit(tier),
-            sync: true // Authenticated users always have sync capability
+            sync: true
         },
         refreshUsage
     };
@@ -110,5 +134,3 @@ export function TierProvider({ children }: { children: React.ReactNode }) {
         </TierContext.Provider>
     );
 }
-
-// useTier hook moved to @/hooks/useTier.ts

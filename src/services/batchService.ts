@@ -1,4 +1,4 @@
-import { storage } from "../lib/storage";
+import { storage, UserTier } from "../lib/storage";
 import { OrchestratorConfig } from "../lib/types";
 import { TaskSummary as AiTask } from "./executionTrackingService";
 import { topologicalSortStages } from "./stageService";
@@ -9,6 +9,7 @@ export interface CreateBatchOptions {
 	batchName?: string;
 	userId?: string;
 	launchId?: string;
+	tier: UserTier;
 }
 
 export const batchService = {
@@ -21,8 +22,14 @@ export const batchService = {
 			inputItems,
 			batchName,
 			userId,
+			tier,
 			launchId: existingLaunchId,
 		} = options;
+
+		const { getTierSource } =
+			await import("../lib/storage/executionRouter");
+		const tierSource = await getTierSource(tier);
+
 		const launchId = existingLaunchId || crypto.randomUUID();
 		const adapter = storage.adapter;
 
@@ -68,6 +75,7 @@ export const batchService = {
 			launch_id: launchId,
 			stage_key: firstStage.stage_key,
 			task_type: firstStage.task_type || "generic",
+			tier_source: tierSource,
 			step_number: 1,
 			status: "plan", // Worker uses 'plan'
 			input_data: {
@@ -115,13 +123,20 @@ export const batchService = {
 			},
 		}));
 
-		const createdTasks = await adapter.createTasks(tasksToCreate);
+		try {
+			const createdTasks = await adapter.createTasks(tasksToCreate);
 
-		// 4. Set root_task_id to self for root tasks
-		for (const task of createdTasks) {
-			await adapter.updateTask(task.id, { root_task_id: task.id });
+			// 4. Set root_task_id to self for root tasks
+			for (const task of createdTasks) {
+				await adapter.updateTask(task.id, { root_task_id: task.id });
+			}
+
+			return { batch, launchId, tasks: createdTasks };
+		} catch (err: any) {
+			if (err.message === "QUOTA_EXCEEDED") {
+				throw new Error("QUOTA_EXCEEDED");
+			}
+			throw err;
 		}
-
-		return { batch, launchId, tasks: createdTasks };
 	},
 };

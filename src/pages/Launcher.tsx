@@ -21,7 +21,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useTier } from '@/hooks/useTier';
-import { storage } from '@/lib/storage';
+import { storage, UserTier } from '@/lib/storage';
+import { getTierSource } from '@/lib/storage/executionRouter';
 import { executorService } from '@/services/executorService';
 
 export function LauncherPage() {
@@ -265,6 +266,7 @@ export function LauncherPage() {
         // 2. Process each row into its own batch
         toast.info(`Preparing ${selectedTasks.length} pipelines...`);
 
+        const tierSource = await getTierSource(tier);
         const allTasksToInsert: Record<string, unknown>[] = [];
 
         for (let i = 0; i < selectedTasks.length; i++) {
@@ -300,6 +302,7 @@ export function LauncherPage() {
             launch_id: launchId, // Grouping at Campaign level
             batch_id: batchId,   // Grouping at Row level
             user_id: user?.id,
+            tier_source: tierSource,
             extra: {
               ...processed.extra,
               launcher_metadata: {
@@ -342,7 +345,22 @@ export function LauncherPage() {
         }
 
         // 3. Perform bulk insert of all initial tasks (Stage 1)
-        await storage.adapter.createTasks(allTasksToInsert);
+        try {
+          await storage.adapter.createTasks(allTasksToInsert);
+        } catch (err: any) {
+          if (err.message === 'QUOTA_EXCEEDED') {
+            toast.error("Monthly quota exceeded (30 tasks). Please upgrade to Premium or use your own API keys.", {
+              duration: 5000,
+              action: {
+                label: "Upgrade",
+                onClick: () => navigate("/settings")
+              }
+            });
+            setIsLaunching(false);
+            return;
+          }
+          throw err;
+        }
 
         // All authenticated users use unified execution path
         executorService.start(tier);
@@ -373,7 +391,8 @@ export function LauncherPage() {
 
           const execution = await createExecutionMutation.mutateAsync({
             configId: selectedConfigId!,
-            syllabusRow: row
+            syllabusRow: row,
+            tier
           });
 
           // All authenticated users use unified execution path

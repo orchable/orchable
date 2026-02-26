@@ -73,8 +73,30 @@ export class SupabaseAdapter implements IStorageAdapter {
 		if (error) throw error;
 	}
 
-	// Tasks
 	async createTasks(tasks: Partial<AiTask>[]): Promise<AiTask[]> {
+		// 1. If any task is 'free_pool', use the quota-enforcing RPC
+		const isFreePool = tasks.some((t) => t.tier_source === "free_pool");
+
+		if (isFreePool) {
+			const { data, error } = await supabase.rpc(
+				"submit_free_tier_tasks",
+				{
+					p_tasks: tasks,
+				},
+			);
+
+			if (error) throw error;
+			if (!data.success) {
+				// The UI/Executor will catch this and show the upgrade modal
+				throw new Error(data.error || "QUOTA_EXCEEDED");
+			}
+
+			// The RPC created the tasks. We return empty or fetch them if needed.
+			// For now, return empty as the UI usually refreshes via subscription.
+			return [];
+		}
+
+		// 2. Normal direct insert for other tiers/sources
 		const { data, error } = await supabase
 			.from("ai_tasks")
 			.insert(tasks)

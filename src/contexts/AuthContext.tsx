@@ -41,35 +41,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    // Step 1: Listen for auth state changes (synchronous — no await)
+    // Step 1: Listen for auth state changes + get initial session
     useEffect(() => {
         let isMounted = true;
+
+        // Proactively get initial session
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (!isMounted) return;
+            if (session) {
+                setSession(session);
+                setUser(session.user);
+                setIsLoading(false);
+            }
+        });
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             (_event, session) => {
                 if (!isMounted) return;
-
-                // Set auth state synchronously — do NOT fetch profile here
-                // to avoid blocking isLoading on a potentially slow/hanging query
                 setSession(session);
                 setUser(session?.user ?? null);
-
                 if (!session?.user) {
                     setProfile(null);
                     profileFetchedForUser.current = null;
                 }
-
                 setIsLoading(false);
             }
         );
 
-        // Safety timeout: if onAuthStateChange hasn't fired in 3s, unblock the UI
+        // Safety timeout: only unblock if still loading after 5s
         const timeout = setTimeout(() => {
             if (isMounted) {
-                console.warn('[AuthContext] Auth state change timeout — unblocking UI');
                 setIsLoading(false);
             }
-        }, 3000);
+        }, 5000);
 
         return () => {
             isMounted = false;
@@ -79,17 +83,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     // Step 2: Fetch profile AFTER user is set (non-blocking)
+    // Note: We avoid a `cancelled` flag here because getSession() and
+    // onAuthStateChange can both set `user` in quick succession, causing
+    // React to re-run this effect. The cleanup of the first run would set
+    // cancelled=true, killing the in-flight fetch, while the second run
+    // skips because profileFetchedForUser is already set.
     useEffect(() => {
-        let cancelled = false;
-
-        if (user && profileFetchedForUser.current !== user.id) {
-            profileFetchedForUser.current = user.id;
-            fetchProfile(user.id).then(p => {
-                if (!cancelled) setProfile(p);
+        const userId = user?.id;
+        if (userId && profileFetchedForUser.current !== userId) {
+            profileFetchedForUser.current = userId;
+            fetchProfile(userId).then(p => {
+                // Only apply if this is still the current user
+                if (profileFetchedForUser.current === userId) {
+                    setProfile(p);
+                }
             });
         }
-
-        return () => { cancelled = true; };
     }, [user]);
 
     const signOut = async () => {

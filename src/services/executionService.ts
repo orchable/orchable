@@ -1,21 +1,26 @@
-import { storage } from "@/lib/storage";
+import { storage, UserTier } from "@/lib/storage";
 import { Execution, StepExecution, SyllabusRow } from "@/lib/types";
+import { batchService } from "./batchService";
 
 export const executionService = {
 	async createExecution(data: {
 		configId: string;
 		syllabusRow: SyllabusRow;
+		tier: UserTier;
 	}): Promise<Execution> {
-		const adapter = storage.adapter;
-		return adapter.createBatch({
-			name: data.syllabusRow.lessonTitle || "Untitled Execution",
-			orchestrator_config_id: data.configId,
-			syllabus_row: data.syllabusRow as any,
-			status: "pending",
-			total_tasks: 0,
-			completed_tasks: 0,
-			failed_tasks: 0,
-		}) as unknown as Promise<Execution>;
+		const { configId, syllabusRow, tier } = data;
+		const configs = await storage.adapter.listConfigs();
+		const config = configs?.find((c) => c.id === configId);
+		if (!config) throw new Error("Config not found");
+
+		const { batch } = await batchService.createLaunch({
+			config,
+			inputItems: [syllabusRow as any],
+			batchName: syllabusRow.lessonTitle || "Untitled Execution",
+			tier,
+		});
+
+		return batch as unknown as Execution;
 	},
 
 	async listExecutions(): Promise<Execution[]> {

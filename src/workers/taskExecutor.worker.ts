@@ -126,10 +126,19 @@ async function processTask(task: AiTask) {
 		}
 
 		// 3. Build prompt
-		const prompt = buildPrompt(template.template, currentInputData);
+		// N8n uses: { ...task, ...task.extra, ...task.input_data }
+		const extra = (task.extra || {}) as Record<string, unknown>;
+		const enrichmentData = {
+			...task,
+			...extra,
+			...currentInputData,
+		};
+		const prompt = buildPrompt(
+			template.template,
+			enrichmentData as Record<string, unknown>,
+		);
 
 		// 4. Call Gemini
-		const extra = (task.extra || {}) as Record<string, unknown>;
 		const taskAiSettings = (extra.ai_settings as Partial<AISettings>) || {};
 		const templateSettings =
 			(template.default_ai_settings as Partial<AISettings>) || {};
@@ -142,15 +151,19 @@ async function processTask(task: AiTask) {
 
 		// --- SUPPORT: return-along-with ---
 		const returnAlongWith = (extra["return-along-with"] as string[]) || [];
+		const finalResult = { ...(result as Record<string, unknown>) };
+
 		if (Array.isArray(returnAlongWith) && returnAlongWith.length > 0) {
-			const inputData =
-				(task.input_data as Record<string, unknown>) || {};
 			for (const key of returnAlongWith) {
-				if (Object.prototype.hasOwnProperty.call(inputData, key)) {
-					(result as Record<string, unknown>)[key] = inputData[key];
+				if (
+					Object.prototype.hasOwnProperty.call(currentInputData, key)
+				) {
+					finalResult[key] = currentInputData[key];
 				}
 			}
 		}
+
+		result = finalResult;
 
 		// --- POST-PROCESS WEBHOOK & MERGING ---
 		const postProcess = stageConfig.post_process;
@@ -388,19 +401,40 @@ async function handleNextStages(
 	result: unknown,
 	template: PromptTemplate,
 ) {
-	let nextTemplateIds = template.next_stage_template_ids || [];
+	// 1. Get next stage configs (Load Batch creates it)
+	const extra = (task.extra || {}) as Record<string, unknown>;
+	let nextStageConfigs = (extra.next_stage_configs as any[]) || [];
 
-	// FIX #5: Fallback to task input_data if template doesn't have next stages
-	if (nextTemplateIds.length === 0) {
-		nextTemplateIds =
-			((task.input_data as Record<string, unknown>)
-				._next_stage_template_ids as string[]) || [];
+	// Hydrate from template if not present (N8n behaviour)
+	if (
+		nextStageConfigs.length === 0 &&
+		template.next_stage_template_ids &&
+		template.next_stage_template_ids.length > 0
+	) {
+		const { db } = await import("../lib/storage/IndexedDBAdapter");
+		nextStageConfigs = await Promise.all(
+			template.next_stage_template_ids.map(async (id) => {
+				const tpl = await db.prompt_templates.get(id);
+				const sc = (tpl?.stage_config as any) || {};
+				return {
+					template_id: id,
+					cardinality: sc.cardinality || "one_to_one",
+					split_path: sc.split_path || null,
+					split_mode: sc.split_mode || "per_item",
+					merge_path: sc.merge_path || null,
+					output_mapping: sc.output_mapping || "result",
+					batch_grouping: sc.batch_grouping || null,
+					requires_approval: sc.requires_approval || false,
+				};
+			}),
+		);
 	}
 
-	if (nextTemplateIds.length === 0) return;
+	if (nextStageConfigs.length === 0) return;
 
-	const stageConfig = template.stage_config || {};
-	const cardinality = stageConfig.cardinality || "one_to_one";
+	const currentStageConfig =
+		(extra.current_stage_config as any) || template.stage_config || {};
+	const cardinality = currentStageConfig.cardinality || "one_to_one";
 
 	if (cardinality === "many_to_one" || cardinality === "N:1") {
 		// N:1 logic: Wait for siblings, then aggregate
@@ -409,17 +443,19 @@ async function handleNextStages(
 	}
 
 	if (cardinality === "one_to_many" || cardinality === "1:N") {
-		const splitMode = stageConfig.split_mode || "per_item";
+		const splitMode = currentStageConfig.split_mode || "per_item";
 		const splitPath: string =
-			(stageConfig.split_path as string) || "result"; // n8n defaults to 'result' or split_path
+			(currentStageConfig.split_path as string) || "result"; // n8n defaults to 'result' or split_path
 		const items = getValueByPath(result, splitPath);
 
 		if (Array.isArray(items)) {
 			if (splitMode === "per_item") {
-				for (const nextTemplateId of nextTemplateIds) {
+				for (const nextConfig of nextStageConfigs) {
+					const nextTemplateId = nextConfig.template_id;
 					const nextTemplate =
 						await db.prompt_templates.get(nextTemplateId);
 					if (!nextTemplate) continue;
+
 					const newTasks = items.map((item, idx) => ({
 						id: crypto.randomUUID(),
 						batch_id: task.batch_id,
@@ -428,6 +464,7 @@ async function handleNextStages(
 							extractStageKey(nextTemplate.id),
 						step_number: (task.step_number || 0) + 1,
 						status: "plan",
+						// 1:N branches carry the parent data down
 						input_data: {
 							...(task.input_data as Record<string, unknown>),
 							item,
@@ -452,7 +489,15 @@ async function handleNextStages(
 						created_at: new Date().toISOString(),
 						sequence: idx + 1,
 						extra: {
-							current_stage_config: nextTemplate.stage_config,
+							current_stage_config: {
+								template_id: nextTemplateId,
+								cardinality:
+									nextConfig.cardinality || "one_to_one",
+								split_path: nextConfig.split_path || null,
+								split_mode: nextConfig.split_mode || "per_item",
+								output_mapping:
+									nextConfig.output_mapping || "result",
+							},
 							parent_stage_key: task.stage_key,
 							parent_task_id: task.id,
 						},
@@ -460,8 +505,10 @@ async function handleNextStages(
 					await db.ai_tasks.bulkAdd(newTasks as unknown as AiTask[]);
 				}
 			} else if (splitMode === "per_batch") {
-				const batchSize = (stageConfig.batch_size as number) || 10;
-				for (const nextTemplateId of nextTemplateIds) {
+				const batchSize =
+					(currentStageConfig.batch_size as number) || 10;
+				for (const nextConfig of nextStageConfigs) {
+					const nextTemplateId = nextConfig.template_id;
 					const nextTemplate =
 						await db.prompt_templates.get(nextTemplateId);
 					if (!nextTemplate) continue;
@@ -504,7 +551,16 @@ async function handleNextStages(
 							created_at: new Date().toISOString(),
 							sequence: bIdx + 1,
 							extra: {
-								current_stage_config: nextTemplate.stage_config,
+								current_stage_config: {
+									template_id: nextTemplateId,
+									cardinality:
+										nextConfig.cardinality || "one_to_one",
+									split_path: nextConfig.split_path || null,
+									split_mode:
+										nextConfig.split_mode || "per_item",
+									output_mapping:
+										nextConfig.output_mapping || "result",
+								},
 								parent_stage_key: task.stage_key,
 								parent_task_id: task.id,
 							},
@@ -516,7 +572,8 @@ async function handleNextStages(
 		}
 	} else {
 		// 1:1 workflow
-		for (const nextTemplateId of nextTemplateIds) {
+		for (const nextConfig of nextStageConfigs) {
+			const nextTemplateId = nextConfig.template_id;
 			const nextTemplate = await db.prompt_templates.get(nextTemplateId);
 			if (!nextTemplate) continue;
 
@@ -527,8 +584,8 @@ async function handleNextStages(
 					nextTemplate.stage_key || extractStageKey(nextTemplate.id),
 				step_number: (task.step_number || 0) + 1,
 				status: "plan",
+				// 1:1 replaces instead of merging inputs!
 				input_data: {
-					...(task.input_data as Record<string, unknown>),
 					...(result as Record<string, unknown>),
 					_parent_id: task.id,
 				},
@@ -546,7 +603,13 @@ async function handleNextStages(
 				prompt_template_id: nextTemplate.id,
 				created_at: new Date().toISOString(),
 				extra: {
-					current_stage_config: nextTemplate.stage_config,
+					current_stage_config: {
+						template_id: nextTemplateId,
+						cardinality: nextConfig.cardinality || "one_to_one",
+						split_path: nextConfig.split_path || null,
+						split_mode: nextConfig.split_mode || "per_item",
+						output_mapping: nextConfig.output_mapping || "result",
+					},
 					parent_stage_key: task.stage_key,
 					parent_task_id: task.id,
 				},
@@ -558,24 +621,59 @@ async function handleNextStages(
 }
 
 async function handleManyToOne(task: AiTask, template: PromptTemplate) {
-	const stageConfig = template.stage_config || {};
+	const extra = (task.extra || {}) as Record<string, unknown>;
+	const currentStageConfig =
+		(extra.current_stage_config as any) || template.stage_config || {};
 	const batchId = task.batch_id;
 	const stageKey = task.stage_key;
 
-	// 1. Check if all sibling tasks in this stage are done
-	const siblings = await db.ai_tasks
-		.where("[batch_id+stage_key]")
-		.equals([batchId, stageKey])
+	if (!batchId) return;
+
+	// FIX: To safely aggregate across the entire batch, we must wait until NO other tasks in the batch
+	// (that are before this M:1 stage) are still 'plan' or 'processing'.
+	// Since stages execute sequentially or level-by-level, simpler check:
+	// Are there ANY tasks in this batch still pending/processing EXCEPT for tasks OF this stage?
+	// Actually, wait until ALL tasks in this stage are completed, AND there are no active parents.
+	const allBatchTasks = await db.ai_tasks
+		.where("batch_id")
+		.equals(batchId)
 		.toArray();
 
-	// Safety: siblings might be empty if IndexedDB is still thinking, but we're in the worker so it should be fine.
-	const allDone = siblings.every(
-		(s) => s.status === "completed" || s.id === task.id,
+	// Identify if any task is still upstream and could generate more siblings.
+	// For simplicity, we assume M:1 aggregates EVERYTHING from the batch for this stage.
+	const isStreamFinished = allBatchTasks.every((t) => {
+		// Ignore self
+		if (t.id === task.id) return true;
+
+		// If it's a future stage (step_number is greater), it's fine.
+		// Wait, we don't know the exact order easily.
+		// If ANY task in the batch is 'plan' or 'processing' (other than siblings of this exact stage), we might not be done.
+		if (
+			(t.status === "plan" ||
+				t.status === "processing" ||
+				t.status === "processing") &&
+			t.stage_key !== stageKey
+		) {
+			return false; // Still processing something else in the batch! Wait!
+		}
+		return true;
+	});
+
+	if (!isStreamFinished) return; // Wait for all other upstream tasks to finish
+
+	// Check if all siblings in THIS stage are done
+	const siblings = allBatchTasks.filter((t) => t.stage_key === stageKey);
+	const allSiblingsDone = siblings.every(
+		(s) =>
+			s.status === "completed" ||
+			s.status === "failed" ||
+			s.id === task.id,
 	);
-	if (!allDone) return; // Wait for others
+
+	if (!allSiblingsDone) return; // Wait for other siblings
 
 	// 2. Aggregate data
-	const mergePath = (stageConfig.merge_path as string) || null;
+	const mergePath = (currentStageConfig.merge_path as string) || null;
 	const allOutputs = siblings
 		.map((s) =>
 			s.id === task.id
@@ -604,8 +702,28 @@ async function handleManyToOne(task: AiTask, template: PromptTemplate) {
 		: { merged_data: aggregatedData };
 
 	// 3. Create next tasks
-	const nextTemplateIds = template.next_stage_template_ids || [];
-	for (const nextTemplateId of nextTemplateIds) {
+	let nextStageConfigs = (extra.next_stage_configs as any[]) || [];
+	if (nextStageConfigs.length === 0 && template.next_stage_template_ids) {
+		nextStageConfigs = await Promise.all(
+			template.next_stage_template_ids.map(async (id) => {
+				const tpl = await db.prompt_templates.get(id);
+				const sc = (tpl?.stage_config as any) || {};
+				return {
+					template_id: id,
+					cardinality: sc.cardinality || "one_to_one",
+					split_path: sc.split_path || null,
+					split_mode: sc.split_mode || "per_item",
+					merge_path: sc.merge_path || null,
+					output_mapping: sc.output_mapping || "result",
+					batch_grouping: sc.batch_grouping || null,
+					requires_approval: sc.requires_approval || false,
+				};
+			}),
+		);
+	}
+
+	for (const nextConfig of nextStageConfigs) {
+		const nextTemplateId = nextConfig.template_id;
 		const nextTemplate = await db.prompt_templates.get(nextTemplateId);
 		if (!nextTemplateId) continue;
 
@@ -617,7 +735,6 @@ async function handleManyToOne(task: AiTask, template: PromptTemplate) {
 			step_number: (task.step_number || 0) + 1,
 			status: "plan",
 			input_data: {
-				...(task.input_data as Record<string, unknown>),
 				...mergedInputData,
 			},
 			parent_task_id: task.id,
@@ -634,9 +751,17 @@ async function handleManyToOne(task: AiTask, template: PromptTemplate) {
 			prompt_template_id: nextTemplateId,
 			created_at: new Date().toISOString(),
 			extra: {
-				current_stage_config: nextTemplate?.stage_config,
+				current_stage_config: {
+					template_id: nextTemplateId,
+					cardinality: nextConfig.cardinality || "one_to_one",
+					split_path: nextConfig.split_path || null,
+					split_mode: nextConfig.split_mode || "per_item",
+					output_mapping: nextConfig.output_mapping || "result",
+					merge_path: nextConfig.merge_path || null,
+				},
 				parent_stage_key: task.stage_key,
 				parent_task_id: task.id,
+				_merged_from_count: siblings.length,
 			},
 		} as unknown as AiTask);
 	}

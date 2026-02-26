@@ -104,16 +104,44 @@ export function UsageDashboard() {
                 </div>
 
                 {!isPremium && (
-                    <div className="p-3 rounded-xl bg-primary/5 border border-primary/10 flex items-start gap-3">
-                        <div className="p-2 rounded-lg bg-primary/10">
-                            <Crown className="w-4 h-4 text-primary" />
+                    <div className="space-y-3">
+                        <div className="p-3 rounded-xl bg-primary/5 border border-primary/10 flex items-start gap-3">
+                            <div className="p-2 rounded-lg bg-primary/10">
+                                <Crown className="w-4 h-4 text-primary" />
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-xs font-bold">Want more power?</p>
+                                <p className="text-[10px] text-muted-foreground">
+                                    Upgrade to <strong>Premium</strong> for unlimited tasks, high-speed Key Pools, and advanced collaboration features.
+                                </p>
+                                <Button size="sm" variant="link" className="p-0 h-auto text-[10px] font-bold">Upgrade Now &rarr;</Button>
+                            </div>
                         </div>
-                        <div className="space-y-1">
-                            <p className="text-xs font-bold">Want more power?</p>
-                            <p className="text-[10px] text-muted-foreground">
-                                Upgrade to <strong>Premium</strong> for unlimited tasks, high-speed Key Pools, and advanced collaboration features.
-                            </p>
-                            <Button size="sm" variant="link" className="p-0 h-auto text-[10px] font-bold">Upgrade Now &rarr;</Button>
+
+                        <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/10 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <AlertTriangle className="w-4 h-4 text-amber-500" />
+                                <div className="space-y-0.5">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-500">Data Lifecycle</p>
+                                    <p className="text-[10px] text-muted-foreground leading-tight">Server tasks expire in 24h.</p>
+                                </div>
+                            </div>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 text-[10px] font-bold border-amber-500/20 hover:bg-amber-500/10"
+                                onClick={async () => {
+                                    const { freeTierService } = await import("@/services/freeTierService");
+                                    const { toast } = await import("sonner");
+                                    toast.promise(freeTierService.syncCompletedTasks(), {
+                                        loading: "Syncing task data...",
+                                        success: (res) => `Synced ${res.synced} tasks to local storage.`,
+                                        error: "Sync failed"
+                                    });
+                                }}
+                            >
+                                Sync to Local
+                            </Button>
                         </div>
                     </div>
                 )}

@@ -1,25 +1,28 @@
 import { IStorageAdapter } from "./StorageAdapter";
 import { IndexedDBAdapter } from "./IndexedDBAdapter";
 import { SupabaseAdapter } from "./SupabaseAdapter";
+import { getExecutionPath } from "./executionRouter";
 
 export type UserTier = "free" | "premium";
 
-export function getStorageAdapter(tier: UserTier): IStorageAdapter {
-	// Authenticated users always use Supabase.
-	return new SupabaseAdapter();
+export function getStorageAdapter(
+	path: "web-worker" | "supabase-n8n",
+): IStorageAdapter {
+	if (path === "supabase-n8n") {
+		return new SupabaseAdapter();
+	}
+	return new IndexedDBAdapter();
 }
 
-// Default to SupabaseAdapter since all protected routes require authentication.
-// SupabaseAdapter methods return empty results for unauthenticated users (via RLS),
-// so this is safe even before auth resolves. IndexedDBAdapter is only used
-// explicitly for anonymous/offline mode.
-let currentAdapter: IStorageAdapter = new SupabaseAdapter();
+let currentAdapter: IStorageAdapter = new IndexedDBAdapter();
 
 export const storage = {
 	get adapter() {
 		return currentAdapter;
 	},
-	setTier(tier: UserTier) {
-		currentAdapter = getStorageAdapter(tier);
+	async refreshAdapter(tier: UserTier) {
+		const path = await getExecutionPath(tier);
+		currentAdapter = getStorageAdapter(path);
+		return path;
 	},
 };
