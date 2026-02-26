@@ -1,4 +1,4 @@
-import React, { createContext, useEffect, useState } from 'react';
+import React, { createContext, useEffect, useState, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { UserProfile } from '@/lib/types';
@@ -13,6 +13,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [session, setSession] = useState<Session | null>(null);
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const profileFetchedForUser = useRef<string | null>(null);
 
     const fetchProfile = async (userId: string): Promise<UserProfile | null> => {
         try {
@@ -20,15 +21,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 .from('user_profiles')
                 .select('*')
                 .eq('id', userId)
-                .maybeSingle(); // Better than .single() if profile might be missing
+                .maybeSingle();
 
             if (error) {
-                console.error('Error fetching profile for user:', userId, error);
+                console.error('[AuthContext] Error fetching profile for user:', userId, error);
                 return null;
             }
             return data;
         } catch (err) {
-            console.error('Critical error in fetchProfile:', err);
+            console.error('[AuthContext] Critical error in fetchProfile:', err);
             return null;
         }
     };
@@ -40,51 +41,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
+    // Step 1: Listen for auth state changes (synchronous — no await)
     useEffect(() => {
         let isMounted = true;
 
-        // Get initial session
-        supabase.auth.getSession().then(async ({ data: { session } }) => {
-            if (!isMounted) return;
-
-            setSession(session);
-            setUser(session?.user ?? null);
-            if (session?.user) {
-                const p = await fetchProfile(session.user.id);
-                if (isMounted) setProfile(p);
-            }
-            if (isMounted) setIsLoading(false);
-        }).catch(err => {
-            console.error('Error in initial session check:', err);
-            if (isMounted) setIsLoading(false);
-        });
-
-        // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (_event, session) => {
+            (_event, session) => {
                 if (!isMounted) return;
 
+                // Set auth state synchronously — do NOT fetch profile here
+                // to avoid blocking isLoading on a potentially slow/hanging query
                 setSession(session);
                 setUser(session?.user ?? null);
-                if (session?.user) {
-                    const p = await fetchProfile(session.user.id);
-                    if (isMounted) setProfile(p);
-                } else {
-                    if (isMounted) setProfile(null);
+
+                if (!session?.user) {
+                    setProfile(null);
+                    profileFetchedForUser.current = null;
                 }
-                if (isMounted) setIsLoading(false);
+
+                setIsLoading(false);
             }
         );
 
+        // Safety timeout: if onAuthStateChange hasn't fired in 3s, unblock the UI
+        const timeout = setTimeout(() => {
+            if (isMounted) {
+                console.warn('[AuthContext] Auth state change timeout — unblocking UI');
+                setIsLoading(false);
+            }
+        }, 3000);
+
         return () => {
             isMounted = false;
+            clearTimeout(timeout);
             subscription.unsubscribe();
         };
     }, []);
 
+    // Step 2: Fetch profile AFTER user is set (non-blocking)
+    useEffect(() => {
+        let cancelled = false;
+
+        if (user && profileFetchedForUser.current !== user.id) {
+            profileFetchedForUser.current = user.id;
+            fetchProfile(user.id).then(p => {
+                if (!cancelled) setProfile(p);
+            });
+        }
+
+        return () => { cancelled = true; };
+    }, [user]);
+
     const signOut = async () => {
         await supabase.auth.signOut();
         setProfile(null);
+        profileFetchedForUser.current = null;
     };
 
     return (

@@ -198,6 +198,22 @@ export class SupabaseAdapter implements IStorageAdapter {
 		return data as OrchestratorConfig;
 	}
 
+	async upsertConfig(config: Partial<OrchestratorConfig>): Promise<void> {
+		const {
+			data: { user },
+		} = await supabase.auth.getUser();
+
+		const { error } = await supabase
+			.from("lab_orchestrator_configs")
+			.upsert({
+				...config,
+				created_by: config.created_by || user?.id,
+				updated_at: new Date().toISOString(),
+			});
+
+		if (error) throw error;
+	}
+
 	async listConfigs(): Promise<OrchestratorConfig[]> {
 		// RLS handles user isolation — no client-side filtering needed
 		const { data, error } = await supabase

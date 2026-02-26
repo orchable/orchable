@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { TierContext } from './TierContextObject';
 import { UserTier, storage } from '@/lib/storage';
@@ -6,11 +6,14 @@ import { syncService } from '@/services/syncService';
 import { usageService } from '@/services/usageService';
 import { supabase } from '@/lib/supabase';
 
+const SYNC_DONE_KEY = 'orchable_sync_done';
+
 export function TierProvider({ children }: { children: React.ReactNode }) {
     const { user, profile } = useAuth();
     const [tier, setTierState] = useState<UserTier>('free');
     const [isSyncing, setIsSyncing] = useState(false);
     const [usage, setUsage] = useState<{ count: number; month: string } | null>(null);
+    const hasHandledProfile = useRef(false);
 
     const refreshUsage = useCallback(async () => {
         if (user) {
@@ -40,27 +43,41 @@ export function TierProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         const handleAuthChange = async () => {
             if (profile) {
-                // Read tier from DB profile sync
+                // Prevent duplicate runs (e.g. if profile object reference changes)
+                if (hasHandledProfile.current) return;
+                hasHandledProfile.current = true;
+
+                // Always switch adapter to Supabase for authenticated users
                 const userTier = (profile.tier || 'free') as UserTier;
                 setTierState(userTier);
-                storage.setTier(userTier); // Switch adapter to SupabaseAdapter
+                storage.setTier(userTier);
 
-                setIsSyncing(true);
-                try {
-                    // Add a timeout to migration to prevent infinite loading
-                    const migrationPromise = syncService.migrateAnonymousData();
-                    const timeoutPromise = new Promise((_, reject) =>
-                        setTimeout(() => reject(new Error("Migration timeout")), 5000)
-                    );
-
-                    await Promise.race([migrationPromise, timeoutPromise]);
-                } catch (e) {
-                    console.warn("Migration or sync failed, continuing to app:", e);
-                } finally {
-                    setIsSyncing(false);
+                // Only run migration on FIRST login in this browser session.
+                // On reload, the data is already in Supabase — no need to re-push
+                // from IndexedDB (which causes INSERT conflicts).
+                const alreadySynced = sessionStorage.getItem(SYNC_DONE_KEY);
+                if (!alreadySynced) {
+                    setIsSyncing(true);
+                    try {
+                        const migrationPromise = syncService.migrateAnonymousData();
+                        const timeoutPromise = new Promise((_, reject) =>
+                            setTimeout(() => reject(new Error("Migration timeout")), 5000)
+                        );
+                        await Promise.race([migrationPromise, timeoutPromise]);
+                        sessionStorage.setItem(SYNC_DONE_KEY, '1');
+                    } catch (e) {
+                        console.warn("Migration or sync failed, continuing to app:", e);
+                        // Mark as done even on failure to prevent retry loops
+                        sessionStorage.setItem(SYNC_DONE_KEY, '1');
+                    } finally {
+                        setIsSyncing(false);
+                    }
                 }
             } else {
                 setTierState('free');
+                hasHandledProfile.current = false;
+                // Clear sync flag on logout so next login triggers migration
+                sessionStorage.removeItem(SYNC_DONE_KEY);
             }
         };
 

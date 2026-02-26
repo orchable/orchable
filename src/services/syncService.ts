@@ -1,27 +1,22 @@
 import { db } from "../lib/storage/IndexedDBAdapter";
 import { SupabaseAdapter } from "../lib/storage/SupabaseAdapter";
-import { Execution as TaskBatch } from "../lib/types";
-import { TaskSummary as AiTask } from "../services/executionTrackingService";
 
 const cloudAdapter = new SupabaseAdapter();
 
 export const syncService = {
 	/**
-	 * Pushes local batches and tasks to Supabase.
-	 * Only works if the user is authenticated (handled by SupabaseAdapter).
+	 * Pushes local batches and tasks to Supabase using UPSERT (not INSERT).
+	 * Each item is synced independently so one failure doesn't abort the rest.
 	 */
 	async syncToCloud() {
 		console.log("[SyncService] Starting sync to cloud...");
 
-		try {
-			// 1. Get all local batches
-			const localBatches = await db.task_batches.toArray();
-
-			for (const batch of localBatches) {
-				// Upsert batch to cloud
+		// 1. Sync batches + their tasks
+		const localBatches = await db.task_batches.toArray();
+		for (const batch of localBatches) {
+			try {
 				await cloudAdapter.upsertBatch(batch);
 
-				// 2. Get all tasks for this batch
 				const tasks = await db.ai_tasks
 					.where("batch_id")
 					.equals(batch.id)
@@ -33,27 +28,35 @@ export const syncService = {
 				console.log(
 					`[SyncService] Synced batch ${batch.id} with ${tasks.length} tasks`,
 				);
+			} catch (err) {
+				console.warn(
+					`[SyncService] Failed to sync batch ${batch.id}:`,
+					err,
+				);
 			}
-
-			// 3. Sync configs
-			const localConfigs = await db.orchestrator_configs.toArray();
-			for (const config of localConfigs) {
-				await cloudAdapter.saveConfig(config);
-				console.log(`[SyncService] Synced config ${config.id}`);
-			}
-
-			console.log("[SyncService] Sync completed.");
-		} catch (error) {
-			console.error("[SyncService] Sync failed:", error);
-			throw error;
 		}
+
+		// 2. Sync configs — use UPSERT to avoid unique constraint violations
+		const localConfigs = await db.orchestrator_configs.toArray();
+		for (const config of localConfigs) {
+			try {
+				await cloudAdapter.upsertConfig(config);
+				console.log(`[SyncService] Synced config ${config.id}`);
+			} catch (err) {
+				console.warn(
+					`[SyncService] Failed to sync config ${config.id}:`,
+					err,
+				);
+			}
+		}
+
+		console.log("[SyncService] Sync completed.");
 	},
 
 	/**
 	 * Migration logic: called after first login to move anonymous data to user's account.
 	 */
 	async migrateAnonymousData() {
-		// In Phase 2, we just trigger a full sync
 		await this.syncToCloud();
 	},
 };

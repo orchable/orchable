@@ -5,13 +5,15 @@ import { SupabaseAdapter } from "./SupabaseAdapter";
 export type UserTier = "free" | "premium";
 
 export function getStorageAdapter(tier: UserTier): IStorageAdapter {
-	// In the new system, we always use Supabase for authenticated users.
-	// We keep IndexedDBAdapter only for temporary caching or offline-first sync.
+	// Authenticated users always use Supabase.
 	return new SupabaseAdapter();
 }
 
-// Global instance for singleton use (will be updated when tier changes)
-let currentAdapter: IStorageAdapter = new IndexedDBAdapter();
+// Default to SupabaseAdapter since all protected routes require authentication.
+// SupabaseAdapter methods return empty results for unauthenticated users (via RLS),
+// so this is safe even before auth resolves. IndexedDBAdapter is only used
+// explicitly for anonymous/offline mode.
+let currentAdapter: IStorageAdapter = new SupabaseAdapter();
 
 export const storage = {
 	get adapter() {
