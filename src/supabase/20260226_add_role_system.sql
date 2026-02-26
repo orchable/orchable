@@ -1,26 +1,23 @@
 -- Migration: Add Role System (Phase 1)
 -- Date: 2026-02-26
+-- NOTE: Uses VARCHAR + CHECK constraint instead of enum to avoid
+-- COALESCE type mismatch errors in triggers/functions.
 
--- 1. Create enum type for roles
-DO $$ BEGIN
-    CREATE TYPE public.user_role AS ENUM ('user', 'admin', 'superadmin');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
--- 2. Clean up existing role data and convert column to enum
--- First update any values that don't match our new enum
+-- 1. Clean up existing role data
 UPDATE public.user_profiles 
 SET role = 'user' 
 WHERE role NOT IN ('user', 'admin', 'superadmin') OR role IS NULL;
 
--- Alter column to use the new enum type
-ALTER TABLE public.user_profiles 
-ALTER COLUMN role TYPE public.user_role 
-USING role::public.user_role;
+-- 2. Add CHECK constraint for role values
+ALTER TABLE public.user_profiles
+DROP CONSTRAINT IF EXISTS user_profiles_role_check;
+
+ALTER TABLE public.user_profiles
+ADD CONSTRAINT user_profiles_role_check 
+CHECK (role IN ('user', 'admin', 'superadmin'));
 
 ALTER TABLE public.user_profiles 
-ALTER COLUMN role SET DEFAULT 'user'::public.user_role;
+ALTER COLUMN role SET DEFAULT 'user';
 
 -- 3. Add tier column to user_profiles for quick frontend access
 ALTER TABLE public.user_profiles 
@@ -45,7 +42,7 @@ ALTER TABLE public.user_subscriptions ENABLE ROW LEVEL SECURITY;
 
 -- 5. Helper functions for RLS
 CREATE OR REPLACE FUNCTION public.get_my_role()
-RETURNS public.user_role
+RETURNS varchar
 LANGUAGE sql STABLE SECURITY DEFINER AS $$
     SELECT role FROM public.user_profiles WHERE id = auth.uid();
 $$;
@@ -55,7 +52,7 @@ RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER AS $$
     SELECT EXISTS (
         SELECT 1 FROM public.user_profiles 
-        WHERE id = auth.uid() AND role IN ('admin'::public.user_role, 'superadmin'::public.user_role)
+        WHERE id = auth.uid() AND role IN ('admin', 'superadmin')
     );
 $$;
 
@@ -126,7 +123,6 @@ AFTER INSERT OR UPDATE OF tier ON public.user_subscriptions
 FOR EACH ROW EXECUTE FUNCTION public.handle_tier_sync();
 
 -- 8. Backfill superadmin
--- We determine superadmin by email as requested
 UPDATE public.user_profiles 
-SET role = 'superadmin'::public.user_role 
+SET role = 'superadmin'
 WHERE email = 'makexyzfun@gmail.com';

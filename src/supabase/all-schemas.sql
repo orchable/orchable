@@ -1,23 +1,43 @@
+-- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
--- Enum
-CREATE TYPE public.ai_task_status AS ENUM (
-  'plan',
-  'pending',
-  'running',
-  'processing',
-  'awaiting_approval',
-  'approved',
-  'completed',
-  'generated',
-  'failed',
-  'cancelled',
-  'skipped'
-);
 
+CREATE TABLE public.ai_model_settings (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  model_id text NOT NULL,
+  name text NOT NULL,
+  description text,
+  temperature numeric DEFAULT 1.0,
+  top_p numeric DEFAULT 0.95,
+  top_k integer DEFAULT 40,
+  max_output_tokens integer DEFAULT 8192,
+  generate_content_api text DEFAULT 'generateContent'::text,
+  timeout_ms integer DEFAULT 300000,
+  retries integer DEFAULT 3,
+  is_active boolean DEFAULT true,
+  organization_code text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  category text,
+  tagline text,
+  supported_inputs jsonb DEFAULT '["Text"]'::jsonb,
+  supported_outputs jsonb DEFAULT '["Text"]'::jsonb,
+  input_token_limit integer DEFAULT 1048576,
+  output_token_limit integer DEFAULT 65536,
+  capabilities jsonb DEFAULT '{}'::jsonb,
+  thinking_config_type text DEFAULT 'none'::text,
+  recommended_thinking text,
+  free_tier_rpm integer,
+  free_tier_tpm integer,
+  free_tier_rpd integer,
+  use_case_tags jsonb DEFAULT '[]'::jsonb,
+  user_id uuid,
+  CONSTRAINT ai_model_settings_pkey PRIMARY KEY (id),
+  CONSTRAINT ai_model_settings_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
 CREATE TABLE public.ai_tasks (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   task_type character varying NOT NULL,
-  status ai_task_status NOT NULL DEFAULT 'plan'::ai_task_status,
+  status USER-DEFINED NOT NULL DEFAULT 'plan'::ai_task_status,
   input_data jsonb DEFAULT '{}'::jsonb,
   output_data jsonb,
   error_message text,
@@ -82,8 +102,10 @@ CREATE TABLE public.api_key_health (
   block_reason character varying,
   last_error_code character varying,
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  user_id uuid,
   CONSTRAINT api_key_health_pkey PRIMARY KEY (user_api_key_id),
-  CONSTRAINT api_key_health_user_api_key_id_fkey FOREIGN KEY (user_api_key_id) REFERENCES public.user_api_keys(id)
+  CONSTRAINT api_key_health_user_api_key_id_fkey FOREIGN KEY (user_api_key_id) REFERENCES public.user_api_keys(id),
+  CONSTRAINT api_key_health_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.api_key_usage_log (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -99,12 +121,14 @@ CREATE TABLE public.api_key_usage_log (
   latency_ms integer,
   used_at timestamp with time zone NOT NULL DEFAULT now(),
   metadata_json jsonb,
+  user_id uuid,
   CONSTRAINT api_key_usage_log_pkey PRIMARY KEY (id),
-  CONSTRAINT api_key_usage_log_user_api_key_id_fkey FOREIGN KEY (user_api_key_id) REFERENCES public.user_api_keys(id)
+  CONSTRAINT api_key_usage_log_user_api_key_id_fkey FOREIGN KEY (user_api_key_id) REFERENCES public.user_api_keys(id),
+  CONSTRAINT api_key_usage_log_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.batch_jobs (
   id character varying NOT NULL,
-  user_id character varying,
+  user_id uuid,
   user_email character varying,
   los_count integer,
   sheet_id character varying,
@@ -120,7 +144,8 @@ CREATE TABLE public.batch_jobs (
   questions_per_lo integer DEFAULT 1,
   diversity_metrics jsonb,
   retry_count integer DEFAULT 0,
-  CONSTRAINT batch_jobs_pkey PRIMARY KEY (id)
+  CONSTRAINT batch_jobs_pkey PRIMARY KEY (id),
+  CONSTRAINT batch_jobs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.batch_questions (
   id character varying NOT NULL,
@@ -134,8 +159,10 @@ CREATE TABLE public.batch_questions (
   created_at timestamp with time zone,
   completed_at timestamp with time zone,
   generated_count integer DEFAULT 1,
+  user_id uuid,
   CONSTRAINT batch_questions_pkey PRIMARY KEY (id),
-  CONSTRAINT batch_questions_batch_id_fkey FOREIGN KEY (batch_id) REFERENCES public.batch_jobs(id)
+  CONSTRAINT batch_questions_batch_id_fkey FOREIGN KEY (batch_id) REFERENCES public.batch_jobs(id),
+  CONSTRAINT batch_questions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.blueprint_presets (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -175,7 +202,9 @@ CREATE TABLE public.celery_task_history (
   retries double precision,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT celery_task_history_pkey PRIMARY KEY (id)
+  user_id uuid,
+  CONSTRAINT celery_task_history_pkey PRIMARY KEY (id),
+  CONSTRAINT celery_task_history_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.concepts (
   code character varying NOT NULL,
@@ -269,8 +298,61 @@ CREATE TABLE public.custom_components (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   created_by uuid,
+  hub_asset_id uuid,
   CONSTRAINT custom_components_pkey PRIMARY KEY (id),
-  CONSTRAINT custom_components_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id)
+  CONSTRAINT custom_components_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id),
+  CONSTRAINT custom_components_hub_asset_id_fkey FOREIGN KEY (hub_asset_id) REFERENCES public.hub_assets(id)
+);
+CREATE TABLE public.hub_assets (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  asset_type text NOT NULL CHECK (asset_type = ANY (ARRAY['orchestration'::text, 'template'::text, 'component'::text, 'ai_preset'::text, 'bundle'::text])),
+  ref_id uuid NOT NULL,
+  creator_id uuid,
+  slug text NOT NULL UNIQUE,
+  title text NOT NULL,
+  description text,
+  tags ARRAY DEFAULT '{}'::text[],
+  thumbnail_url text,
+  source_asset_id uuid,
+  parent_asset_id uuid,
+  remix_depth integer NOT NULL DEFAULT 0,
+  is_public boolean NOT NULL DEFAULT false,
+  published_at timestamp with time zone,
+  is_hidden boolean NOT NULL DEFAULT false,
+  license text NOT NULL DEFAULT 'orchable-free'::text,
+  price_cents integer NOT NULL DEFAULT 0,
+  stripe_product_id text,
+  install_count integer NOT NULL DEFAULT 0,
+  star_count integer NOT NULL DEFAULT 0,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  content jsonb NOT NULL DEFAULT '{}'::jsonb,
+  CONSTRAINT hub_assets_pkey PRIMARY KEY (id),
+  CONSTRAINT hub_assets_creator_id_fkey FOREIGN KEY (creator_id) REFERENCES auth.users(id),
+  CONSTRAINT hub_assets_source_asset_id_fkey FOREIGN KEY (source_asset_id) REFERENCES public.hub_assets(id),
+  CONSTRAINT hub_assets_parent_asset_id_fkey FOREIGN KEY (parent_asset_id) REFERENCES public.hub_assets(id)
+);
+CREATE TABLE public.hub_reports (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  asset_id uuid,
+  reporter_id uuid,
+  reason text NOT NULL,
+  details text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  resolved boolean NOT NULL DEFAULT false,
+  resolved_by uuid,
+  CONSTRAINT hub_reports_pkey PRIMARY KEY (id),
+  CONSTRAINT hub_reports_asset_id_fkey FOREIGN KEY (asset_id) REFERENCES public.hub_assets(id),
+  CONSTRAINT hub_reports_reporter_id_fkey FOREIGN KEY (reporter_id) REFERENCES auth.users(id),
+  CONSTRAINT hub_reports_resolved_by_fkey FOREIGN KEY (resolved_by) REFERENCES auth.users(id)
+);
+CREATE TABLE public.hub_stars (
+  asset_id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  starred_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT hub_stars_pkey PRIMARY KEY (asset_id, user_id),
+  CONSTRAINT hub_stars_asset_id_fkey FOREIGN KEY (asset_id) REFERENCES public.hub_assets(id),
+  CONSTRAINT hub_stars_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.knowledge_categories (
   code character varying NOT NULL,
@@ -324,11 +406,16 @@ CREATE TABLE public.lab_orchestrator_configs (
   steps jsonb NOT NULL CHECK (jsonb_typeof(steps) = 'array'::text),
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
-  created_by character varying,
+  created_by uuid,
   viewport jsonb DEFAULT '{"x": 0, "y": 0, "zoom": 1}'::jsonb,
   n8n_workflow_id text,
   input_mapping jsonb,
-  CONSTRAINT lab_orchestrator_configs_pkey PRIMARY KEY (id)
+  hub_asset_id uuid,
+  is_public boolean DEFAULT false,
+  tags ARRAY DEFAULT '{}'::text[],
+  CONSTRAINT lab_orchestrator_configs_pkey PRIMARY KEY (id),
+  CONSTRAINT lab_orchestrator_configs_hub_asset_id_fkey FOREIGN KEY (hub_asset_id) REFERENCES public.hub_assets(id),
+  CONSTRAINT lab_orchestrator_configs_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id)
 );
 CREATE TABLE public.learning_objective_concepts (
   lo_code character varying NOT NULL,
@@ -352,7 +439,7 @@ CREATE TABLE public.learning_objectives (
 CREATE TABLE public.orchestrator_executions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   orchestrator_id uuid NOT NULL,
-  user_id character varying NOT NULL,
+  user_id uuid NOT NULL,
   user_email character varying,
   status character varying DEFAULT 'pending'::character varying CHECK (status::text = ANY (ARRAY['pending'::character varying, 'running'::character varying, 'awaiting_approval'::character varying, 'completed'::character varying, 'failed'::character varying, 'cancelled'::character varying]::text[])),
   current_phase_id uuid,
@@ -370,7 +457,8 @@ CREATE TABLE public.orchestrator_executions (
   CONSTRAINT orchestrator_executions_pkey PRIMARY KEY (id),
   CONSTRAINT orchestrator_executions_orchestrator_id_fkey FOREIGN KEY (orchestrator_id) REFERENCES public.orchestrators(id),
   CONSTRAINT orchestrator_executions_current_phase_id_fkey FOREIGN KEY (current_phase_id) REFERENCES public.orchestrator_phases(id),
-  CONSTRAINT orchestrator_executions_current_step_id_fkey FOREIGN KEY (current_step_id) REFERENCES public.orchestrator_steps(id)
+  CONSTRAINT orchestrator_executions_current_step_id_fkey FOREIGN KEY (current_step_id) REFERENCES public.orchestrator_steps(id),
+  CONSTRAINT orchestrator_executions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.orchestrator_phases (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -446,16 +534,14 @@ CREATE TABLE public.prompt_templates (
   custom_component_id uuid,
   view_config jsonb DEFAULT '{}'::jsonb,
   stage_key text,
+  hub_asset_id uuid,
+  is_public boolean DEFAULT false,
   CONSTRAINT prompt_templates_pkey PRIMARY KEY (id),
   CONSTRAINT prompt_templates_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id),
   CONSTRAINT prompt_templates_next_stage_fkey FOREIGN KEY (next_stage_template_id) REFERENCES public.prompt_templates(id),
-  CONSTRAINT prompt_templates_custom_component_id_fkey FOREIGN KEY (custom_component_id) REFERENCES public.custom_components(id)
+  CONSTRAINT prompt_templates_custom_component_id_fkey FOREIGN KEY (custom_component_id) REFERENCES public.custom_components(id),
+  CONSTRAINT prompt_templates_hub_asset_id_fkey FOREIGN KEY (hub_asset_id) REFERENCES public.hub_assets(id)
 );
-CREATE INDEX IF NOT EXISTS idx_prompt_templates_org ON public.prompt_templates (organization_code);
-CREATE INDEX IF NOT EXISTS idx_prompt_templates_active ON public.prompt_templates (is_active) WHERE is_active = true;
-CREATE INDEX IF NOT EXISTS idx_prompt_templates_next_stage ON public.prompt_templates (next_stage_template_id);
-CREATE INDEX IF NOT EXISTS idx_prompt_templates_stage_config ON public.prompt_templates USING gin (stage_config);
-CREATE INDEX IF NOT EXISTS idx_prompt_templates_stage_key ON public.prompt_templates (stage_key);
 CREATE TABLE public.step_executions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   execution_id uuid NOT NULL,
@@ -471,9 +557,11 @@ CREATE TABLE public.step_executions (
   retry_count integer DEFAULT 0,
   created_at timestamp with time zone DEFAULT now(),
   lobster_token character varying,
+  user_id uuid,
   CONSTRAINT step_executions_pkey PRIMARY KEY (id),
   CONSTRAINT step_executions_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.orchestrator_executions(id),
-  CONSTRAINT step_executions_step_id_fkey FOREIGN KEY (step_id) REFERENCES public.orchestrator_steps(id)
+  CONSTRAINT step_executions_step_id_fkey FOREIGN KEY (step_id) REFERENCES public.orchestrator_steps(id),
+  CONSTRAINT step_executions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.subject_fields (
   subject_code character varying NOT NULL,
@@ -576,6 +664,7 @@ CREATE TABLE public.user_api_keys (
   priority integer NOT NULL DEFAULT 1,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  pool_type USER-DEFINED DEFAULT 'personal'::api_key_pool_type,
   CONSTRAINT user_api_keys_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.user_generated_resources (
@@ -593,12 +682,13 @@ CREATE TABLE public.user_profiles (
   id uuid NOT NULL,
   email text NOT NULL,
   full_name text,
-  role character varying NOT NULL,
+  role USER-DEFINED NOT NULL DEFAULT 'user'::user_role,
   avatar_url text,
   created_at timestamp with time zone NOT NULL,
   updated_at timestamp with time zone NOT NULL,
   username text UNIQUE,
   settings jsonb,
+  tier character varying DEFAULT 'free'::character varying,
   CONSTRAINT user_profiles_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.user_prompt_customizations (
@@ -625,6 +715,31 @@ CREATE TABLE public.user_saved_resources (
   CONSTRAINT user_saved_resources_pkey PRIMARY KEY (resource_id),
   CONSTRAINT user_saved_resources_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.user_profiles(id)
 );
+CREATE TABLE public.user_subscriptions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL UNIQUE,
+  tier character varying NOT NULL DEFAULT 'free'::character varying CHECK (tier::text = ANY (ARRAY['free'::character varying, 'premium'::character varying]::text[])),
+  stripe_customer_id text,
+  stripe_subscription_id text,
+  current_period_start timestamp with time zone,
+  current_period_end timestamp with time zone,
+  cancel_at_period_end boolean DEFAULT false,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT user_subscriptions_pkey PRIMARY KEY (id),
+  CONSTRAINT user_subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.user_usage (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  month character varying NOT NULL,
+  task_count integer DEFAULT 0,
+  token_input_count bigint DEFAULT 0,
+  token_output_count bigint DEFAULT 0,
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT user_usage_pkey PRIMARY KEY (id),
+  CONSTRAINT user_usage_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
 CREATE TABLE public.workflow_edit_locks (
   lock_id uuid NOT NULL,
   entity_type character varying NOT NULL CHECK (entity_type::text = ANY (ARRAY['syllabus'::character varying, 'resource_spec'::character varying]::text[])),
@@ -632,7 +747,9 @@ CREATE TABLE public.workflow_edit_locks (
   locked_by character varying NOT NULL,
   locked_at timestamp with time zone DEFAULT now(),
   expires_at timestamp with time zone NOT NULL,
-  CONSTRAINT workflow_edit_locks_pkey PRIMARY KEY (lock_id)
+  locked_by_id uuid,
+  CONSTRAINT workflow_edit_locks_pkey PRIMARY KEY (lock_id),
+  CONSTRAINT workflow_edit_locks_locked_by_id_fkey FOREIGN KEY (locked_by_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.workflow_errors (
   error_id uuid NOT NULL,
@@ -642,12 +759,14 @@ CREATE TABLE public.workflow_errors (
   error_message text NOT NULL,
   context_json jsonb DEFAULT '{}'::jsonb,
   created_at timestamp with time zone DEFAULT now(),
+  user_id uuid,
   CONSTRAINT workflow_errors_pkey PRIMARY KEY (error_id),
-  CONSTRAINT workflow_errors_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.workflow_jobs(job_id)
+  CONSTRAINT workflow_errors_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.workflow_jobs(job_id),
+  CONSTRAINT workflow_errors_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.workflow_jobs (
   job_id uuid NOT NULL,
-  user_id character varying,
+  user_id uuid,
   user_email character varying NOT NULL,
   state character varying NOT NULL CHECK (state::text = ANY (ARRAY['init'::character varying, 'generating_syllabi'::character varying, 'awaiting_syllabus_review'::character varying, 'generating_resource_specs'::character varying, 'awaiting_resource_review'::character varying, 'generating_resources'::character varying, 'generating_guides'::character varying, 'packaging'::character varying, 'completed'::character varying, 'failed'::character varying, 'cancelled'::character varying, 'paused_no_keys'::character varying]::text[])),
   course_config jsonb NOT NULL,
@@ -668,7 +787,8 @@ CREATE TABLE public.workflow_jobs (
   student_guide text,
   package_url character varying,
   CONSTRAINT workflow_jobs_pkey PRIMARY KEY (job_id),
-  CONSTRAINT fk_workflow_jobs_task_id FOREIGN KEY (task_id) REFERENCES public.workflow_tasks(task_id)
+  CONSTRAINT fk_workflow_jobs_task_id FOREIGN KEY (task_id) REFERENCES public.workflow_tasks(task_id),
+  CONSTRAINT workflow_jobs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.workflow_progress (
   progress_id uuid NOT NULL,
@@ -679,8 +799,10 @@ CREATE TABLE public.workflow_progress (
   progress_percentage double precision DEFAULT '0'::double precision,
   status character varying DEFAULT 'in_progress'::character varying,
   updated_at timestamp with time zone DEFAULT now(),
+  user_id uuid,
   CONSTRAINT workflow_progress_pkey PRIMARY KEY (progress_id),
-  CONSTRAINT workflow_progress_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.workflow_jobs(job_id)
+  CONSTRAINT workflow_progress_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.workflow_jobs(job_id),
+  CONSTRAINT workflow_progress_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.workflow_registry (
   registry_id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -710,8 +832,10 @@ CREATE TABLE public.workflow_resource_specs (
   validation_errors jsonb DEFAULT '[]'::jsonb,
   validation_warnings jsonb DEFAULT '[]'::jsonb,
   learning_objective_codes ARRAY DEFAULT '{}'::character varying[],
+  user_id uuid,
   CONSTRAINT workflow_resource_specs_pkey PRIMARY KEY (spec_id),
-  CONSTRAINT workflow_resource_specs_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.workflow_jobs(job_id)
+  CONSTRAINT workflow_resource_specs_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.workflow_jobs(job_id),
+  CONSTRAINT workflow_resource_specs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.workflow_resources (
   resource_id uuid NOT NULL,
@@ -724,8 +848,10 @@ CREATE TABLE public.workflow_resources (
   unit_index integer NOT NULL,
   metadata_json jsonb DEFAULT '{}'::jsonb,
   status character varying DEFAULT 'generated'::character varying,
+  user_id uuid,
   CONSTRAINT workflow_resources_pkey PRIMARY KEY (resource_id),
-  CONSTRAINT workflow_resources_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.workflow_jobs(job_id)
+  CONSTRAINT workflow_resources_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.workflow_jobs(job_id),
+  CONSTRAINT workflow_resources_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.workflow_syllabi (
   syllabus_id uuid NOT NULL,
@@ -739,8 +865,10 @@ CREATE TABLE public.workflow_syllabi (
   review_notes text,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
+  user_id uuid,
   CONSTRAINT workflow_syllabi_pkey PRIMARY KEY (syllabus_id),
-  CONSTRAINT workflow_syllabi_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.workflow_jobs(job_id)
+  CONSTRAINT workflow_syllabi_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.workflow_jobs(job_id),
+  CONSTRAINT workflow_syllabi_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.workflow_tasks (
   task_id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -760,9 +888,10 @@ CREATE TABLE public.workflow_versions (
   entity_id uuid NOT NULL,
   version_number integer NOT NULL,
   content text NOT NULL,
-  created_by character varying,
+  created_by uuid,
   change_notes text,
   is_approved boolean,
   created_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT workflow_versions_pkey PRIMARY KEY (version_id)
+  CONSTRAINT workflow_versions_pkey PRIMARY KEY (version_id),
+  CONSTRAINT workflow_versions_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id)
 );
