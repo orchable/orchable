@@ -25,17 +25,21 @@ CHECK (role IN ('user', 'admin', 'superadmin'));
 -- Step 4: Recreate helper functions with varchar instead of enum
 CREATE OR REPLACE FUNCTION public.get_my_role()
 RETURNS varchar
-LANGUAGE sql STABLE SECURITY DEFINER AS $$
-    SELECT role FROM public.user_profiles WHERE id = auth.uid();
+LANGUAGE plpgsql STABLE SECURITY DEFINER AS $$
+BEGIN
+    RETURN (SELECT role FROM public.user_profiles WHERE id = auth.uid());
+END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER AS $$
-    SELECT EXISTS (
+LANGUAGE plpgsql STABLE SECURITY DEFINER AS $$
+BEGIN
+    RETURN EXISTS (
         SELECT 1 FROM public.user_profiles 
         WHERE id = auth.uid() AND role IN ('admin', 'superadmin')
     );
+END;
 $$;
 
 -- Step 5: Fix handle_new_user to use plain text (no enum cast needed)

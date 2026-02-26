@@ -682,7 +682,7 @@ CREATE TABLE public.user_profiles (
   id uuid NOT NULL,
   email text NOT NULL,
   full_name text,
-  role USER-DEFINED NOT NULL DEFAULT 'user'::user_role,
+  role character varying NOT NULL DEFAULT 'user'::character varying CHECK (role::text = ANY (ARRAY['user'::character varying, 'admin'::character varying, 'superadmin'::character varying]::text[])),
   avatar_url text,
   created_at timestamp with time zone NOT NULL,
   updated_at timestamp with time zone NOT NULL,

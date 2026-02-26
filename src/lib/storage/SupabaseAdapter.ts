@@ -21,9 +21,16 @@ export class SupabaseAdapter implements IStorageAdapter {
 	}
 
 	async listBatches(limit = 20): Promise<TaskBatch[]> {
+		const {
+			data: { user },
+		} = await supabase.auth.getUser();
+
+		if (!user) return [];
+
 		const { data, error } = await supabase
 			.from("task_batches")
 			.select("*")
+			.eq("created_by", user.id)
 			.order("created_at", { ascending: false })
 			.limit(limit);
 

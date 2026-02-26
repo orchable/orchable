@@ -468,6 +468,12 @@ export async function getRecentBatches(
 		}));
 	}
 
+	const {
+		data: { user },
+	} = await supabase.auth.getUser();
+
+	if (!user) return getRecentBatchesFallback(limit);
+
 	const { data, error } = await supabase
 		.from("task_batches")
 		.select(
@@ -478,6 +484,7 @@ export async function getRecentBatches(
             )
         `,
 		)
+		.eq("created_by", user.id)
 		.order("created_at", { ascending: false })
 		.limit(limit);
 
@@ -541,10 +548,17 @@ export async function getRecentBatches(
 async function getRecentBatchesFallback(
 	limit: number = 20,
 ): Promise<BatchSummary[]> {
+	const {
+		data: { user },
+	} = await supabase.auth.getUser();
+
+	if (!user) return [];
+
 	// Fetch last 200 tasks
 	const { data: tasks, error } = await supabase
 		.from("ai_tasks")
 		.select("id, batch_id, status, created_at, input_data")
+		.eq("user_id", user.id)
 		.order("created_at", { ascending: false })
 		.limit(200);
 
