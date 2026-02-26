@@ -1,23 +1,10 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { useAuth } from './AuthContext';
-import { storage, UserTier } from '@/lib/storage';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { TierContext } from './TierContextObject';
+import { UserTier } from '@/lib/storage';
 import { syncService } from '@/services/syncService';
 import { usageService } from '@/services/usageService';
 import { supabase } from '@/lib/supabase';
-
-interface TierContextType {
-    tier: UserTier;
-    isPremium: boolean;
-    isSyncing: boolean;
-    usage: { count: number; month: string } | null;
-    limits: {
-        tasks: number;
-        sync: boolean;
-    };
-    refreshUsage: () => Promise<void>;
-}
-
-export const TierContext = createContext<TierContextType | undefined>(undefined);
 
 export function TierProvider({ children }: { children: React.ReactNode }) {
     const { user, profile } = useAuth();

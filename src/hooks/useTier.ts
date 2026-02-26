@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { TierContext } from "@/contexts/TierContext";
+import { TierContext } from "@/contexts/TierContextObject";
 
 export const useTier = () => {
 	const context = useContext(TierContext);

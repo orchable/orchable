@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ExecutionMonitor } from './ExecutionMonitor';
-import { analyzeJsonStructure, isStructureCompatible } from '@/lib/jsonAnalyzer';
+import { analyzeJsonStructure, isStructureCompatible, AnalysisResult, FieldInfo } from '@/lib/jsonAnalyzer';
 import { batchService } from '@/services/batchService';
 import { useTier } from '@/hooks/useTier';
 
@@ -63,10 +63,10 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
                             mode: 'json',
                             fileName: file.name,
                             jsonData: json,
-                            jsonAnalysis: analysis,
+                            jsonAnalysis: analysis as AnalysisResult,
                             fieldSelection: savedMapping.fieldSelection,
                             fieldMapping: savedMapping.fieldMapping,
-                            selectedTaskIndices: (analysis.sampleTasks as any[]) ? (analysis.sampleTasks as any[]).map((_: any, i: number) => i) : []
+                            selectedTaskIndices: (analysis.sampleTasks as unknown[]).map((_, i: number) => i)
                         });
                         toast.success(`Structure matched! Settings restored from config.`);
                     } else {
@@ -74,13 +74,13 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
                             mode: 'json',
                             fileName: file.name,
                             jsonData: json,
-                            jsonAnalysis: analysis,
+                            jsonAnalysis: analysis as AnalysisResult,
                             fieldSelection: {
-                                shared: analysis.sharedFields.map((f: any) => f.path),
-                                perTask: analysis.perTaskFields.map((f: any) => f.path)
+                                shared: analysis.sharedFields.map((f: FieldInfo) => f.path),
+                                perTask: analysis.perTaskFields.map((f: FieldInfo) => f.path)
                             },
                             fieldMapping: {},
-                            selectedTaskIndices: (analysis.sampleTasks as any[]) ? (analysis.sampleTasks as any[]).map((_, i) => i) : []
+                            selectedTaskIndices: (analysis.sampleTasks as unknown[]).map((_, i) => i)
                         });
                         if (savedMapping) {
                             toast.info(`New structure detected. Defaulting to select all.`);
@@ -139,7 +139,7 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
                 inputItems = currentInputData.syllabusData;
             } else {
                 const { processTaskData } = await import('@/lib/jsonAnalyzer');
-                inputItems = (currentInputData.jsonAnalysis as any).sampleTasks.map((task: any) => {
+                inputItems = (currentInputData.jsonAnalysis as AnalysisResult).sampleTasks.map((task: Record<string, unknown>) => {
                     const processed = processTaskData(
                         task,
                         currentInputData.jsonData,
@@ -186,9 +186,10 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
             toast.success(`Launched ${inputItems.length} pipelines (Batch: ${batch.id.slice(0, 8)})`);
             setExecutionId(launchId);
 
-        } catch (error: any) {
+        } catch (error) {
             console.error('Failed to start execution:', error);
-            toast.error(`Failed to start: ${error.message}`);
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            toast.error(`Failed to start: ${message}`);
         } finally {
             setIsCreating(false);
         }
@@ -250,7 +251,7 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
                                         <div className="bg-background/50 p-2 rounded border border-success/10">
                                             <p className="text-[10px] text-muted-foreground uppercase font-bold">Total Items</p>
                                             <p className="text-lg font-mono font-bold">
-                                                {inputData.mode === 'json' ? (inputData.jsonAnalysis as any)?.sampleTasks?.length : inputData.syllabusData.length}
+                                                {inputData.mode === 'json' ? (inputData.jsonAnalysis as unknown as AnalysisResult)?.sampleTasks?.length : inputData.syllabusData.length}
                                             </p>
                                         </div>
                                         <div className="bg-background/50 p-2 rounded border border-success/10">

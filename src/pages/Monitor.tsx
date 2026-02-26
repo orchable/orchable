@@ -8,10 +8,15 @@ import { StepBadge } from '@/components/common/StepBadge';
 import { useExecutions, useExecution, useAiTasks } from '@/hooks/useExecutions';
 import { useStepExecutions } from '@/hooks/useStepExecutions';
 import { formatDistanceToNow, format } from 'date-fns';
-import type { StepExecution, StepResult } from '@/lib/types';
+import { useNavigate } from 'react-router-dom';
+import {
+  Execution,
+  StepExecution,
+  StepResult,
+  ExecutionStatus
+} from '@/lib/types';
 import { cn, formatBytes } from '@/lib/utils';
 import { getRecentBatches, BatchSummary } from '@/services/executionTrackingService';
-import { useNavigate } from 'react-router-dom';
 import { Progress } from '@/components/ui/progress';
 import {
   DropdownMenu,
@@ -216,14 +221,14 @@ function ExecutionDetailPanel({ executionData }: { executionData: Record<string,
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Input Data</p>
                 <pre className="text-xs bg-muted p-3 rounded-lg overflow-auto max-h-60">
-                  {JSON.stringify(displayData.input_data, null, 2)}
+                  {JSON.stringify((displayData as any).input_data || (displayData as any).syllabus_row, null, 2)}
                 </pre>
               </div>
-              {displayData.output_data && (
+              {(displayData as any).output_data && (
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Output Data</p>
                   <pre className="text-xs bg-success/5 border border-success/20 p-3 rounded-lg overflow-auto max-h-60">
-                    {JSON.stringify(displayData.output_data, null, 2)}
+                    {JSON.stringify((displayData as any).output_data, null, 2)}
                   </pre>
                 </div>
               )}
@@ -488,7 +493,7 @@ export function MonitorPage() {
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <StatusBadge status={camp.status as any} size="sm" showIcon={false} />
+                      <StatusBadge status={camp.status as ExecutionStatus} size="sm" showIcon={false} />
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                           <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground">
@@ -550,7 +555,7 @@ export function MonitorPage() {
                     <span className="font-mono text-xs font-medium bg-muted px-1.5 py-0.5 rounded opacity-70">
                       {execution.syllabus_row?.lessonId || execution.task_type || 'Task'}
                     </span>
-                    <StatusBadge status={(execution.status as any) || 'pending'} size="sm" showIcon={false} />
+                    <StatusBadge status={(execution.status as ExecutionStatus) || 'pending'} size="sm" showIcon={false} />
                   </div>
                   <p className="text-sm font-medium truncate mb-2">
                     {execution.syllabus_row?.lessonTitle || execution.task_type || 'Unknown AI Task'}

@@ -1,9 +1,9 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { useRole } from '@/contexts/RoleContext';
+import { useRole } from '@/hooks/useRole';
 import { Loader2 } from 'lucide-react';
-import { UnauthorizedView } from './UnauthorizedView';
+import { UnauthorizedView } from '@/components/common/UnauthorizedView';
 
 export const ProtectedRoute: React.FC<{
     children: React.ReactNode;

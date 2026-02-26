@@ -1,23 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-
-export type UserRole = 'user' | 'admin' | 'superadmin';
-
-interface RoleContextType {
-    role: UserRole;
-    isAdmin: boolean;
-    isSuperAdmin: boolean;
-    isLoading: boolean;
-}
-
-const RoleContext = createContext<RoleContextType>({
-    role: 'user',
-    isAdmin: false,
-    isSuperAdmin: false,
-    isLoading: true,
-});
-
-export const useRole = () => useContext(RoleContext);
+import { RoleContext, UserRole } from './RoleContextObject';
+export type { UserRole };
 
 export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { profile, isLoading: authLoading } = useAuth();

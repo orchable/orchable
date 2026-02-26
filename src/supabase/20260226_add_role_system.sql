@@ -87,6 +87,11 @@ DROP POLICY IF EXISTS "Admins view all batches" ON public.task_batches;
 CREATE POLICY "Admins view all batches" ON public.task_batches 
 FOR SELECT TO authenticated USING (public.is_admin());
 
+-- workflow_jobs admin bypass
+DROP POLICY IF EXISTS "Admins view all workflow jobs" ON public.workflow_jobs;
+CREATE POLICY "Admins view all workflow jobs" ON public.workflow_jobs 
+FOR SELECT TO authenticated USING (public.is_admin());
+
 -- hub_assets: Allow all authenticated users to insert (not just premium)
 DROP POLICY IF EXISTS "Authenticated users can create assets" ON public.hub_assets;
 CREATE POLICY "Authenticated users can create assets" ON public.hub_assets 

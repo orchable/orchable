@@ -1,4 +1,5 @@
-import { useRole, UserRole } from "@/contexts/RoleContext";
+import { useRole } from "@/hooks/useRole";
+import { UserRole } from "@/contexts/RoleContextObject";
 
 export function useRoleGuard(requiredRole: UserRole) {
 	const { role, isAdmin, isLoading } = useRole();

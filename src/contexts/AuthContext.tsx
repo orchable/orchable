@@ -3,23 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { UserProfile } from '@/lib/types';
 
-interface AuthContextType {
-    user: User | null;
-    session: Session | null;
-    profile: UserProfile | null;
-    isLoading: boolean;
-    signOut: () => Promise<void>;
-    refreshProfile: () => Promise<void>;
-}
-
-export const AuthContext = createContext<AuthContextType>({
-    user: null,
-    session: null,
-    profile: null,
-    isLoading: true,
-    signOut: async () => { },
-    refreshProfile: async () => { },
-});
+import { AuthContext } from './AuthContextObject';
 
 // useAuth hook moved to @/hooks/useAuth.ts
 
