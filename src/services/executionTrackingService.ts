@@ -154,19 +154,20 @@ export async function getExecutionProgress(
 		}));
 	} else {
 		// 1. Get batch info AND join with orchestration config to get expected stages
+		const batchSelect = `
+			id,
+			name, 
+			status, 
+			orchestrator_config_id,
+			lab_orchestrator_configs!task_batches_orchestrator_config_id_fkey (
+				name,
+				steps
+			)
+		`;
+
 		const response = await supabase
 			.from("task_batches")
-			.select(
-				`
-				name, 
-				status, 
-				orchestrator_config_id,
-				lab_orchestrator_configs!task_batches_orchestrator_config_id_fkey (
-					name,
-					steps
-				)
-			`,
-			)
+			.select(batchSelect)
 			.eq("id", id)
 			.maybeSingle();
 
@@ -177,17 +178,7 @@ export async function getExecutionProgress(
 		if (!bb && !batchError) {
 			const { data: launchBatch, error: launchErr } = await supabase
 				.from("task_batches")
-				.select(
-					`
-				name, 
-				status, 
-				orchestrator_config_id,
-				lab_orchestrator_configs!task_batches_orchestrator_config_id_fkey (
-					name,
-					steps
-				)
-			`,
-				)
+				.select(batchSelect)
 				.eq("launch_id", id)
 				.order("created_at", { ascending: true })
 				.limit(1)
@@ -212,12 +203,19 @@ export async function getExecutionProgress(
 		}
 
 		// 2. Get all tasks for this batch OR launch (campaign)
+		// Use the resolved batch PK if the URL param was a launch_id
+		const resolvedBatchId = (batchData?.id as string) || id;
+		const orFilter =
+			resolvedBatchId !== id
+				? `batch_id.eq.${resolvedBatchId},batch_id.eq.${id},launch_id.eq.${id}`
+				: `batch_id.eq.${id},launch_id.eq.${id}`;
+
 		const { data: tasks, error: tasksError } = await supabase
 			.from("ai_tasks")
 			.select(
 				"id, stage_key, step_number, status, created_at, started_at, completed_at, input_data",
 			)
-			.or(`batch_id.eq.${id},launch_id.eq.${id}`);
+			.or(orFilter);
 
 		if (tasksError) {
 			console.error("Failed to fetch tasks:", tasksError);
@@ -433,14 +431,42 @@ export async function getExecutionTasks(
 
 		rawTasks = tasks as unknown as Partial<TaskSummary>[];
 	} else {
+		// First, resolve the real batch PK in case `id` is actually a launch_id
+		let resolvedId = id;
+		const { data: matchedBatch } = await supabase
+			.from("task_batches")
+			.select("id")
+			.eq("id", id)
+			.maybeSingle();
+
+		if (!matchedBatch) {
+			// Try as launch_id
+			const { data: launchBatch } = await supabase
+				.from("task_batches")
+				.select("id")
+				.eq("launch_id", id)
+				.limit(1)
+				.maybeSingle();
+			if (launchBatch) {
+				resolvedId = launchBatch.id;
+			}
+		}
+
+		const orParts = [
+			`batch_id.eq.${resolvedId}`,
+			`launch_id.eq.${id}`,
+			`orchestrator_execution_id.eq.${id}`,
+		];
+		if (resolvedId !== id) {
+			orParts.push(`batch_id.eq.${id}`);
+		}
+
 		let query = supabase
 			.from("ai_tasks")
 			.select(
 				"id, stage_key, step_number, task_type, status, lo_code, created_at, updated_at, started_at, completed_at, error_message, user_id, parent_task_id, root_task_id, hierarchy_path, input_data, output_data, prompt_template_id",
 			)
-			.or(
-				`batch_id.eq.${id},launch_id.eq.${id},orchestrator_execution_id.eq.${id}`,
-			)
+			.or(orParts.join(","))
 			.order("step_number")
 			.order("created_at");
 
