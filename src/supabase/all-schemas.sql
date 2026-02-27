@@ -74,6 +74,9 @@ CREATE TABLE public.ai_tasks (
   extra jsonb DEFAULT '{}'::jsonb,
   split_group_id uuid,
   launch_id uuid,
+  tier_source character varying DEFAULT NULL::character varying,
+  synced_to_client boolean DEFAULT false,
+  updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT ai_tasks_pkey PRIMARY KEY (id),
   CONSTRAINT ai_tasks_step_id_fkey FOREIGN KEY (step_id) REFERENCES public.orchestrator_steps(id),
   CONSTRAINT ai_tasks_parent_task_id_fkey FOREIGN KEY (parent_task_id) REFERENCES public.ai_tasks(id),
@@ -435,6 +438,15 @@ CREATE TABLE public.learning_objectives (
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT learning_objectives_pkey PRIMARY KEY (code),
   CONSTRAINT learning_objectives_parent_lo_code_fkey FOREIGN KEY (parent_lo_code) REFERENCES public.learning_objectives(code)
+);
+CREATE TABLE public.notifications (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid,
+  type text,
+  task_id uuid,
+  sent_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT notifications_pkey PRIMARY KEY (id),
+  CONSTRAINT notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.orchestrator_executions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

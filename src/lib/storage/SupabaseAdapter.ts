@@ -209,7 +209,10 @@ export class SupabaseAdapter implements IStorageAdapter {
 
 		const { data, error } = await supabase
 			.from("lab_orchestrator_configs")
-			.insert(config)
+			.insert({
+				...config,
+				created_by: user?.id,
+			})
 			.select()
 			.single();
 
@@ -224,7 +227,10 @@ export class SupabaseAdapter implements IStorageAdapter {
 
 		const { error } = await supabase
 			.from("lab_orchestrator_configs")
-			.upsert(config);
+			.upsert({
+				...config,
+				created_by: config.created_by || user?.id,
+			});
 
 		if (error) throw error;
 	}
@@ -258,7 +264,10 @@ export class SupabaseAdapter implements IStorageAdapter {
 	): Promise<OrchestratorConfig> {
 		const { data, error } = await supabase
 			.from("lab_orchestrator_configs")
-			.update(updates)
+			.update({
+				...updates,
+				updated_at: new Date().toISOString(),
+			})
 			.eq("id", id)
 			.select()
 			.single();
