@@ -128,9 +128,11 @@ export async function getExecutionProgress(
 		const { db } = await import("@/lib/storage/IndexedDBAdapter");
 		// 1. Get batch info
 		const batch = await db.task_batches.get(id);
-		batchData =
-			batch ||
-			(await db.task_batches.where("launch_id").equals(id).first());
+		batchData = (batch ||
+			(await db.task_batches
+				.where("launch_id")
+				.equals(id)
+				.first())) as unknown as Record<string, unknown> | null;
 
 		if (batchData && batchData.orchestrator_config_id) {
 			orchestratorConfig = await db.orchestrator_configs.get(
@@ -152,7 +154,7 @@ export async function getExecutionProgress(
 		}));
 	} else {
 		// 1. Get batch info AND join with orchestration config to get expected stages
-		let { data: bb, error: batchError } = await supabase
+		const response = await supabase
 			.from("task_batches")
 			.select(
 				`
@@ -167,6 +169,9 @@ export async function getExecutionProgress(
 			)
 			.eq("id", id)
 			.maybeSingle();
+
+		let bb = response.data;
+		const batchError = response.error;
 
 		// If not found by batch id, try as a launch_id (campaign navigation)
 		if (!bb && !batchError) {
@@ -373,9 +378,9 @@ export async function getExecutionProgress(
 
 	return {
 		orchestrator_execution_id: id,
-		orchestrator_name: orchestratorName,
-		batch_name: batchData?.name,
-		config_name: orchestratorConfig?.name,
+		orchestrator_name: orchestratorName as string,
+		batch_name: batchData?.name as string,
+		config_name: orchestratorConfig?.name as string,
 		status: finalStatus,
 		started_at: startedAt,
 		completed_at: completedAt,

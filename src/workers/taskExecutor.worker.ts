@@ -403,7 +403,8 @@ async function handleNextStages(
 ) {
 	// 1. Get next stage configs (Load Batch creates it)
 	const extra = (task.extra || {}) as Record<string, unknown>;
-	let nextStageConfigs = (extra.next_stage_configs as any[]) || [];
+	let nextStageConfigs =
+		(extra.next_stage_configs as Record<string, unknown>[]) || [];
 
 	// Hydrate from template if not present (N8n behaviour)
 	if (
@@ -415,7 +416,7 @@ async function handleNextStages(
 		nextStageConfigs = await Promise.all(
 			template.next_stage_template_ids.map(async (id) => {
 				const tpl = await db.prompt_templates.get(id);
-				const sc = (tpl?.stage_config as any) || {};
+				const sc = (tpl?.stage_config as Record<string, unknown>) || {};
 				return {
 					template_id: id,
 					cardinality: sc.cardinality || "one_to_one",
@@ -433,7 +434,9 @@ async function handleNextStages(
 	if (nextStageConfigs.length === 0) return;
 
 	const currentStageConfig =
-		(extra.current_stage_config as any) || template.stage_config || {};
+		(extra.current_stage_config as Record<string, unknown>) ||
+		template.stage_config ||
+		{};
 	const cardinality = currentStageConfig.cardinality || "one_to_one";
 
 	if (cardinality === "many_to_one" || cardinality === "N:1") {
@@ -638,7 +641,9 @@ async function handleManyToOne(
 ) {
 	const extra = (task.extra || {}) as Record<string, unknown>;
 	const currentStageConfig =
-		(extra.current_stage_config as any) || template.stage_config || {};
+		(extra.current_stage_config as Record<string, unknown>) ||
+		template.stage_config ||
+		{};
 	const batchId = task.batch_id;
 	const stageKey = task.stage_key;
 
@@ -723,12 +728,13 @@ async function handleManyToOne(
 		: { merged_data: aggregatedData };
 
 	// 3. Create next tasks
-	let nextStageConfigs = (extra.next_stage_configs as any[]) || [];
+	let nextStageConfigs =
+		(extra.next_stage_configs as Record<string, unknown>[]) || [];
 	if (nextStageConfigs.length === 0 && template.next_stage_template_ids) {
 		nextStageConfigs = await Promise.all(
 			template.next_stage_template_ids.map(async (id) => {
 				const tpl = await db.prompt_templates.get(id);
-				const sc = (tpl?.stage_config as any) || {};
+				const sc = (tpl?.stage_config as Record<string, unknown>) || {};
 				return {
 					template_id: id,
 					cardinality: sc.cardinality || "one_to_one",
@@ -752,7 +758,8 @@ async function handleManyToOne(
 			id: crypto.randomUUID(),
 			batch_id: batchId,
 			stage_key:
-				nextTemplate?.stage_key || extractStageKey(nextTemplateId),
+				nextTemplate?.stage_key ||
+				extractStageKey(nextTemplateId as string),
 			step_number: (task.step_number || 0) + 1,
 			status: "plan",
 			input_data: {
@@ -768,17 +775,19 @@ async function handleManyToOne(
 			split_group_id:
 				((task as unknown as Record<string, unknown>)
 					.split_group_id as string) || task.id,
-			task_type: extractStageKey(nextTemplateId),
-			prompt_template_id: nextTemplateId,
+			task_type: extractStageKey(nextTemplateId as string),
+			prompt_template_id: nextTemplateId as string,
 			created_at: new Date().toISOString(),
 			extra: {
 				current_stage_config: {
-					template_id: nextTemplateId,
-					cardinality: nextConfig.cardinality || "one_to_one",
-					split_path: nextConfig.split_path || null,
-					split_mode: nextConfig.split_mode || "per_item",
-					output_mapping: nextConfig.output_mapping || "result",
-					merge_path: nextConfig.merge_path || null,
+					template_id: nextTemplateId as string,
+					cardinality:
+						(nextConfig.cardinality as string) || "one_to_one",
+					split_path: (nextConfig.split_path as string) || null,
+					split_mode: (nextConfig.split_mode as string) || "per_item",
+					output_mapping:
+						(nextConfig.output_mapping as string) || "result",
+					merge_path: (nextConfig.merge_path as string) || null,
 				},
 				parent_stage_key: task.stage_key,
 				parent_task_id: task.id,

@@ -1,5 +1,10 @@
 import { storage, UserTier } from "@/lib/storage";
-import { Execution, StepExecution, SyllabusRow } from "@/lib/types";
+import {
+	Execution,
+	StepExecution,
+	SyllabusRow,
+	ExecutionStatus,
+} from "@/lib/types";
 import { batchService } from "./batchService";
 
 export const executionService = {
@@ -15,7 +20,7 @@ export const executionService = {
 
 		const { batch } = await batchService.createLaunch({
 			config,
-			inputItems: [syllabusRow as any],
+			inputItems: [syllabusRow as unknown as Record<string, unknown>],
 			batchName: syllabusRow.lessonTitle || "Untitled Execution",
 			tier,
 		});
@@ -60,7 +65,7 @@ export const executionService = {
 		additionalData?: Partial<Execution>,
 	): Promise<void> {
 		await storage.adapter.updateBatch(id, {
-			status: status as any,
+			status: status as ExecutionStatus,
 			...additionalData,
 		});
 	},
@@ -73,7 +78,7 @@ export const executionService = {
 			execution_id: t.batch_id,
 			step_id: t.stage_key,
 			step_name: t.stage_key,
-			status: t.status as any,
+			status: t.status as string,
 			retry_count: 0,
 			max_retries: 3,
 			created_at: t.created_at || new Date().toISOString(),
@@ -85,7 +90,7 @@ export const executionService = {
 		})) as StepExecution[];
 	},
 
-	async listAiTasks(): Promise<any[]> {
+	async listAiTasks(): Promise<unknown[]> {
 		await storage.waitForAdapter();
 		const adapter = storage.adapter;
 
