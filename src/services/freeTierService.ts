@@ -73,6 +73,18 @@ export const freeTierService = {
 		} = await supabase.auth.getUser();
 		if (!user) return { synced: 0 };
 
+		// 0. Only run sync-down logic for free-tier users.
+		// Premium users already have their tasks directly on Supabase.
+		const { data: profile } = await supabase
+			.from("profiles")
+			.select("role")
+			.eq("id", user.id)
+			.maybeSingle();
+
+		if (profile?.role === "superadmin" || profile?.role === "admin") {
+			return { synced: 0 };
+		}
+
 		try {
 			// 1. Fetch completed, unsynced tasks for this user
 			const { data: unsyncedTasks, error } = await supabase

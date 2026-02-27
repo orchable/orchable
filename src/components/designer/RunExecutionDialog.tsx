@@ -170,7 +170,8 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
                 config,
                 inputItems,
                 batchName: batchAlias.trim(),
-                userId: currentUserId
+                userId: currentUserId,
+                tier
             });
 
             // If in Lite mode, ensure executor is running

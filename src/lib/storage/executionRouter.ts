@@ -25,5 +25,12 @@ export async function getTierSource(tier: UserTier): Promise<TierSource> {
 	if (tier === "premium") {
 		return hasKeys ? "premium_byok" : "premium_pool";
 	}
+	if (tier === "free") {
+		return hasKeys ? "free_byok" : "free_pool";
+	}
+	// Safety fallback (should never happen if types are respected, but helps avoid silent misclassification)
+	console.warn(
+		`[getTierSource] Unknown tier received: ${tier}. Defaulting to free.`,
+	);
 	return hasKeys ? "free_byok" : "free_pool";
 }

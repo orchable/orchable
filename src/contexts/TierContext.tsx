@@ -77,7 +77,7 @@ export function TierProvider({ children }: { children: React.ReactNode }) {
             const alreadySynced = sessionStorage.getItem(SYNC_DONE_KEY);
             if (!alreadySynced) {
                 setIsSyncing(true);
-                syncService.migrateAnonymousData()
+                syncService.migrateAnonymousData(tier)
                     .then(() => sessionStorage.setItem(SYNC_DONE_KEY, '1'))
                     .catch(e => {
                         console.warn("Migration or sync failed:", e);
@@ -89,7 +89,7 @@ export function TierProvider({ children }: { children: React.ReactNode }) {
             hasHandledProfile.current = false;
             sessionStorage.removeItem(SYNC_DONE_KEY);
         }
-    }, [profile]);
+    }, [profile, tier]);
 
     // 3. Worker Auto-Start (Only for Free + Key path)
     useEffect(() => {
