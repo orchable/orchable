@@ -112,11 +112,10 @@ const parseSafe = (val: any): any => {
 export async function getExecutionProgress(
 	id: string,
 ): Promise<ExecutionProgress | null> {
-	// Check Supabase session first to avoid race condition with adapter switching
-	const {
-		data: { user: sessionUser },
-	} = await supabase.auth.getUser();
-	const isIndexedDB = !sessionUser; // No session → use IndexedDB (offline/free)
+	const { storage } = await import("@/lib/storage");
+	await storage.waitForAdapter();
+	const adapter = storage.adapter;
+	const isIndexedDB = adapter.constructor.name === "IndexedDBAdapter";
 
 	let batchData: Record<string, unknown> | null = null;
 	let orchestratorConfig: {
@@ -397,11 +396,10 @@ export async function getExecutionTasks(
 	id: string,
 	stageKey?: string,
 ): Promise<TaskSummary[]> {
-	// Check Supabase session first to avoid race condition with adapter switching
-	const {
-		data: { user: sessionUser },
-	} = await supabase.auth.getUser();
-	const isIndexedDB = !sessionUser;
+	const { storage } = await import("@/lib/storage");
+	await storage.waitForAdapter();
+	const adapter = storage.adapter;
+	const isIndexedDB = adapter.constructor.name === "IndexedDBAdapter";
 
 	let rawTasks: Partial<TaskSummary>[] = [];
 
@@ -557,74 +555,11 @@ export interface BatchSummary {
 export async function getRecentBatches(
 	limit: number = 20,
 ): Promise<BatchSummary[]> {
-	// Always check Supabase session first — the storage adapter may not have
-	// finished switching from IndexedDB to SupabaseAdapter yet (race condition
-	// on page load for premium users).
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
-
-	if (user) {
-		// Authenticated user — query Supabase directly
-		// (covers premium users even if adapter is still IndexedDB on first render)
-		const { data, error } = await supabase
-			.from("task_batches")
-			.select(
-				`
-            *,
-            lab_orchestrator_configs!task_batches_orchestrator_config_id_fkey (
-                steps
-            )
-        `,
-			)
-			.eq("created_by", user.id)
-			.order("created_at", { ascending: false })
-			.limit(limit);
-
-		if (!error && data && data.length > 0) {
-			return data.map((b) => {
-				const total = b.total_tasks || 0;
-				const completed = b.completed_tasks || 0;
-				const failed = b.failed_tasks || 0;
-				const processing = b.processing_tasks || 0;
-
-				let calculatedStatus = b.status || "pending";
-				if (total > 0) {
-					if (completed + failed >= total) {
-						calculatedStatus = failed > 0 ? "failed" : "completed";
-					} else if (processing > 0 || completed + failed > 0) {
-						calculatedStatus = "processing";
-					}
-				}
-
-				return {
-					id: b.id,
-					orchestrator_name: b.name || "Generic Execution",
-					status:
-						b.status === "completed" || b.status === "failed"
-							? b.status
-							: calculatedStatus,
-					created_at: b.created_at,
-					task_count: total,
-					completed_tasks: completed,
-					failed_tasks: failed,
-					progress:
-						total > 0 ? Math.round((completed / total) * 100) : 0,
-					launch_id: b.launch_id,
-				};
-			});
-		}
-
-		// Supabase returned error or empty — try fallback (ai_tasks group-by)
-		if (error) {
-			console.error("Failed to fetch recent batches:", error);
-		}
-		return getRecentBatchesFallback(limit);
-	}
-
-	// No session — check if IndexedDB has anything (offline / free tier)
 	const { storage } = await import("@/lib/storage");
+	await storage.waitForAdapter();
 	const adapter = storage.adapter;
+
+	// If using IndexedDB (free/BYOK tiers), query there
 	if (adapter.constructor.name === "IndexedDBAdapter") {
 		const batches = await adapter.listBatches(limit);
 		return batches.map((b) => ({
@@ -643,6 +578,63 @@ export async function getRecentBatches(
 					: 0,
 			launch_id: b.launch_id,
 		}));
+	}
+
+	const {
+		data: { user },
+	} = await supabase.auth.getUser();
+
+	if (!user) return getRecentBatchesFallback(limit);
+
+	const { data, error } = await supabase
+		.from("task_batches")
+		.select(
+			`
+            *,
+            lab_orchestrator_configs!task_batches_orchestrator_config_id_fkey (
+                steps
+            )
+        `,
+		)
+		.eq("created_by", user.id)
+		.order("created_at", { ascending: false })
+		.limit(limit);
+
+	if (!error && data && data.length > 0) {
+		return data.map((b) => {
+			const total = b.total_tasks || 0;
+			const completed = b.completed_tasks || 0;
+			const failed = b.failed_tasks || 0;
+			const processing = b.processing_tasks || 0;
+
+			let calculatedStatus = b.status || "pending";
+			if (total > 0) {
+				if (completed + failed >= total) {
+					calculatedStatus = failed > 0 ? "failed" : "completed";
+				} else if (processing > 0 || completed + failed > 0) {
+					calculatedStatus = "processing";
+				}
+			}
+
+			return {
+				id: b.id,
+				orchestrator_name: b.name || "Generic Execution",
+				status:
+					b.status === "completed" || b.status === "failed"
+						? b.status
+						: calculatedStatus,
+				created_at: b.created_at,
+				task_count: total,
+				completed_tasks: completed,
+				failed_tasks: failed,
+				progress: total > 0 ? Math.round((completed / total) * 100) : 0,
+				launch_id: b.launch_id,
+			};
+		});
+	}
+
+	if (error) {
+		console.error("Failed to fetch recent batches:", error);
 	}
 
 	return getRecentBatchesFallback(limit);

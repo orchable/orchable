@@ -24,10 +24,18 @@ export const executionService = {
 	},
 
 	async listExecutions(): Promise<Execution[]> {
+		await storage.waitForAdapter();
+		const adapter = storage.adapter;
+
+		if (adapter.constructor.name === "IndexedDBAdapter") {
+			return adapter.listBatches() as unknown as Promise<Execution[]>;
+		}
+
 		const { supabase } = await import("@/lib/supabase");
 		const {
 			data: { user },
 		} = await supabase.auth.getUser();
+
 		if (user) {
 			const { data } = await supabase
 				.from("task_batches")
@@ -37,7 +45,7 @@ export const executionService = {
 				.limit(40);
 			return (data || []) as unknown as Execution[];
 		}
-		return storage.adapter.listBatches() as unknown as Promise<Execution[]>;
+		return [];
 	},
 
 	async getExecution(id: string): Promise<Execution> {
@@ -78,10 +86,21 @@ export const executionService = {
 	},
 
 	async listAiTasks(): Promise<any[]> {
+		await storage.waitForAdapter();
+		const adapter = storage.adapter;
+
+		if (adapter.constructor.name === "IndexedDBAdapter") {
+			const db = await import("@/lib/storage/IndexedDBAdapter").then(
+				(m) => m.db,
+			);
+			return db.ai_tasks.toArray();
+		}
+
 		const { supabase } = await import("@/lib/supabase");
 		const {
 			data: { user },
 		} = await supabase.auth.getUser();
+
 		if (user) {
 			const { data } = await supabase
 				.from("ai_tasks")
@@ -92,14 +111,6 @@ export const executionService = {
 				.order("created_at", { ascending: false })
 				.limit(100);
 			return data || [];
-		}
-		// IndexedDB fallback for unauthenticated / lite users
-		const adapter = storage.adapter;
-		if (adapter.constructor.name === "IndexedDBAdapter") {
-			const db = await import("@/lib/storage/IndexedDBAdapter").then(
-				(m) => m.db,
-			);
-			return db.ai_tasks.toArray();
 		}
 		return [];
 	},

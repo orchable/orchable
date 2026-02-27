@@ -33,6 +33,8 @@ export const taskActionService = {
 				status: "plan",
 				error_message: null,
 			});
+			// Cascade: reset downstream children that depend on this task's output
+			await this._cascadeResetChildren(taskId);
 			return;
 		}
 
@@ -42,6 +44,32 @@ export const taskActionService = {
 		if (error) {
 			console.error("Error retrying task:", error);
 			throw error;
+		}
+	},
+
+	/**
+	 * Recursively resets downstream tasks whose parent_task_id matches taskId.
+	 * These tasks use the retried task's output as input and must be re-run.
+	 */
+	async _cascadeResetChildren(taskId: string): Promise<void> {
+		const { db } = await import("@/lib/storage/IndexedDBAdapter");
+		const children = await db.ai_tasks
+			.where("parent_task_id")
+			.equals(taskId)
+			.toArray();
+
+		for (const child of children) {
+			if (child.status === "completed" || child.status === "failed") {
+				await db.ai_tasks.update(child.id, {
+					status: "plan",
+					error_message: null,
+					output_data: null,
+					started_at: null,
+					completed_at: null,
+				});
+				// Recurse to grandchildren
+				await this._cascadeResetChildren(child.id);
+			}
 		}
 	},
 

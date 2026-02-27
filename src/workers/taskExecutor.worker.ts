@@ -438,15 +438,24 @@ async function handleNextStages(
 
 	if (cardinality === "many_to_one" || cardinality === "N:1") {
 		// N:1 logic: Wait for siblings, then aggregate
-		await handleManyToOne(task, template);
+		await handleManyToOne(task, result, template);
 		return;
 	}
 
 	if (cardinality === "one_to_many" || cardinality === "1:N") {
 		const splitMode = currentStageConfig.split_mode || "per_item";
 		const splitPath: string =
-			(currentStageConfig.split_path as string) || "result"; // n8n defaults to 'result' or split_path
-		const items = getValueByPath(result, splitPath);
+			(currentStageConfig.split_path as string) || "result";
+		// n8n treats "result" as identity path (the result itself, not result.result)
+		let items: unknown;
+		if (splitPath === "result" || splitPath === ".") {
+			items = result;
+		} else {
+			const cleanPath = splitPath.startsWith("result.")
+				? splitPath.slice(7)
+				: splitPath;
+			items = getValueByPath(result, cleanPath);
+		}
 
 		if (Array.isArray(items)) {
 			if (splitMode === "per_item") {
@@ -495,6 +504,7 @@ async function handleNextStages(
 									nextConfig.cardinality || "one_to_one",
 								split_path: nextConfig.split_path || null,
 								split_mode: nextConfig.split_mode || "per_item",
+								merge_path: nextConfig.merge_path || null,
 								output_mapping:
 									nextConfig.output_mapping || "result",
 							},
@@ -558,6 +568,7 @@ async function handleNextStages(
 									split_path: nextConfig.split_path || null,
 									split_mode:
 										nextConfig.split_mode || "per_item",
+									merge_path: nextConfig.merge_path || null,
 									output_mapping:
 										nextConfig.output_mapping || "result",
 								},
@@ -620,7 +631,11 @@ async function handleNextStages(
 	}
 }
 
-async function handleManyToOne(task: AiTask, template: PromptTemplate) {
+async function handleManyToOne(
+	task: AiTask,
+	result: unknown,
+	template: PromptTemplate,
+) {
 	const extra = (task.extra || {}) as Record<string, unknown>;
 	const currentStageConfig =
 		(extra.current_stage_config as any) || template.stage_config || {};
@@ -648,13 +663,15 @@ async function handleManyToOne(task: AiTask, template: PromptTemplate) {
 		// If it's a future stage (step_number is greater), it's fine.
 		// Wait, we don't know the exact order easily.
 		// If ANY task in the batch is 'plan' or 'processing' (other than siblings of this exact stage), we might not be done.
+		// Only block on UPSTREAM tasks (lower step_number) that could generate more siblings
 		if (
 			(t.status === "plan" ||
 				t.status === "processing" ||
-				t.status === "processing") &&
-			t.stage_key !== stageKey
+				t.status === "pending") &&
+			t.stage_key !== stageKey &&
+			(t.step_number || 0) < (task.step_number || 0)
 		) {
-			return false; // Still processing something else in the batch! Wait!
+			return false; // Still processing upstream tasks that could generate more siblings!
 		}
 		return true;
 	});
@@ -674,10 +691,14 @@ async function handleManyToOne(task: AiTask, template: PromptTemplate) {
 
 	// 2. Aggregate data
 	const mergePath = (currentStageConfig.merge_path as string) || null;
-	const allOutputs = siblings
+	// Only aggregate outputs from COMPLETED siblings (exclude failed)
+	const completedSiblings = siblings.filter(
+		(s) => s.status === "completed" || s.id === task.id,
+	);
+	const allOutputs = completedSiblings
 		.map((s) =>
 			s.id === task.id
-				? (task.output_data as Record<string, unknown>)
+				? (result as Record<string, unknown>)
 				: (s.output_data as Record<string, unknown>),
 		)
 		.filter(Boolean);
