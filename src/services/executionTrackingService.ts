@@ -436,7 +436,7 @@ export async function getExecutionTasks(
 		let query = supabase
 			.from("ai_tasks")
 			.select(
-				"id, stage_key, step_number, task_type, status, lo_code, created_at, started_at, completed_at, error_message, user_id, parent_task_id, root_task_id, hierarchy_path, input_data, output_data, prompt_template_id",
+				"id, stage_key, step_number, task_type, status, lo_code, created_at, updated_at, started_at, completed_at, error_message, user_id, parent_task_id, root_task_id, hierarchy_path, input_data, output_data, prompt_template_id",
 			)
 			.or(
 				`batch_id.eq.${id},launch_id.eq.${id},orchestrator_execution_id.eq.${id}`,
