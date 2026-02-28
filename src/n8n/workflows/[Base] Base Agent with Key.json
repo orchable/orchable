@@ -233,10 +233,12 @@
 		{
 			"parameters": {
 				"method": "POST",
-				"url": "=https://generativelanguage.googleapis.com/v1beta/models/{{$('Final Result').item.json.ai_settings.model_id}}:{{$('Final Result').item.json.ai_settings.generate_content_api}}?key={{ $json.api_key }}",
+				"url": "https://pblhqgylryfayqohptaa.supabase.co/functions/v1/ai-proxy",
+				"authentication": "genericCredentialType",
+				"genericAuthType": "httpHeaderAuth",
 				"sendBody": true,
 				"specifyBody": "json",
-				"jsonBody": "={{ \n  JSON.stringify({\n    \"generationConfig\": ($('Final Result').item.json.ai_settings || {}).generationConfig || {},\n    \"contents\": [\n      {\n        \"role\": \"user\",\n        \"parts\": [\n          { \"text\": $('Final Result').item.json.prompt }\n        ]\n      }\n    ]\n  })\n}}",
+				"jsonBody": "={{ \n  JSON.stringify({\n    \"batch_id\": $('Final Result').item.json.batch_id,\n    \"prompt\": $('Final Result').item.json.prompt,\n    \"ai_settings\": $('Final Result').item.json.ai_settings || {},\n    \"global_context\": $('Final Result').item.json.extra?.global_context,\n    \"system_instruction\": $('Final Result').item.json.extra?.system_instruction\n  })\n}}",
 				"options": {}
 			},
 			"type": "n8n-nodes-base.httpRequest",
@@ -246,6 +248,12 @@
 			"name": "Gemini API Call",
 			"notesInFlow": true,
 			"executeOnce": true,
+			"credentials": {
+				"httpHeaderAuth": {
+					"id": "supabase_anon",
+					"name": "Supabase Anon Key"
+				}
+			},
 			"onError": "continueErrorOutput"
 		},
 		{

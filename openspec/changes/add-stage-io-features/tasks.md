@@ -22,3 +22,9 @@
 ## 5. Security & Validation
 - [x] 5.1 Enforce Hard Limit token checking on Launcher for Free-tier campaigns using Auxiliary Documents.
 - [ ] 5.2 Test edge case: Gemini TTL expiry mid-execution (Cache renewal recovery mechanism).
+
+## 6. Phase 2: Gemini Context Caching
+- [ ] 6.1 Create `gemini_caches` table via Supabase migration.
+- [ ] 6.2 Implement `ai-proxy` Supabase Edge Function with Gemini `/cachedContents` and `/generateContent` integrations.
+- [ ] 6.3 Update `taskExecutor.worker.ts` to call Edge Function when Tier is Premium (or update N8n workflow locally depending on final setup; although Web Worker handles free, Premium uses n8n, so n8n needs updating).
+- [ ] 6.4 Implement Edge Function Cron Job (or Supabase Trigger) to clean up expired DB rows.

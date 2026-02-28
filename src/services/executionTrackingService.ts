@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import { ExecutionStatus } from "@/lib/types";
 
 // Types
 export interface StageProgress {
@@ -568,6 +569,78 @@ export function subscribeToExecutionUpdates(
 	};
 }
 
+/**
+ * Triggers a hard recalculation of batch counters to self-heal stuck batches.
+ */
+export async function syncBatchCounters(id: string): Promise<void> {
+	try {
+		const { storage } = await import("@/lib/storage");
+		await storage.waitForAdapter();
+		const adapter = storage.adapter;
+
+		if (adapter.constructor.name === "IndexedDBAdapter") {
+			// Local environment recalculation
+			const tasks = await adapter.listTasks(id);
+			if (!tasks.length) return;
+
+			const newStatus = {
+				total_tasks: tasks.length,
+				completed_tasks: tasks.filter(
+					(t) =>
+						t.status === "completed" ||
+						t.status === "approved" ||
+						t.status === "generated" ||
+						t.status === "skipped",
+				).length,
+				failed_tasks: tasks.filter(
+					(t) => t.status === "failed" || t.status === "cancelled",
+				).length,
+				pending_tasks: tasks.filter(
+					(t) =>
+						t.status === "plan" ||
+						t.status === "pending" ||
+						t.status === "awaiting_approval",
+				).length,
+				processing_tasks: tasks.filter(
+					(t) => t.status === "running" || t.status === "processing",
+				).length,
+				status: "processing", // will be updated below
+				completed_at: undefined as string | undefined,
+			};
+
+			const done = newStatus.completed_tasks + newStatus.failed_tasks;
+			if (done >= newStatus.total_tasks && newStatus.total_tasks > 0) {
+				newStatus.status =
+					newStatus.failed_tasks > 0 ? "failed" : "completed";
+				newStatus.completed_at = new Date().toISOString();
+			} else if (
+				newStatus.processing_tasks === 0 &&
+				newStatus.completed_tasks === 0 &&
+				newStatus.failed_tasks === 0
+			) {
+				newStatus.status = "pending";
+			}
+
+			await adapter.updateBatch(
+				id,
+				newStatus as Partial<import("@/lib/types").Execution>,
+			);
+			return;
+		}
+
+		// Supabase remote recalculation using RPC
+		const { supabase } = await import("@/lib/supabase");
+		const { error } = await supabase.rpc("sync_batch_counters", {
+			p_batch_id: id,
+		});
+		if (error) {
+			console.error("Failed to sync remote batch counters:", error);
+		}
+	} catch (err) {
+		console.error("Failed to sync batch counters:", err);
+	}
+}
+
 export interface BatchSummary {
 	id: string;
 	orchestrator_name: string;
@@ -593,22 +666,39 @@ export async function getRecentBatches(
 	// If using IndexedDB (free/BYOK tiers), query there
 	if (adapter.constructor.name === "IndexedDBAdapter") {
 		const batches = await adapter.listBatches(limit);
-		return batches.map((b) => ({
-			id: b.id,
-			orchestrator_name: b.name || "Generic Execution",
-			status: b.status || "pending",
-			created_at: b.created_at,
-			task_count: b.total_tasks || 0,
-			completed_tasks: b.completed_tasks || 0,
-			failed_tasks: b.failed_tasks || 0,
-			progress:
-				(b.total_tasks || 0) > 0
-					? Math.round(
-							((b.completed_tasks || 0) / b.total_tasks!) * 100,
-						)
-					: 0,
-			launch_id: b.launch_id,
-		}));
+		return batches.map((b) => {
+			// Recalculate status fallback
+			const total = b.total_tasks || 0;
+			const completed = b.completed_tasks || 0;
+			const failed = b.failed_tasks || 0;
+			const processing = b.processing_tasks || 0;
+			let calculatedStatus = b.status || "pending";
+
+			// Auto repair if mismatched in IndexedDB
+			if (
+				total > 0 &&
+				b.status !== "completed" &&
+				b.status !== "failed"
+			) {
+				if (completed + failed >= total) {
+					calculatedStatus = failed > 0 ? "failed" : "completed";
+				} else if (processing > 0 || completed + failed > 0) {
+					calculatedStatus = "processing";
+				}
+			}
+
+			return {
+				id: b.id,
+				orchestrator_name: b.name || "Generic Execution",
+				status: calculatedStatus,
+				created_at: b.created_at,
+				task_count: total,
+				completed_tasks: completed,
+				failed_tasks: failed,
+				progress: total > 0 ? Math.round((completed / total) * 100) : 0,
+				launch_id: b.launch_id,
+			};
+		});
 	}
 
 	const {
