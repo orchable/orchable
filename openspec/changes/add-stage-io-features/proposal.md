@@ -1,5 +1,7 @@
 # Change: Add Stage IO Features
 
+**Status**: Ready to Merge / Implementation Approved
+
 ## Why
 The orchestrator currently only supports a single flat input list (Main Input) and lacks native mechanisms for injecting supporting documents (Auxiliary Inputs) and explicitly exporting stage results to external destinations. Adding these features will unlock complex workflows like document analysis (RAG) and automated reporting.
 
