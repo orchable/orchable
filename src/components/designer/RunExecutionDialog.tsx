@@ -22,6 +22,11 @@ import { batchService } from '@/services/batchService';
 import { useTier } from '@/hooks/useTier';
 import { keyPoolService } from '@/services/keyPoolService';
 
+interface InputMapping {
+    fieldSelection: { shared: string[]; perTask: string[] };
+    fieldMapping: Record<string, string>;
+}
+
 interface RunExecutionDialogProps {
     disabled?: boolean;
 }
@@ -56,8 +61,8 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
                     }
 
                     // CHECK FOR STRUCTURAL COMPATIBILITY
-                    const savedMapping = config?.input_mapping as Record<string, unknown>;
-                    const isCompatible = isStructureCompatible(savedMapping as any, analysis);
+                    const savedMapping = config?.input_mapping as (Record<string, unknown> & InputMapping) | undefined;
+                    const isCompatible = isStructureCompatible(savedMapping, analysis);
 
                     if (isCompatible && savedMapping) {
                         setInputData({
@@ -135,17 +140,16 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
         try {
             // Get input items
             let inputItems: Record<string, unknown>[];
-            const currentInputData = inputData as Record<string, unknown>;
-            if (currentInputData.mode === 'tsv') {
-                inputItems = currentInputData.syllabusData as Record<string, unknown>[];
+            if (inputData.mode === 'tsv') {
+                inputItems = inputData.syllabusData as Record<string, unknown>[];
             } else {
                 const { processTaskData } = await import('@/lib/jsonAnalyzer');
-                inputItems = (currentInputData.jsonAnalysis as AnalysisResult).sampleTasks.map((task: Record<string, unknown>) => {
+                inputItems = (inputData.jsonAnalysis as AnalysisResult).sampleTasks.map((task: Record<string, unknown>) => {
                     const processed = processTaskData(
                         task,
-                        currentInputData.jsonData,
-                        currentInputData.fieldSelection,
-                        currentInputData.fieldMapping,
+                        inputData.jsonData,
+                        inputData.fieldSelection,
+                        inputData.fieldMapping,
                         []
                     );
                     return {
@@ -271,21 +275,23 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
                                         </div>
                                     </div>
 
-                                    <div className="space-y-2 pt-2 border-t border-success/10">
-                                        <Label htmlFor="batch-alias" className="text-xs font-semibold text-muted-foreground">
-                                            Batch Alias Name (Optional)
-                                        </Label>
-                                        <Input
-                                            id="batch-alias"
-                                            placeholder="e.g. Test Run with High Temperature"
-                                            value={batchAlias}
-                                            onChange={(e) => setBatchAlias(e.target.value)}
-                                            className="bg-background/50 h-9"
-                                        />
-                                        <p className="text-[10px] text-muted-foreground italic">
-                                            Best practice: use a name that describes this specific batch of data or parameters.
-                                        </p>
+                                    <div className="pt-2 border-t border-success/10">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="batch-alias" className="text-xs font-semibold text-muted-foreground">
+                                                Batch Alias Name (Optional)
+                                            </Label>
+                                            <Input
+                                                id="batch-alias"
+                                                placeholder="e.g. Test Run with High Temperature"
+                                                value={batchAlias}
+                                                onChange={(e) => setBatchAlias(e.target.value)}
+                                                className="bg-background/50 h-9"
+                                            />
+                                        </div>
                                     </div>
+                                    <p className="text-[10px] text-muted-foreground italic">
+                                        Best practice: use a name that describes this specific batch.
+                                    </p>
                                 </div>
                             ) : (
                                 <div className="relative group">

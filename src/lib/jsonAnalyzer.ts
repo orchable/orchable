@@ -167,7 +167,10 @@ export function getValueByPath(obj: unknown, path: string): unknown {
  * Checks if a saved input mapping is compatible with a new JSON analysis.
  */
 export function isStructureCompatible(
-	savedMapping: Record<string, unknown>,
+	savedMapping:
+		| { fieldSelection?: { shared: string[]; perTask: string[] } }
+		| null
+		| undefined,
 	newAnalysis: AnalysisResult,
 ): boolean {
 	if (!savedMapping || !savedMapping.fieldSelection) return false;

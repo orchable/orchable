@@ -49,6 +49,7 @@ interface DesignerState {
 		fieldSelection: { shared: string[]; perTask: string[] };
 		fieldMapping: Record<string, string>;
 		selectedTaskIndices: number[];
+		execution_delay_seconds: number;
 	};
 	setInputData: (data: Partial<DesignerState["inputData"]>) => void;
 	clearInputData: () => void;
@@ -78,6 +79,7 @@ export const useDesignerStore = create<DesignerState>()(
 				fieldSelection: { shared: [], perTask: [] },
 				fieldMapping: {},
 				selectedTaskIndices: [],
+				execution_delay_seconds: 0,
 			},
 			orchestratorName: "",
 			orchestratorDescription: "",
@@ -100,6 +102,7 @@ export const useDesignerStore = create<DesignerState>()(
 						fieldSelection: { shared: [], perTask: [] },
 						fieldMapping: {},
 						selectedTaskIndices: [],
+						execution_delay_seconds: 0,
 					},
 				});
 			},
@@ -334,6 +337,8 @@ export const useDesignerStore = create<DesignerState>()(
 								jsonData: null,
 								syllabusData: [],
 								jsonAnalysis: null,
+								execution_delay_seconds:
+									config.execution_delay_seconds || 0,
 							}
 						: get().inputData,
 				});

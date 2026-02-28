@@ -11,7 +11,13 @@ export interface OrchestratorConfig {
 	created_by?: string;
 	viewport?: { x: number; y: number; zoom: number };
 	n8n_workflow_id?: string;
-	input_mapping?: unknown;
+	input_mapping?: JsonInputMapping;
+	execution_delay_seconds?: number;
+}
+
+export interface JsonInputMapping {
+	fieldSelection: { shared: string[]; perTask: string[] };
+	fieldMapping: Record<string, string>;
 }
 
 // Legacy Step Config - now supports both legacy webhook and new stage-based fields
@@ -391,6 +397,7 @@ export interface Execution {
 	hub_asset_id?: string;
 	is_public?: boolean;
 	created_by?: string; // New
+	execution_delay_seconds?: number;
 
 	// Parity with task_batches table
 	source_file?: string | null;
@@ -400,8 +407,8 @@ export interface Execution {
 	n8n_workflow_id?: string | null;
 	n8n_execution_id?: string | null;
 	finished_tasks?: number;
-	pending_tasks?: number; // Added for parity
-	global_context?: Record<string, any>; // 🔨 Snapshotting/Caching
+	pending_tasks: number; // Added for parity
+	global_context?: Record<string, unknown>; // 🔨 Snapshotting/Caching
 }
 
 export interface StepExecution {
@@ -482,7 +489,7 @@ export interface UserProfile {
 	tier: "free" | "premium";
 	avatar_url: string | null;
 	username: string | null;
-	settings: Record<string, any>;
+	settings: Record<string, unknown>;
 	created_at: string;
 	updated_at: string;
 }

@@ -167,6 +167,7 @@ export function useSaveOrchestrator() {
 				viewport,
 				steps,
 				input_mapping: inputMapping,
+				execution_delay_seconds: inputData.execution_delay_seconds,
 			};
 
 			// 1. Save to Supabase (Create or Update)

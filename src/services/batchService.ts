@@ -1,5 +1,5 @@
 import { storage, UserTier } from "../lib/storage";
-import { OrchestratorConfig } from "../lib/types";
+import { OrchestratorConfig, Execution } from "../lib/types";
 import { TaskSummary as AiTask } from "./executionTrackingService";
 import { topologicalSortStages } from "./stageService";
 
@@ -97,7 +97,8 @@ export const batchService = {
 			created_by: userId || "anonymous",
 			global_context: globalContext,
 			total_tasks: inputItems.length,
-			...({ launch_id: launchId } as Record<string, unknown>),
+			execution_delay_seconds: config.execution_delay_seconds || 0,
+			...({ launch_id: launchId } as Partial<Execution>),
 		});
 
 		// 3. Prepare tasks
@@ -131,7 +132,10 @@ export const batchService = {
 						firstStage.cardinality === "1:N" ||
 						firstStage.cardinality === "one_to_many"
 							? "one_to_many"
-							: "one_to_one",
+							: firstStage.cardinality === "N:1" ||
+								  firstStage.cardinality === "many_to_one"
+								? "many_to_one"
+								: "one_to_one",
 					split_path: firstStage.split_path || null,
 					split_mode: firstStage.split_mode || "per_item",
 					output_mapping: firstStage.output_mapping || "result",
@@ -155,6 +159,7 @@ export const batchService = {
 					delimiters: ns.contract?.input?.delimiters,
 				})),
 				delimiters: firstStage.contract?.input?.delimiters,
+				execution_delay_seconds: config.execution_delay_seconds || 0,
 				...extraMetadata,
 			},
 		}));

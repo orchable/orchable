@@ -136,6 +136,11 @@ export function TaskHierarchyTree({ tasks }: TaskHierarchyTreeProps) {
                                         </Badge>
                                     )}
                                     <span className="text-[10px] text-muted-foreground font-mono opacity-50">#{task.id.slice(0, 6)}</span>
+                                    {(task.extra as Record<string, unknown>)?._merged_from_count && (
+                                        <Badge variant="secondary" className="text-[9px] h-4 px-1 opacity-80 bg-purple-500/10 text-purple-600 border-purple-500/20">
+                                            N:1 Merge ({String((task.extra as Record<string, unknown>)._merged_from_count)})
+                                        </Badge>
+                                    )}
                                 </div>
                                 {task.lo_code && (
                                     <span className="text-[10px] font-mono bg-blue-500/10 text-blue-600 px-1.5 py-0.5 rounded inline-block w-fit mt-0.5">
