@@ -20,6 +20,7 @@ const mainNavItems = [
   { title: 'Launcher', url: '/launcher', icon: Code, description: 'Run Batch Jobs' },
   { title: 'Monitor', url: '/monitor', icon: Search, description: 'Track Executions' },
   { title: 'Assets', url: '/assets', icon: Library, description: 'Prompt & Component Library' },
+  { title: 'Calculator', url: '/calculator', icon: Calculator, description: 'Estimate Costs' },
   { title: 'Community Hub', url: '/hub', icon: Globe, description: 'Share & Discover' },
 ];
 
