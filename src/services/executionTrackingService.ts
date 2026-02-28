@@ -675,14 +675,18 @@ export async function getRecentBatches(
 			let calculatedStatus = b.status || "pending";
 
 			// Auto repair if mismatched in IndexedDB
+			const isActuallyFinished =
+				(total > 0 && completed + failed >= total) ||
+				(total === 0 && completed + failed > 0 && processing === 0);
+
 			if (
-				total > 0 &&
+				isActuallyFinished &&
 				b.status !== "completed" &&
 				b.status !== "failed"
 			) {
-				if (completed + failed >= total) {
-					calculatedStatus = failed > 0 ? "failed" : "completed";
-				} else if (processing > 0 || completed + failed > 0) {
+				calculatedStatus = failed > 0 ? "failed" : "completed";
+			} else if (processing > 0 || completed + failed > 0) {
+				if (b.status !== "completed" && b.status !== "failed") {
 					calculatedStatus = "processing";
 				}
 			}
@@ -729,10 +733,18 @@ export async function getRecentBatches(
 			const processing = b.processing_tasks || 0;
 
 			let calculatedStatus = b.status || "pending";
-			if (total > 0) {
-				if (completed + failed >= total) {
-					calculatedStatus = failed > 0 ? "failed" : "completed";
-				} else if (processing > 0 || completed + failed > 0) {
+			const isActuallyFinished =
+				(total > 0 && completed + failed >= total) ||
+				(total === 0 && completed + failed > 0 && processing === 0);
+
+			if (
+				isActuallyFinished &&
+				b.status !== "completed" &&
+				b.status !== "failed"
+			) {
+				calculatedStatus = failed > 0 ? "failed" : "completed";
+			} else if (processing > 0 || completed + failed > 0) {
+				if (b.status !== "completed" && b.status !== "failed") {
 					calculatedStatus = "processing";
 				}
 			}

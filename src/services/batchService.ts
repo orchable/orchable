@@ -96,6 +96,7 @@ export const batchService = {
 			orchestrator_config_id: config.id,
 			created_by: userId || "anonymous",
 			global_context: globalContext,
+			total_tasks: inputItems.length,
 			...({ launch_id: launchId } as Record<string, unknown>),
 		});
 

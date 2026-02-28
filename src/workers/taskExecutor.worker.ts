@@ -961,7 +961,16 @@ async function updateBatchCounters(batchId: string, success: boolean) {
 				(update.completed_tasks ?? batch.completed_tasks ?? 0) +
 				(update.failed_tasks ?? batch.failed_tasks ?? 0);
 
-			if (done >= total && total > 0) {
+			// Self-healing: If total is 0 but we have finished tasks, it means initialization failed
+			// but we can still determine if it's "done" if there are no more processing tasks.
+			const isActuallyDone =
+				(total > 0 && done >= total) ||
+				(total === 0 &&
+					done > 0 &&
+					(update.processing_tasks ?? batch.processing_tasks ?? 0) ===
+						0);
+
+			if (isActuallyDone) {
 				update.status =
 					(update.failed_tasks ?? batch.failed_tasks ?? 0) > 0
 						? "failed"
