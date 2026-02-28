@@ -1,13 +1,13 @@
 import { db } from "../lib/storage/IndexedDBAdapter";
 import { TaskSummary as AiTask } from "../services/executionTrackingService";
 import { PromptTemplate } from "../lib/storage/StorageAdapter";
-import type { AISettings, StepConfig } from "@/lib/types";
+import type { AISettings, StepConfig, Execution } from "@/lib/types";
 import type { KeyConfig } from "@/services/keyPoolService";
 import type { UserTier } from "@/lib/storage";
 
 // Types for the worker messages
 export type WorkerMessage =
-	| { type: "START"; configs: KeyConfig[]; tier: string }
+	| { type: "START"; configs: KeyConfig[]; tier: UserTier }
 	| { type: "STOP" };
 
 export type WorkerStatus =
