@@ -1,8 +1,9 @@
 import { db } from "../lib/storage/IndexedDBAdapter";
 import { TaskSummary as AiTask } from "../services/executionTrackingService";
 import { PromptTemplate } from "../lib/storage/StorageAdapter";
-import { StepConfig, AISettings, Execution } from "../lib/types";
-import { KeyConfig } from "../services/keyPoolService";
+import type { AISettings, StepConfig } from "@/lib/types";
+import type { KeyConfig } from "@/services/keyPoolService";
+import type { UserTier } from "@/lib/storage";
 
 // Types for the worker messages
 export type WorkerMessage =
@@ -16,9 +17,232 @@ export type WorkerStatus =
 
 let isRunning = false;
 let isLooping = false;
-let currentConfigs: KeyConfig[] = [];
-let currentConfigIndex = 0;
-let currentTier = "free";
+let currentTier: Exclude<UserTier, null> = "free";
+
+// ============================================================================
+// KEY MANAGER (Replaces round-robin for personal keys)
+// ============================================================================
+
+interface KeyState {
+	apiKey: string;
+	healthStatus:
+		| "healthy"
+		| "degraded"
+		| "blocked"
+		| "disabled"
+		| "rate_limited";
+	remainingRequests: number;
+	remainingTokens: number;
+	blockedUntil: number; // timestamp
+	consecutiveFailures: number;
+	lastUsedAt: number; // timestamp
+}
+
+class KeyManager {
+	private keys: KeyState[] = [];
+	private poolConfig: KeyConfig | null = null;
+
+	// Config limits based on Base Agent logic
+	private LOW_REQUESTS_THRESHOLD = 5;
+	private LOW_TOKENS_THRESHOLD = 5000;
+	private MAX_CONSECUTIVE_FAILS = 3;
+	private BLOCK_DURATION_HOURS = 2;
+	private COOLDOWN_MINUTES = 5; // To prevent hammering one key
+
+	public initialize(configs: KeyConfig[]) {
+		this.keys = [];
+		this.poolConfig = null;
+
+		for (const config of configs) {
+			if (config.type === "personal" && config.apiKey) {
+				this.keys.push({
+					apiKey: config.apiKey,
+					healthStatus: "healthy",
+					remainingRequests: 999999, // default max before first parse
+					remainingTokens: 999999999,
+					blockedUntil: 0,
+					consecutiveFailures: 0,
+					lastUsedAt: 0,
+				});
+			} else if (config.type === "pool") {
+				// We only expect one pool config per worker session based on tier
+				this.poolConfig = config;
+			}
+		}
+	}
+
+	public getBestKey():
+		| { type: "personal"; keyState: KeyState }
+		| { type: "pool"; config: KeyConfig }
+		| null {
+		// If no personal keys exist, fallback to pool if available
+		if (this.keys.length === 0) {
+			return this.poolConfig
+				? { type: "pool", config: this.poolConfig }
+				: null;
+		}
+
+		const now = Date.now();
+
+		// Filter candidates
+		const candidates = this.keys.filter((k) => {
+			if (k.healthStatus === "disabled") return false;
+			if (k.blockedUntil > now) return false;
+			if (k.consecutiveFailures >= this.MAX_CONSECUTIVE_FAILS)
+				return false;
+			// Fast quota guard
+			if (k.remainingRequests < 1 || k.remainingTokens < 100)
+				return false;
+
+			// Cooldown logic for heavy usage
+			if (k.lastUsedAt > 0 && k.healthStatus !== "degraded") {
+				const minutesAgo = (now - k.lastUsedAt) / (1000 * 60);
+				// We relax cooldown if it's the ONLY key, better to hit rate limit naturally than wait 5m doing nothing
+				if (
+					this.keys.length > 1 &&
+					minutesAgo < this.COOLDOWN_MINUTES / this.keys.length
+				) {
+					// Soft cooldown based on number of keys
+				}
+			}
+			return true;
+		});
+
+		if (candidates.length === 0) {
+			// All personal keys are exhausted/blocked. Fallback to pool? In our architecture, premium users get priority pools.
+			// Free users with BYOK shouldn't fallback to standard pools if they configured BYOK, to save platform costs.
+			// Actually, if they are out of keys, we throw.
+			return this.poolConfig
+				? { type: "pool", config: this.poolConfig }
+				: null;
+		}
+
+		// Sort: Health > Tokens > LRU
+		candidates.sort((a, b) => {
+			// 1. Health
+			const healthPriority = {
+				healthy: 0,
+				degraded: 1,
+				rate_limited: 2,
+				blocked: 3,
+				disabled: 4,
+			};
+			const aH = healthPriority[a.healthStatus];
+			const bH = healthPriority[b.healthStatus];
+			if (aH !== bH) return aH - bH;
+
+			// 2. Tokens (High to Low)
+			if (a.remainingTokens !== b.remainingTokens)
+				return b.remainingTokens - a.remainingTokens;
+
+			// 3. LRU
+			return a.lastUsedAt - b.lastUsedAt;
+		});
+
+		const selected = candidates[0];
+		selected.lastUsedAt = now;
+		return { type: "personal", keyState: selected };
+	}
+
+	public updateKeyStatus(apiKey: string, headers: Headers) {
+		const key = this.keys.find((k) => k.apiKey === apiKey);
+		if (!key) return;
+
+		const reqLeft = headers.get("x-ratelimit-remaining-requests");
+		const tokLeft = headers.get("x-ratelimit-remaining-tokens");
+
+		if (reqLeft !== null) key.remainingRequests = parseInt(reqLeft, 10);
+		if (tokLeft !== null) key.remainingTokens = parseInt(tokLeft, 10);
+
+		// Auto low-quota limit
+		if (
+			key.remainingRequests < this.LOW_REQUESTS_THRESHOLD ||
+			key.remainingTokens < this.LOW_TOKENS_THRESHOLD
+		) {
+			if (key.healthStatus === "healthy") {
+				key.healthStatus = "rate_limited";
+				// Soft block for 2 mins to let quota regenerate
+				key.blockedUntil = Date.now() + 2 * 60 * 1000;
+			}
+		}
+	}
+
+	public reportError(
+		apiKey: string,
+		status: number,
+		errorMessage: string,
+		headers: Headers,
+	) {
+		const key = this.keys.find((k) => k.apiKey === apiKey);
+		if (!key) return;
+		const now = Date.now();
+
+		// Update limits if header is provided
+		if (headers) this.updateKeyStatus(apiKey, headers);
+
+		// Error classification
+		const msg = errorMessage.toLowerCase();
+		const isRateLimit =
+			status === 429 ||
+			msg.includes("resource exhausted") ||
+			msg.includes("rate limit") ||
+			msg.includes("quota exceeded");
+
+		if (isRateLimit) {
+			key.healthStatus = "rate_limited";
+			key.consecutiveFailures++;
+			let blockMinutes = 15;
+			if (msg.includes("per day") || msg.includes("daily")) {
+				blockMinutes = 720; // 12h
+			} else {
+				// Parse retry-after from header or message if possible
+				const retryAfter = headers.get("retry-after");
+				if (retryAfter)
+					blockMinutes = Math.ceil(parseInt(retryAfter, 10) / 60);
+			}
+			key.blockedUntil = now + blockMinutes * 60 * 1000;
+			console.warn(
+				`[KeyManager] Key rate limited. Blocked for ${blockMinutes}m.`,
+			);
+		} else if (status === 403 || msg.includes("permission denied")) {
+			key.healthStatus = "blocked";
+			key.blockedUntil = now + 24 * 60 * 60 * 1000; // 24h
+			key.consecutiveFailures++;
+		} else if (
+			status === 401 ||
+			msg.includes("unauthenticated") ||
+			msg.includes("invalid api key")
+		) {
+			key.healthStatus = "disabled";
+			key.consecutiveFailures++;
+		} else if (status >= 500) {
+			key.healthStatus = "degraded";
+			key.consecutiveFailures++;
+			if (key.consecutiveFailures >= this.MAX_CONSECUTIVE_FAILS) {
+				key.blockedUntil =
+					now + this.BLOCK_DURATION_HOURS * 60 * 60 * 1000;
+			}
+		} else {
+			// e.g., 400 Bad Request (not the key's fault structurally, maybe prompt issue)
+			// Don't punish the key too heavily
+			key.consecutiveFailures++;
+		}
+	}
+
+	public reportSuccess(apiKey: string, headers: Headers) {
+		const key = this.keys.find((k) => k.apiKey === apiKey);
+		if (!key) return;
+
+		key.healthStatus = "healthy";
+		key.consecutiveFailures = 0;
+		key.blockedUntil = 0;
+		if (headers) this.updateKeyStatus(apiKey, headers);
+	}
+}
+
+const keyManager = new KeyManager();
+
+// ============================================================================
 const lastTaskCompletionTimes: Record<string, number> = {};
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -28,16 +252,18 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 
 	if (data.type === "START") {
 		isRunning = true;
-		currentConfigs = data.configs || [];
-		currentConfigIndex = 0;
+		if (data.configs.length === 0) {
+			throw new Error("No execution configs provided.");
+		}
+		keyManager.initialize(data.configs);
 		currentTier = data.tier || "free";
 		console.log(
-			`[Worker] Started processing loop (Tier: ${currentTier}, Keys: ${currentConfigs.length})`,
+			`[Worker] Started processing loop (Tier: ${currentTier}, Keys: ${data.configs.length})`,
 		);
 		if (!isLooping) runLoop();
 	} else if (data.type === "STOP") {
 		isRunning = false;
-		currentConfigs = [];
+		keyManager.initialize([]); // Clear keys on stop
 		console.log("[Worker] Stopped");
 	}
 };
@@ -430,12 +656,21 @@ async function callGemini(
 	batchId?: string,
 	globalContextStr?: string,
 ) {
-	if (currentConfigs.length === 0)
-		throw new Error("No API keys or pools available.");
+	const keySelection = keyManager.getBestKey();
 
-	// Rotate keys/pools
-	const currentConfig = currentConfigs[currentConfigIndex];
-	currentConfigIndex = (currentConfigIndex + 1) % currentConfigs.length;
+	if (!keySelection) {
+		throw new Error("No API keys or pools available.");
+	}
+
+	let apiKey: string | undefined;
+	let currentConfig: KeyConfig | undefined;
+
+	if (keySelection.type === "personal") {
+		apiKey = keySelection.keyState.apiKey;
+		currentConfig = { type: "personal", apiKey: apiKey }; // Create a dummy KeyConfig for consistency
+	} else {
+		currentConfig = keySelection.config;
+	}
 
 	if (currentConfig.type === "pool") {
 		// Route to platform Key Pool via webhook
@@ -518,38 +753,64 @@ async function callGemini(
 			body: JSON.stringify(bodyPayload),
 		});
 
-		if (response.status === 429) {
-			const json = await response.json();
-			const errMsg = json.error?.message || "";
-			console.warn(
-				`[Worker] Rate limited (429). Attempt ${attempt + 1}/${maxRetries}. Error: ${errMsg}`,
-			);
+		if (!response.ok) {
+			const json = await response.json().catch(() => ({}));
+			const errMsg =
+				json.error?.message ||
+				json.error ||
+				`HTTP ${response.status} ${response.statusText}`;
 
-			if (attempt === maxRetries) {
-				throw new Error(
-					errMsg || "Gemini API Error: 429 Too Many Requests",
+			// Report to KeyManager if using a personal key
+			if (currentConfig.type === "personal" && apiKey) {
+				keyManager.reportError(
+					apiKey,
+					response.status,
+					errMsg,
+					response.headers,
 				);
 			}
 
-			// Try to parse "retry in X.XXs" from message
-			let delayMs = Math.pow(2, attempt) * 5000 + Math.random() * 2000; // default exp backoff + jitter
-			const match = errMsg.match(/retry in\s+([\d.]+)s/i);
-			if (match && match[1]) {
-				const seconds = parseFloat(match[1]);
-				if (!isNaN(seconds)) {
-					delayMs = seconds * 1000 + 1000; // Parsed delay + 1s buffer
+			if (response.status === 429) {
+				console.warn(
+					`[Worker] Rate limited (429). Attempt ${attempt + 1}/${maxRetries}. Error: ${errMsg}`,
+				);
+
+				if (attempt === maxRetries) {
+					throw new Error(
+						errMsg || "Gemini API Error: 429 Too Many Requests",
+					);
 				}
+
+				// Try to parse "retry in X.XXs" from message
+				let delayMs =
+					Math.pow(2, attempt) * 5000 + Math.random() * 2000; // default exp backoff + jitter
+				const match = errMsg.match(/retry in\s+([\d.]+)s/i);
+				if (match && match[1]) {
+					const seconds = parseFloat(match[1]);
+					if (!isNaN(seconds)) {
+						delayMs = seconds * 1000 + 1000; // Parsed delay + 1s buffer
+					}
+				}
+
+				console.log(
+					`[Worker] Waiting ${Math.round(delayMs / 1000)}s before retry...`,
+				);
+				await new Promise((resolve) => setTimeout(resolve, delayMs));
+				attempt++;
+				continue;
 			}
 
-			console.log(
-				`[Worker] Waiting ${Math.round(delayMs / 1000)}s before retry...`,
-			);
-			await new Promise((resolve) => setTimeout(resolve, delayMs));
-			attempt++;
-			continue;
+			// For non-429 errors (like 400, 401, 403), we might not want to retry,
+			// or if we do, the key manager has already marked the current key blocked/disabled.
+			// However, since we are inside a single task execution step, we just throw and let the task fail.
+			// Next task will pick a new healthy key.
+			throw new Error(errMsg || "Gemini API Error");
 		}
 
-		// If success or other error, break out of retry loop
+		// If success
+		if (currentConfig.type === "personal" && apiKey) {
+			keyManager.reportSuccess(apiKey, response.headers);
+		}
 		break;
 	}
 
@@ -558,12 +819,6 @@ async function callGemini(
 	}
 
 	const json = await response.json();
-
-	if (!response.ok) {
-		throw new Error(
-			json.error?.message || json.error || "Gemini API Error",
-		);
-	}
 
 	const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
 	if (!text) throw new Error("Empty response from Gemini");
