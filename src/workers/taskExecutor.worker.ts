@@ -41,11 +41,33 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 async function runLoop() {
 	while (isRunning) {
 		try {
-			// 1. Get next 'plan' task
-			const task = await db.ai_tasks
+			// 1. Get next 'plan' task, prioritized by step_number and age
+			const planTasks = await db.ai_tasks
 				.where("status")
 				.equals("plan")
-				.first();
+				.toArray();
+
+			if (planTasks.length === 0) {
+				// No more plan tasks, wait a bit
+				await new Promise((r) => setTimeout(r, 2000));
+				continue;
+			}
+
+			// Prioritize:
+			// 1. Lower step_number (earlier stages)
+			// 2. Older created_at (FIFO within stage)
+			planTasks.sort((a, b) => {
+				const stepA = a.step_number || 0;
+				const stepB = b.step_number || 0;
+				if (stepA !== stepB) return stepA - stepB;
+
+				return (
+					new Date(a.created_at).getTime() -
+					new Date(b.created_at).getTime()
+				);
+			});
+
+			const task = planTasks[0];
 
 			if (!task) {
 				// No more plan tasks, wait a bit
@@ -753,30 +775,37 @@ async function handleManyToOne(
 		(extra.current_stage_config as Record<string, unknown>) ||
 		template.stage_config ||
 		{};
+
 	const batchId = task.batch_id;
+	const launchId = task.launch_id;
 	const stageKey = task.stage_key;
+	const grouping = currentStageConfig.batch_grouping || "batch";
 
-	if (!batchId) return;
+	if (!batchId && !launchId) return;
 
-	// FIX: To safely aggregate across the entire batch, we must wait until NO other tasks in the batch
-	// (that are before this M:1 stage) are still 'plan' or 'processing'.
-	// Since stages execute sequentially or level-by-level, simpler check:
-	// Are there ANY tasks in this batch still pending/processing EXCEPT for tasks OF this stage?
-	// Actually, wait until ALL tasks in this stage are completed, AND there are no active parents.
-	const allBatchTasks = await db.ai_tasks
-		.where("batch_id")
-		.equals(batchId)
-		.toArray();
+	// 1. Determine the scope of tasks to merge
+	let scopeTasks: AiTask[];
+	if (grouping === "global" && launchId) {
+		console.log(`[Worker] M:1 Global Merge for launch: ${launchId}`);
+		scopeTasks = await db.ai_tasks
+			.where("launch_id")
+			.equals(launchId)
+			.toArray();
+	} else if (batchId) {
+		console.log(`[Worker] M:1 Batch Merge for batch: ${batchId}`);
+		scopeTasks = await db.ai_tasks
+			.where("batch_id")
+			.equals(batchId)
+			.toArray();
+	} else {
+		return;
+	}
 
-	// Identify if any task is still upstream and could generate more siblings.
-	// For simplicity, we assume M:1 aggregates EVERYTHING from the batch for this stage.
-	const isStreamFinished = allBatchTasks.every((t) => {
+	// 2. Identify if any task is still upstream and could generate more siblings.
+	const isStreamFinished = scopeTasks.every((t) => {
 		// Ignore self
 		if (t.id === task.id) return true;
 
-		// If it's a future stage (step_number is greater), it's fine.
-		// Wait, we don't know the exact order easily.
-		// If ANY task in the batch is 'plan' or 'processing' (other than siblings of this exact stage), we might not be done.
 		// Only block on UPSTREAM tasks (lower step_number) that could generate more siblings
 		if (
 			(t.status === "plan" ||
@@ -785,23 +814,31 @@ async function handleManyToOne(
 			t.stage_key !== stageKey &&
 			(t.step_number || 0) < (task.step_number || 0)
 		) {
-			return false; // Still processing upstream tasks that could generate more siblings!
+			return false; // Still processing upstream tasks
 		}
 		return true;
 	});
 
-	if (!isStreamFinished) return; // Wait for all other upstream tasks to finish
+	if (!isStreamFinished) {
+		console.log("[Worker] Upstream tasks still active, waiting...");
+		return;
+	}
 
-	// Check if all siblings in THIS stage are done
-	const siblings = allBatchTasks.filter((t) => t.stage_key === stageKey);
+	// 3. Check if all siblings in THIS stage are done
+	const siblings = scopeTasks.filter((t) => t.stage_key === stageKey);
 	const allSiblingsDone = siblings.every(
 		(s) =>
+			s.id === task.id ||
 			s.status === "completed" ||
-			s.status === "failed" ||
-			s.id === task.id,
+			s.status === "failed",
 	);
 
-	if (!allSiblingsDone) return; // Wait for other siblings
+	if (!allSiblingsDone) {
+		console.log(
+			`[Worker] Waiting for ${siblings.filter((s) => s.status !== "completed" && s.status !== "failed").length} siblings...`,
+		);
+		return;
+	}
 
 	// 2. Aggregate data
 	const mergePath = (currentStageConfig.merge_path as string) || null;

@@ -1,4 +1,7 @@
+# Specification: Orchestrator IO & Costing
+
 ## MODIFIED Requirements
+
 ### Requirement: Stage Configuration Definition
 The system SHALL allow users to define a pipeline step (`StepConfig`) via the StageConfigPanel, storing the configuration globally within the Orchestrator schema.
 **MODIFIED**: Added `export_config` definition.
@@ -8,7 +11,6 @@ The system SHALL allow users to define a pipeline step (`StepConfig`) via the St
 - **THEN** the system saves the `export_config` parameters inside the Stage Configuration JSON in the `prompt_templates.stage_config` column.
 - **AND** the Orchestrator Execution engine queues the export hook to trigger once the stage dynamically completes via wildcard iteration ("Last Sibling Standing" logic).
 
-## MODIFIED Requirements
 ### Requirement: Orchestrator Launcher Metric Calculation
 The system SHALL calculate the token usage cost for execution projection in `Calculator.tsx`.
 **MODIFIED**: Accounting for Auxiliary document footprint.
@@ -22,3 +24,4 @@ The system SHALL calculate the token usage cost for execution projection in `Cal
 - **WHEN** a Premium Tier user launches a configuration with large Auxiliary Documents.
 - **THEN** the Calculation view displays a breakdown of `Cache Storage Cost (Time)` vs `Cached Inference Cost (Token)` vs `Standard Inference Cost`.
 - **AND** executes the Cache creation middleware sequentially.
+

@@ -13,10 +13,11 @@ import {
   Execution,
   StepExecution,
   StepResult,
-  ExecutionStatus
+  ExecutionStatus,
+  SyllabusRow
 } from '@/lib/types';
 import { cn, formatBytes } from '@/lib/utils';
-import { getRecentBatches, BatchSummary } from '@/services/executionTrackingService';
+import { getRecentBatches, BatchSummary, TaskSummary } from '@/services/executionTrackingService';
 import { Progress } from '@/components/ui/progress';
 import {
   DropdownMenu,
@@ -158,16 +159,27 @@ function StepMonitorItem({ step, index, expanded, onToggle }: { step: StepExecut
 }
 
 // Side Panel: Execution Detail
-// Side Panel: Execution Detail
-function ExecutionDetailPanel({ executionData }: { executionData: Record<string, any> }) {
-  const isAiTask = executionData.task_type !== undefined;
+interface ExtendedTask extends TaskSummary {
+  syllabus_row?: { lessonId?: string; lessonTitle?: string } & Partial<SyllabusRow>;
+  total_steps?: number;
+  completed_steps?: number;
+}
+
+type ExecutionOrTask = Execution | ExtendedTask;
+
+function isExtendedTask(item: ExecutionOrTask): item is ExtendedTask {
+  return 'task_type' in item && item.task_type !== undefined;
+}
+
+function ExecutionDetailPanel({ executionData }: { executionData: ExecutionOrTask }) {
+  const isAiTask = isExtendedTask(executionData);
 
   // Only query standard execution details if NOT an AI task
   const { data: execution } = useExecution(executionData.id, isAiTask ? null : 3000);
   const { data: steps } = useStepExecutions(executionData.id, isAiTask ? null : 3000);
   const [expandedStep, setExpandedStep] = useState<string | null>(null);
 
-  const displayData = isAiTask ? executionData : (execution || executionData);
+  const displayData = isAiTask ? (executionData as ExtendedTask) : (execution || executionData as Execution);
   if (!displayData) return <div className="p-8 flex justify-center"><Loader2 className="animate-spin text-muted-foreground" /></div>;
 
   return (
@@ -183,9 +195,9 @@ function ExecutionDetailPanel({ executionData }: { executionData: Record<string,
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-4">
             <h1 className="text-xl font-bold truncate max-w-lg">
-              {isAiTask ? (displayData as any).task_type : ((displayData as any).syllabus_row?.lessonTitle || 'Execution')}
+              {(isAiTask ? (displayData as ExtendedTask).task_type : (displayData as Execution).syllabus_row?.lessonTitle) || 'Execution'}
             </h1>
-            <StatusBadge status={displayData.status} size="lg" />
+            <StatusBadge status={displayData.status as ExecutionStatus} size="lg" />
           </div>
         </div>
         <div className="flex items-center gap-6 text-sm text-muted-foreground">
@@ -196,14 +208,14 @@ function ExecutionDetailPanel({ executionData }: { executionData: Record<string,
             <Clock className="w-4 h-4" />
             Created: {format(new Date(displayData.created_at), 'Pp')}
           </span>
-          {isAiTask && (displayData as any).batch_id && (
+          {isAiTask && (displayData as ExtendedTask).batch_id && (
             <div className="flex items-center gap-2">
-              <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">Batch: {(displayData as any).batch_id.slice(0, 8)}</span>
+              <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">Batch: {(displayData as ExtendedTask).batch_id?.slice(0, 8)}</span>
               <Button
                 variant="outline"
                 size="sm"
                 className="h-7 text-[10px] gap-1 px-2 border-primary/30 text-primary hover:bg-primary/5"
-                onClick={() => window.open(`/batch/${(displayData as any).batch_id}`, '_blank')}
+                onClick={() => window.open(`/batch/${(displayData as ExtendedTask).batch_id}`, '_blank')}
               >
                 <Activity className="w-3 h-3" />
                 View Batch Progress
@@ -221,20 +233,20 @@ function ExecutionDetailPanel({ executionData }: { executionData: Record<string,
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Input Data</p>
                 <pre className="text-xs bg-muted p-3 rounded-lg overflow-auto max-h-60">
-                  {JSON.stringify((displayData as any).input_data || (displayData as any).syllabus_row, null, 2)}
+                  {JSON.stringify((displayData as ExtendedTask).input_data || (displayData as ExtendedTask).syllabus_row, null, 2)}
                 </pre>
               </div>
-              {(displayData as any).output_data && (
+              {(displayData as ExtendedTask).output_data && (
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Output Data</p>
                   <pre className="text-xs bg-success/5 border border-success/20 p-3 rounded-lg overflow-auto max-h-60">
-                    {JSON.stringify((displayData as any).output_data, null, 2)}
+                    {JSON.stringify((displayData as ExtendedTask).output_data, null, 2)}
                   </pre>
                 </div>
               )}
-              {displayData.error_message && (
+              {(displayData as ExtendedTask).error_message && (
                 <div className="p-3 bg-destructive/10 text-destructive rounded-lg text-sm">
-                  Error: {displayData.error_message}
+                  Error: {(displayData as ExtendedTask).error_message}
                 </div>
               )}
             </CardContent>
@@ -316,22 +328,33 @@ export function MonitorPage() {
 
   const unifiedList = useMemo(() => {
     const list = [
-      ...(executions || []),
-      ...(aiTasks || []).map(task => ({
-        id: task.id,
-        status: task.status,
-        created_at: task.created_at,
-        syllabus_row: {
-          lessonId: (task.extra?.launcher_metadata?.original_index !== undefined) ? `JSON #${task.extra.launcher_metadata.original_index + 1}` : 'AI',
-          lessonTitle: task.task_type || 'AI Task',
-        },
-        total_steps: 1,
-        completed_steps: task.status === 'completed' ? 1 : 0,
-        ...task
-      }))
+      // Only show ai_tasks in Raw Tasks view. 
+      // Executions (Batches) are already handled by the Campaigns view via getRecentBatches
+      ...(aiTasks || []).map((task: TaskSummary) => {
+        const inputData = (task.input_data || {}) as Record<string, unknown>;
+        const extra = (task.extra || {}) as Record<string, unknown>;
+
+        const launcherMetadata = extra.launcher_metadata as Record<string, unknown> | undefined;
+        const originalIndex = launcherMetadata?.original_index as number | undefined;
+
+        return {
+          id: task.id,
+          status: task.status,
+          created_at: task.created_at,
+          syllabus_row: {
+            lessonId: (originalIndex !== undefined)
+              ? `JSON #${originalIndex + 1}`
+              : 'AI',
+            lessonTitle: (inputData.lessonTitle || inputData._orchestrator_name || task.task_type || 'AI Task') as string,
+          },
+          total_steps: 1,
+          completed_steps: task.status === 'completed' ? 1 : 0,
+          ...task
+        };
+      })
     ];
     return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  }, [executions, aiTasks]);
+  }, [aiTasks]);
 
   useEffect(() => {
     if (viewMode === 'executions' && !selectedExecutionId && unifiedList.length > 0 && !isLoadingExec && !isLoadingAi) {
@@ -537,38 +560,45 @@ export function MonitorPage() {
             ) : unifiedList?.length === 0 ? (
               <div className="text-center p-4 text-muted-foreground text-sm">No executions found.</div>
             ) : (
-              unifiedList?.map((execution, idx) => (
-                <motion.div
-                  key={execution.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.05 }}
-                  onClick={() => setSelectedExecutionId(execution.id)}
-                  className={cn(
-                    "p-3 rounded-lg cursor-pointer transition-all border",
-                    selectedExecutionId === execution.id
-                      ? 'bg-primary/10 border-primary/30 shadow-sm'
-                      : 'bg-card border-transparent hover:border-border hover:shadow-sm'
-                  )}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-mono text-xs font-medium bg-muted px-1.5 py-0.5 rounded opacity-70">
-                      {execution.syllabus_row?.lessonId || execution.task_type || 'Task'}
-                    </span>
-                    <StatusBadge status={(execution.status as ExecutionStatus) || 'pending'} size="sm" showIcon={false} />
-                  </div>
-                  <p className="text-sm font-medium truncate mb-2">
-                    {execution.syllabus_row?.lessonTitle || execution.task_type || 'Unknown AI Task'}
-                  </p>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{execution.completed_steps || 0}/{execution.total_steps || 1} steps</span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {formatDistanceToNow(new Date(execution.created_at || new Date()), { addSuffix: true })}
-                    </span>
-                  </div>
-                </motion.div>
-              ))
+              unifiedList?.map((execution, idx) => {
+                const item = execution as ExecutionOrTask;
+                const isAiTask = isExtendedTask(item);
+                const label = item.syllabus_row?.lessonId || (isAiTask ? item.task_type : 'Task');
+                const title = item.syllabus_row?.lessonTitle || (isAiTask ? item.task_type : 'Unknown AI Task');
+
+                return (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    onClick={() => setSelectedExecutionId(item.id)}
+                    className={cn(
+                      "p-3 rounded-lg cursor-pointer transition-all border",
+                      selectedExecutionId === item.id
+                        ? 'bg-primary/10 border-primary/30 shadow-sm'
+                        : 'bg-card border-transparent hover:border-border hover:shadow-sm'
+                    )}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-mono text-xs font-medium bg-muted px-1.5 py-0.5 rounded opacity-70">
+                        {label}
+                      </span>
+                      <StatusBadge status={(item.status as ExecutionStatus) || 'pending'} size="sm" showIcon={false} />
+                    </div>
+                    <p className="text-sm font-medium truncate mb-2">
+                      {title}
+                    </p>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{item.completed_steps || 0}/{item.total_steps || 1} steps</span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {formatDistanceToNow(new Date(item.created_at || new Date()), { addSuffix: true })}
+                      </span>
+                    </div>
+                  </motion.div>
+                );
+              })
             )
           )}
         </div>
