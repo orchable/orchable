@@ -6,19 +6,48 @@ export const taskActionService = {
 	 * Deletes a batch and all its associated tasks.
 	 * Uses the RPC function delete_batch_cascade in Supabase to ensure clean deletion.
 	 */
-	async deleteBatch(batchId: string): Promise<void> {
+	async deleteBatch(batchOrLaunchId: string): Promise<void> {
 		const adapter = storage.adapter;
 		if (adapter.constructor.name === "IndexedDBAdapter") {
-			await adapter.deleteBatch(batchId);
+			const { db } = await import("@/lib/storage/IndexedDBAdapter");
+			await db.transaction(
+				"rw",
+				db.task_batches,
+				db.ai_tasks,
+				async () => {
+					const batches = await db.task_batches
+						.where("launch_id")
+						.equals(batchOrLaunchId)
+						.toArray();
+					if (batches.length > 0) {
+						for (const b of batches) {
+							await db.ai_tasks
+								.where("batch_id")
+								.equals(b.id)
+								.delete();
+						}
+						const batchIds = batches.map((b) => b.id);
+						await db.task_batches.bulkDelete(batchIds);
+					} else {
+						await db.ai_tasks
+							.where("batch_id")
+							.equals(batchOrLaunchId)
+							.delete();
+						await db.task_batches.delete(batchOrLaunchId);
+					}
+				},
+			);
 			return;
 		}
 
-		const { error } = await supabase.rpc("delete_batch_cascade", {
-			p_batch_id: batchId,
-		});
+		// Supabase handles cascade via foreign keys
+		const { error } = await supabase
+			.from("task_batches")
+			.delete()
+			.or(`launch_id.eq.${batchOrLaunchId},id.eq.${batchOrLaunchId}`);
 
 		if (error) {
-			console.error("Error deleting batch:", error);
+			console.error("Error deleting batch/launch:", error);
 			throw error;
 		}
 	},

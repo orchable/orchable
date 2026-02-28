@@ -144,10 +144,14 @@ export const batchService = {
 						ns.cardinality === "1:N" ||
 						ns.cardinality === "one_to_many"
 							? "one_to_many"
-							: "one_to_one",
+							: ns.cardinality === "N:1" ||
+								  ns.cardinality === "many_to_one"
+								? "many_to_one"
+								: "one_to_one",
 					split_path: ns.split_path || "result.questions",
 					split_mode: ns.split_mode || "per_item",
 					output_mapping: ns.output_mapping || "result",
+					batch_grouping: ns.batch_grouping || null,
 					delimiters: ns.contract?.input?.delimiters,
 				})),
 				delimiters: firstStage.contract?.input?.delimiters,

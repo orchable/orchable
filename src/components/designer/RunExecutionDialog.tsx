@@ -20,6 +20,7 @@ import { ExecutionMonitor } from './ExecutionMonitor';
 import { analyzeJsonStructure, isStructureCompatible, AnalysisResult, FieldInfo } from '@/lib/jsonAnalyzer';
 import { batchService } from '@/services/batchService';
 import { useTier } from '@/hooks/useTier';
+import { keyPoolService } from '@/services/keyPoolService';
 
 interface RunExecutionDialogProps {
     disabled?: boolean;
@@ -55,8 +56,8 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
                     }
 
                     // CHECK FOR STRUCTURAL COMPATIBILITY
-                    const savedMapping = config?.input_mapping as Record<string, any>;
-                    const isCompatible = isStructureCompatible(savedMapping, analysis);
+                    const savedMapping = config?.input_mapping as Record<string, unknown>;
+                    const isCompatible = isStructureCompatible(savedMapping as any, analysis);
 
                     if (isCompatible && savedMapping) {
                         setInputData({
@@ -133,10 +134,10 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
 
         try {
             // Get input items
-            let inputItems: any[];
-            const currentInputData = inputData as Record<string, any>;
+            let inputItems: Record<string, unknown>[];
+            const currentInputData = inputData as Record<string, unknown>;
             if (currentInputData.mode === 'tsv') {
-                inputItems = currentInputData.syllabusData;
+                inputItems = currentInputData.syllabusData as Record<string, unknown>[];
             } else {
                 const { processTaskData } = await import('@/lib/jsonAnalyzer');
                 inputItems = (currentInputData.jsonAnalysis as AnalysisResult).sampleTasks.map((task: Record<string, unknown>) => {
@@ -179,9 +180,10 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
             const execPath = await getExecutionPath(tier);
 
             if (execPath === 'web-worker') {
-                // BYOK path: check for local API key
-                const geminiApiKey = localStorage.getItem("orchable_gemini_api_key");
-                if (geminiApiKey) {
+                // BYOK path: check for personal keys in Supabase (resolved via service)
+                const hasKeys = await keyPoolService.hasPersonalKeys();
+
+                if (hasKeys || tier === 'premium') {
                     const { executorService } = await import('@/services/executorService');
                     executorService.start(tier);
                     toast.success(`Local executor started for ${inputItems.length} pipelines (Batch: ${batch.id.slice(0, 8)})`);

@@ -564,9 +564,19 @@ async function handleNextStages(
 		{};
 	const cardinality = currentStageConfig.cardinality || "one_to_one";
 
-	if (cardinality === "many_to_one" || cardinality === "N:1") {
+	const hasMergeChild = nextStageConfigs.some(
+		(c) => c.cardinality === "many_to_one" || c.cardinality === "N:1",
+	);
+
+	if (
+		cardinality === "many_to_one" ||
+		cardinality === "N:1" ||
+		hasMergeChild
+	) {
 		// N:1 logic: Wait for siblings, then aggregate
 		await handleManyToOne(task, result, template, nextStageConfigs);
+		// Note: We return here because handleManyToOne will also create any non-merge branches
+		// if it's the last sibling. If it's NOT the last sibling, we shouldn't create anything.
 		return;
 	}
 
@@ -718,9 +728,17 @@ async function handleNextStages(
 			}
 		}
 	} else {
-		// 1:1 workflow
+		// Standard 1:1 or 1:N branching
 		for (const nextConfig of nextStageConfigs) {
-			const nextTemplateId = nextConfig.template_id;
+			// CRITICAL: Skip N:1 children here, they are handled by handleManyToOne
+			if (
+				nextConfig.cardinality === "many_to_one" ||
+				nextConfig.cardinality === "N:1"
+			) {
+				continue;
+			}
+
+			const nextTemplateId = nextConfig.template_id as string;
 			const nextTemplate = await db.prompt_templates.get(nextTemplateId);
 			if (!nextTemplate) continue;
 
