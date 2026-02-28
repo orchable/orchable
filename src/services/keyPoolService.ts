@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { UserTier } from "@/lib/storage";
+import { db } from "@/lib/storage/IndexedDBAdapter";
 
 export interface KeyConfig {
 	type: "personal" | "pool";
@@ -15,15 +16,34 @@ export const keyPoolService = {
 		} = await supabase.auth.getUser();
 		if (!user) throw new Error("Authentication required to resolve keys.");
 
-		// 1. Fetch personal keys from user_api_keys
-		const { data: personalKeys, error } = await supabase
-			.from("user_api_keys")
-			.select("*")
-			.eq("user_id", user.id)
-			.eq("pool_type", "personal");
+		// 1. Fetch personal keys based on tier
+		let personalKeys: { api_key_encrypted: string }[] = [];
 
-		if (error) {
-			console.error("Error fetching personal keys:", error);
+		if (tier === "free") {
+			// Fetch from local IndexedDB
+			const localKeys = await db.user_api_keys
+				.where("pool_type")
+				.equals("personal")
+				.toArray();
+			personalKeys = localKeys.map((k) => ({
+				api_key_encrypted: k.api_key_encrypted,
+			}));
+		} else {
+			// Premium: Fetch from Supabase
+			const { data, error } = await supabase
+				.from("user_api_keys")
+				.select("*")
+				.eq("user_id", user.id)
+				.eq("pool_type", "personal");
+
+			if (error) {
+				console.error(
+					"Error fetching personal keys from Supabase:",
+					error,
+				);
+			} else {
+				personalKeys = data || [];
+			}
 		}
 
 		// 2. If user has personal keys, return them (with tier-based limits)
@@ -31,7 +51,7 @@ export const keyPoolService = {
 			const limit = tier === "premium" ? Infinity : 3;
 			return personalKeys.slice(0, limit).map((k) => ({
 				type: "personal",
-				apiKey: k.api_key_encrypted, // In a real app, this would be decrypted or use Vault secret ID
+				apiKey: k.api_key_encrypted,
 			}));
 		}
 
@@ -50,7 +70,15 @@ export const keyPoolService = {
 		];
 	},
 
-	async hasPersonalKeys(): Promise<boolean> {
+	async hasPersonalKeys(tier?: UserTier): Promise<boolean> {
+		if (tier === "free") {
+			const count = await db.user_api_keys
+				.where("pool_type")
+				.equals("personal")
+				.count();
+			return count > 0;
+		}
+
 		const {
 			data: { user },
 		} = await supabase.auth.getUser();

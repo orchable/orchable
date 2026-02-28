@@ -10,6 +10,7 @@ import {
 	DocumentAsset,
 } from "../types";
 import { TaskSummary as AiTask } from "../../services/executionTrackingService";
+import { AIModelSetting } from "../types";
 
 export interface MetadataValue {
 	count: number;
@@ -31,12 +32,21 @@ export class OrchableDatabase extends Dexie {
 		created_at: string;
 	}>;
 	document_assets!: Table<DocumentAsset>;
+	user_api_keys!: Table<{
+		id: string;
+		key_name: string;
+		api_key_encrypted: string;
+		pool_type: "personal" | "free_pool" | "premium_pool";
+		created_at: string;
+		user_id: string;
+	}>;
+	ai_model_settings!: Table<AIModelSetting>;
 
 	constructor() {
 		super("orchable_db");
 		this.version(7).stores({
 			task_batches:
-				"id, status, created_at, orchestrator_config_id, launch_id",
+				"id, status, created_at, orchestrator_config_id, launch_id, execution_delay_seconds",
 			ai_tasks:
 				"id, batch_id, status, stage_key, [batch_id+stage_key], launch_id, [launch_id+stage_key]",
 			prompt_templates: "id, name, stage_key, organization_code",
@@ -45,6 +55,17 @@ export class OrchableDatabase extends Dexie {
 			orchestrator_configs: "id, name, created_at",
 			assets: "id, name, type",
 			document_assets: "id, name, user_id, config_id",
+			user_api_keys: "id, key_name, pool_type, user_id",
+		});
+		this.version(9).stores({
+			task_batches:
+				"id, status, created_at, orchestrator_config_id, launch_id, execution_delay_seconds",
+		});
+		this.version(10).stores({
+			user_api_keys: "id, key_name, pool_type, user_id",
+		});
+		this.version(11).stores({
+			ai_model_settings: "id, model_id, is_active",
 		});
 	}
 
@@ -174,6 +195,15 @@ export class IndexedDBAdapter implements IStorageAdapter {
 		await db.custom_components.put(component);
 	}
 
+	// AI Model Settings
+	async listAiModelSettings(): Promise<AIModelSetting[]> {
+		return db.ai_model_settings.toArray();
+	}
+
+	async upsertAiModelSetting(setting: AIModelSetting): Promise<void> {
+		await db.ai_model_settings.put(setting);
+	}
+
 	// Configs
 	async saveConfig(
 		config: Partial<OrchestratorConfig>,
@@ -293,5 +323,34 @@ export class IndexedDBAdapter implements IStorageAdapter {
 		});
 
 		return `local://documents/${assetId}`;
+	}
+
+	// API Keys
+	async listKeys(): Promise<
+		{
+			id: string;
+			key_name: string;
+			pool_type: "personal" | "free_pool" | "premium_pool";
+			created_at: string;
+		}[]
+	> {
+		return db.user_api_keys.toArray();
+	}
+
+	async upsertKey(key: {
+		id: string;
+		key_name: string;
+		api_key_encrypted: string;
+		pool_type: "personal" | "free_pool" | "premium_pool";
+		user_id: string;
+	}): Promise<void> {
+		await db.user_api_keys.put({
+			...key,
+			created_at: new Date().toISOString(),
+		});
+	}
+
+	async deleteKey(id: string): Promise<void> {
+		await db.user_api_keys.delete(id);
 	}
 }

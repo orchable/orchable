@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/storage/IndexedDBAdapter";
 import { useAuth } from "@/hooks/useAuth";
 import { useTier } from "@/hooks/useTier";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,22 +36,30 @@ export function ApiKeyManager() {
         if (!user) return;
         setIsLoading(true);
         try {
-            const { data, error } = await supabase
-                .from('user_api_keys')
-                .select('id, key_name, pool_type, created_at')
-                .eq('user_id', user.id)
-                .eq('pool_type', 'personal')
-                .order('created_at', { ascending: false });
+            if (tier === 'free') {
+                const localKeys = await db.user_api_keys
+                    .where('pool_type')
+                    .equals('personal')
+                    .toArray();
+                setKeys(localKeys || []);
+            } else {
+                const { data, error } = await supabase
+                    .from('user_api_keys')
+                    .select('id, key_name, pool_type, created_at')
+                    .eq('user_id', user.id)
+                    .eq('pool_type', 'personal')
+                    .order('created_at', { ascending: false });
 
-            if (error) throw error;
-            setKeys(data || []);
+                if (error) throw error;
+                setKeys(data || []);
+            }
         } catch (err) {
             console.error("Failed to fetch keys:", err);
             toast.error("Failed to load API keys");
         } finally {
             setIsLoading(false);
         }
-    }, [user]);
+    }, [user, tier]);
 
     useEffect(() => {
         fetchKeys();
@@ -63,19 +72,35 @@ export function ApiKeyManager() {
             return;
         }
 
+        const trimmedKey = newKeyValue.trim();
+        if (!trimmedKey.startsWith("AIza") || trimmedKey.length < 30) {
+            toast.error("Invalid Gemini API Key format. It should start with 'AIza'.");
+            return;
+        }
+
         setIsAdding(true);
         try {
-            // Note: In production, the backend/RPC handles encryption or vault.create_secret
-            const { error } = await supabase
-                .from('user_api_keys')
-                .insert({
+            if (tier === 'free') {
+                await db.user_api_keys.put({
+                    id: crypto.randomUUID(),
                     user_id: user.id,
-                    key_name: newKeyName,
-                    api_key_encrypted: newKeyValue, // Temporary until vault RPC is active
-                    pool_type: 'personal'
+                    key_name: newKeyName.trim(),
+                    api_key_encrypted: trimmedKey,
+                    pool_type: 'personal',
+                    created_at: new Date().toISOString()
                 });
+            } else {
+                const { error } = await supabase
+                    .from('user_api_keys')
+                    .insert({
+                        user_id: user.id,
+                        key_name: newKeyName.trim(),
+                        api_key_encrypted: trimmedKey,
+                        pool_type: 'personal'
+                    });
 
-            if (error) throw error;
+                if (error) throw error;
+            }
 
             toast.success("API Key added successfully");
             setNewKeyName("");
@@ -91,15 +116,19 @@ export function ApiKeyManager() {
 
     async function handleDeleteKey(id: string) {
         try {
-            const { error } = await supabase
-                .from('user_api_keys')
-                .delete()
-                .eq('id', id);
+            if (tier === 'free') {
+                await db.user_api_keys.delete(id);
+            } else {
+                const { error } = await supabase
+                    .from('user_api_keys')
+                    .delete()
+                    .eq('id', id);
 
-            if (error) throw error;
+                if (error) throw error;
+            }
 
             toast.success("API Key removed");
-            setKeys(keys.filter(k => k.id !== id));
+            fetchKeys();
         } catch (err) {
             console.error("Failed to delete key:", err);
             toast.error("Failed to delete API key");

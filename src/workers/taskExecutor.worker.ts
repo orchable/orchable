@@ -490,6 +490,7 @@ async function processTask(task: AiTask) {
 			mergedAiSettings,
 			task.batch_id,
 			globalContextStr,
+			task.id,
 		);
 
 		// --- SUPPORT: return-along-with ---
@@ -553,6 +554,7 @@ async function processTask(task: AiTask) {
 		await db.ai_tasks.update(task.id, {
 			status: "completed",
 			output_data: result,
+			error_message: null,
 			completed_at: new Date().toISOString(),
 		});
 
@@ -655,6 +657,7 @@ async function callGemini(
 	aiSettings: AISettings,
 	batchId?: string,
 	globalContextStr?: string,
+	taskId?: string,
 ) {
 	const keySelection = keyManager.getBestKey();
 
@@ -795,6 +798,14 @@ async function callGemini(
 				console.log(
 					`[Worker] Waiting ${Math.round(delayMs / 1000)}s before retry...`,
 				);
+
+				// Phase 14: Persist transient error message so UI can show it while "processing"
+				if (taskId) {
+					await db.ai_tasks.update(taskId, {
+						error_message: `Rate limited (429). Retrying in ${Math.round(delayMs / 1000)}s... (Attempt ${attempt + 1}/${maxRetries})`,
+					});
+				}
+
 				await new Promise((resolve) => setTimeout(resolve, delayMs));
 				attempt++;
 				continue;

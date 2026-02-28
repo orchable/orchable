@@ -31,11 +31,11 @@ INSERT INTO public.ai_model_settings (
     'Optimized for latency and efficiency with advanced reasoning capabilities.', 
     '["text", "image", "video", "audio", "pdf"]'::jsonb, 
     '["text"]'::jsonb, 
-    1000000, 8192, 
+    1000000, 65536, 
     '{"thinking": true, "function_calling": true, "search_grounding": true, "code_execution": true}'::jsonb, 
     5, 250000, 20, 
     '["fast", "reasoning", "multimodal"]'::jsonb,
-    1.0, 0.95, 40, 8192, true
+    1.0, 0.95, 40, 65536, true
 ),
 -- Gemini 2.5 Flash
 (
@@ -46,11 +46,11 @@ INSERT INTO public.ai_model_settings (
     'Massive context window with robust multimodal understanding and reasoning.', 
     '["text", "image", "video", "audio", "pdf"]'::jsonb, 
     '["text"]'::jsonb, 
-    1000000, 8192, 
+    1000000, 65536, 
     '{"thinking": true, "function_calling": true, "search_grounding": true, "code_execution": true}'::jsonb, 
     5, 250000, 20, 
     '["balanced", "reasoning", "multimodal"]'::jsonb,
-    1.0, 0.95, 40, 8192, true
+    1.0, 0.95, 40, 65536, true
 ),
 -- Gemini 2.5 Flash Lite
 (
@@ -61,11 +61,11 @@ INSERT INTO public.ai_model_settings (
     'Best for high-volume, low-complexity tasks. Generous free tier quotas.', 
     '["text", "image", "video", "audio", "pdf"]'::jsonb, 
     '["text"]'::jsonb, 
-    1000000, 8192, 
+    1000000, 65536, 
     '{"function_calling": true, "search_grounding": true}'::jsonb, 
     10, 250000, 20, 
     '["chat", "fast", "lite"]'::jsonb,
-    1.0, 0.95, 40, 8192, true
+    1.0, 0.95, 40, 65536, true
 ),
 -- Gemma 3 27B
 (

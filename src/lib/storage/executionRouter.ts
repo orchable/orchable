@@ -4,9 +4,8 @@ import { keyPoolService } from "../../services/keyPoolService";
 export type ExecutionPath = "web-worker" | "supabase-n8n";
 
 export async function getExecutionPath(tier: UserTier): Promise<ExecutionPath> {
-	// ... (no changes to existing logic)
 	if (tier === "free") {
-		const hasKeys = await keyPoolService.hasPersonalKeys();
+		const hasKeys = await keyPoolService.hasPersonalKeys(tier);
 		if (hasKeys) {
 			return "web-worker";
 		}
@@ -21,7 +20,7 @@ export type TierSource =
 	| "premium_byok";
 
 export async function getTierSource(tier: UserTier): Promise<TierSource> {
-	const hasKeys = await keyPoolService.hasPersonalKeys();
+	const hasKeys = await keyPoolService.hasPersonalKeys(tier);
 	if (tier === "premium") {
 		return hasKeys ? "premium_byok" : "premium_pool";
 	}

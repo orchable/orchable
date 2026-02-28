@@ -62,8 +62,10 @@ import { supabase } from "@/lib/supabase";
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useTier } from '@/hooks/useTier';
 import { ComponentEditor } from '@/components/batch/ComponentEditor';
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { db } from '@/lib/storage/IndexedDBAdapter';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { PromptEditorDialog } from '@/components/designer/PromptEditorDialog';
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -107,6 +109,7 @@ export function AssetLibrary() {
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
     const { user } = useAuth();
+    const { tier } = useTier();
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -124,7 +127,23 @@ export function AssetLibrary() {
             ]);
             setComponents(comps);
             if (tplList.data) setTemplates(tplList.data);
-            if (aiList.data) setAiSettings(aiList.data);
+
+            if (aiList.data) {
+                // If Free Tier, load local overrides from IndexedDB
+                if (tier === 'free') {
+                    const localSettings = await db.ai_model_settings.toArray();
+                    const mergedSettings = aiList.data.map(globalSetting => {
+                        const localOverride = localSettings.find(ls => ls.model_id === globalSetting.model_id);
+                        if (localOverride) {
+                            return { ...globalSetting, ...localOverride, id: globalSetting.id }; // Keep global ID but use local values
+                        }
+                        return globalSetting;
+                    });
+                    setAiSettings(mergedSettings);
+                } else {
+                    setAiSettings(aiList.data);
+                }
+            }
             if (docList.data) setDocuments(docList.data as DocumentAsset[]);
         } catch (error) {
             console.error('Failed to fetch assets:', error);
@@ -242,19 +261,53 @@ export function AssetLibrary() {
         if (!editingAiSetting) return;
         setIsSavingAiSetting(true);
         try {
-            const { error } = await supabase
-                .from('ai_model_settings')
-                .update({
-                    temperature: editingAiSetting.temperature,
-                    top_k: editingAiSetting.top_k,
-                    top_p: editingAiSetting.top_p,
-                    max_output_tokens: editingAiSetting.max_output_tokens,
-                    timeout_ms: editingAiSetting.timeout_ms,
-                    retries: editingAiSetting.retries
-                })
-                .eq('id', editingAiSetting.id);
+            // Check if the setting is owned by the user or a system global setting.
+            // Fast approach: we perform an upsert on model_id + user_id.
+            if (!user) throw new Error("Must be logged in to save settings.");
 
-            if (error) throw error;
+            const { data: existingUserSetting } = await supabase
+                .from('ai_model_settings')
+                .select('id')
+                .eq('user_id', user.id)
+                .eq('model_id', editingAiSetting.model_id)
+                .single();
+
+            const payload = {
+                model_id: editingAiSetting.model_id,
+                name: editingAiSetting.name,
+                category: editingAiSetting.category,
+                tagline: editingAiSetting.tagline,
+                description: editingAiSetting.description,
+                supported_inputs: editingAiSetting.supported_inputs,
+                supported_outputs: editingAiSetting.supported_outputs,
+                input_token_limit: editingAiSetting.input_token_limit,
+                output_token_limit: editingAiSetting.output_token_limit,
+                capabilities: editingAiSetting.capabilities,
+                temperature: editingAiSetting.temperature,
+                top_k: editingAiSetting.top_k,
+                top_p: editingAiSetting.top_p,
+                max_output_tokens: editingAiSetting.max_output_tokens,
+                timeout_ms: editingAiSetting.timeout_ms,
+                retries: editingAiSetting.retries,
+                user_id: user.id
+            };
+
+            let saveError;
+            if (existingUserSetting) {
+                const { error } = await supabase
+                    .from('ai_model_settings')
+                    .update(payload)
+                    .eq('id', existingUserSetting.id);
+                saveError = error;
+            } else {
+                const { error } = await supabase
+                    .from('ai_model_settings')
+                    .insert(payload);
+                saveError = error;
+            }
+
+            if (saveError) throw saveError;
+
             toast.success('AI default settings updated');
             setIsAiSettingEditorOpen(false);
             fetchAssets();
@@ -307,10 +360,18 @@ export function AssetLibrary() {
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
                     </div>
-                    <Button className="gap-2" onClick={handleNewComponent}>
-                        <Plus className="w-4 h-4" />
-                        New Asset
-                    </Button>
+                    {activeTab === 'components' && (
+                        <Button className="gap-2" onClick={handleNewComponent}>
+                            <Plus className="w-4 h-4" />
+                            New Component
+                        </Button>
+                    )}
+                    {activeTab === 'documents' && (
+                        <Button className="gap-2" onClick={() => setIsUploadModalOpen(true)}>
+                            <Plus className="w-4 h-4" />
+                            Upload Document
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -766,6 +827,78 @@ export function AssetLibrary() {
                 delimiters={promptDelimiters}
                 onDelimitersChange={setPromptDelimiters}
             />
+
+            <Dialog open={isAiSettingEditorOpen} onOpenChange={setIsAiSettingEditorOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Edit AI Defaults</DialogTitle>
+                        <DialogDescription>
+                            Configure default parameters for {editingAiSetting?.name}. These can be overridden per task.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {editingAiSetting && (
+                        <div className="grid gap-4 py-4">
+                            <div className="grid gap-2">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="temperature">Temperature</Label>
+                                    <span className="text-sm text-muted-foreground">{editingAiSetting.temperature}</span>
+                                </div>
+                                <Slider
+                                    id="temperature"
+                                    min={0}
+                                    max={2}
+                                    step={0.1}
+                                    value={[editingAiSetting.temperature]}
+                                    onValueChange={([v]) => setEditingAiSetting({ ...editingAiSetting, temperature: v })}
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="top_p">Top-P</Label>
+                                    <span className="text-sm text-muted-foreground">{editingAiSetting.top_p}</span>
+                                </div>
+                                <Slider
+                                    id="top_p"
+                                    min={0}
+                                    max={1}
+                                    step={0.05}
+                                    value={[editingAiSetting.top_p || 0.95]}
+                                    onValueChange={([v]) => setEditingAiSetting({ ...editingAiSetting, top_p: v })}
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="top_k">Top-K</Label>
+                                    <span className="text-sm text-muted-foreground">{editingAiSetting.top_k}</span>
+                                </div>
+                                <Slider
+                                    id="top_k"
+                                    min={1}
+                                    max={100}
+                                    step={1}
+                                    value={[editingAiSetting.top_k || 40]}
+                                    onValueChange={([v]) => setEditingAiSetting({ ...editingAiSetting, top_k: v })}
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="max_tokens">Max Output Tokens</Label>
+                                <Input
+                                    id="max_tokens"
+                                    type="number"
+                                    value={editingAiSetting.max_output_tokens}
+                                    onChange={(e) => setEditingAiSetting({ ...editingAiSetting, max_output_tokens: parseInt(e.target.value) || 8192 })}
+                                />
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsAiSettingEditorOpen(false)}>Cancel</Button>
+                        <Button onClick={handleSaveAiSetting} disabled={isSavingAiSetting}>
+                            {isSavingAiSetting ? 'Saving...' : 'Save changes'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <ShareToHubDialog
                 open={isShareDialogOpen}

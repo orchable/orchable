@@ -151,7 +151,15 @@ export function TaskHierarchyTree({ tasks }: TaskHierarchyTreeProps) {
                         </div>
                     </TableCell>
                     <TableCell className="py-2">
-                        <StatusBadge status={(task.status || 'pending') as ExecutionStatus} size="sm" />
+                        <div className="flex flex-col gap-1">
+                            <StatusBadge status={(task.status || 'pending') as ExecutionStatus} size="sm" />
+                            {task.status === 'processing' && task.error_message && (
+                                <div className="flex items-center gap-1 text-[10px] text-warning animate-pulse">
+                                    <Clock className="w-2.5 h-2.5" />
+                                    <span className="truncate max-w-[150px]">{task.error_message}</span>
+                                </div>
+                            )}
+                        </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs font-mono py-2">
                         {task.started_at ? (

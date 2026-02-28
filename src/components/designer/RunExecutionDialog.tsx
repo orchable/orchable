@@ -184,8 +184,14 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
             const execPath = await getExecutionPath(tier);
 
             if (execPath === 'web-worker') {
-                // BYOK path: check for personal keys in Supabase (resolved via service)
-                const hasKeys = await keyPoolService.hasPersonalKeys();
+                // BYOK path: check for personal keys in appropriate storage (IndexedDB for free, Supabase for premium)
+                const hasKeys = await keyPoolService.hasPersonalKeys(tier);
+
+                if (tier === 'free' && !hasKeys) {
+                    toast.error('Free Tier requires a personal Gemini API Key. Please add one in Settings.');
+                    setIsCreating(false);
+                    return;
+                }
 
                 if (hasKeys || tier === 'premium') {
                     const { executorService } = await import('@/services/executorService');
