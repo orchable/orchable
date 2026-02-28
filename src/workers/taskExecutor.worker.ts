@@ -15,6 +15,7 @@ export type WorkerStatus =
 	| { type: "BATCH_COMPLETE"; batchId: string };
 
 let isRunning = false;
+let isLooping = false;
 let currentConfigs: KeyConfig[] = [];
 let currentConfigIndex = 0;
 let currentTier = "free";
@@ -30,7 +31,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 		console.log(
 			`[Worker] Started processing loop (Tier: ${currentTier}, Keys: ${currentConfigs.length})`,
 		);
-		runLoop();
+		if (!isLooping) runLoop();
 	} else if (data.type === "STOP") {
 		isRunning = false;
 		currentConfigs = [];
@@ -39,6 +40,8 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 };
 
 async function runLoop() {
+	if (isLooping) return;
+	isLooping = true;
 	while (isRunning) {
 		try {
 			// 1. Get next 'plan' task, prioritized by step_number and age
@@ -563,7 +566,7 @@ async function handleNextStages(
 
 	if (cardinality === "many_to_one" || cardinality === "N:1") {
 		// N:1 logic: Wait for siblings, then aggregate
-		await handleManyToOne(task, result, template);
+		await handleManyToOne(task, result, template, nextStageConfigs);
 		return;
 	}
 
@@ -769,6 +772,7 @@ async function handleManyToOne(
 	task: AiTask,
 	result: unknown,
 	template: PromptTemplate,
+	nextStageConfigs: Record<string, unknown>[],
 ) {
 	const extra = (task.extra || {}) as Record<string, unknown>;
 	const currentStageConfig =
@@ -779,169 +783,177 @@ async function handleManyToOne(
 	const batchId = task.batch_id;
 	const launchId = task.launch_id;
 	const stageKey = task.stage_key;
-	const grouping = currentStageConfig.batch_grouping || "batch";
+
+	// Determine grouping: Check if ANY next stage is a global merge
+	const isGlobalMerge = nextStageConfigs.some(
+		(c) =>
+			(c.cardinality === "many_to_one" || c.cardinality === "N:1") &&
+			c.batch_grouping === "global",
+	);
+
+	const grouping = isGlobalMerge
+		? "global"
+		: (currentStageConfig.batch_grouping as string) || "batch";
 
 	if (!batchId && !launchId) return;
 
-	// 1. Determine the scope of tasks to merge
-	let scopeTasks: AiTask[];
-	if (grouping === "global" && launchId) {
-		console.log(`[Worker] M:1 Global Merge for launch: ${launchId}`);
-		scopeTasks = await db.ai_tasks
-			.where("launch_id")
-			.equals(launchId)
-			.toArray();
-	} else if (batchId) {
-		console.log(`[Worker] M:1 Batch Merge for batch: ${batchId}`);
-		scopeTasks = await db.ai_tasks
-			.where("batch_id")
-			.equals(batchId)
-			.toArray();
-	} else {
-		return;
-	}
-
-	// 2. Identify if any task is still upstream and could generate more siblings.
-	const isStreamFinished = scopeTasks.every((t) => {
-		// Ignore self
-		if (t.id === task.id) return true;
-
-		// Only block on UPSTREAM tasks (lower step_number) that could generate more siblings
-		if (
-			(t.status === "plan" ||
-				t.status === "processing" ||
-				t.status === "pending") &&
-			t.stage_key !== stageKey &&
-			(t.step_number || 0) < (task.step_number || 0)
-		) {
-			return false; // Still processing upstream tasks
+	// Use a transaction to ensure atomicity and prevent duplicate merge tasks
+	await db.transaction("rw", db.ai_tasks, db.task_batches, async () => {
+		// 1. Determine the scope of tasks to merge (Re-fetch inside transaction)
+		let scopeTasks: AiTask[];
+		if (grouping === "global" && launchId) {
+			scopeTasks = await db.ai_tasks
+				.where("launch_id")
+				.equals(launchId)
+				.toArray();
+		} else if (batchId) {
+			scopeTasks = await db.ai_tasks
+				.where("batch_id")
+				.equals(batchId)
+				.toArray();
+		} else {
+			return;
 		}
-		return true;
-	});
 
-	if (!isStreamFinished) {
-		console.log("[Worker] Upstream tasks still active, waiting...");
-		return;
-	}
-
-	// 3. Check if all siblings in THIS stage are done
-	const siblings = scopeTasks.filter((t) => t.stage_key === stageKey);
-	const allSiblingsDone = siblings.every(
-		(s) =>
-			s.id === task.id ||
-			s.status === "completed" ||
-			s.status === "failed",
-	);
-
-	if (!allSiblingsDone) {
-		console.log(
-			`[Worker] Waiting for ${siblings.filter((s) => s.status !== "completed" && s.status !== "failed").length} siblings...`,
-		);
-		return;
-	}
-
-	// 2. Aggregate data
-	const mergePath = (currentStageConfig.merge_path as string) || null;
-	// Only aggregate outputs from COMPLETED siblings (exclude failed)
-	const completedSiblings = siblings.filter(
-		(s) => s.status === "completed" || s.id === task.id,
-	);
-	const allOutputs = completedSiblings
-		.map((s) =>
-			s.id === task.id
-				? (result as Record<string, unknown>)
-				: (s.output_data as Record<string, unknown>),
-		)
-		.filter(Boolean);
-
-	let aggregatedData: unknown[] = [];
-	if (mergePath) {
-		for (const curr of allOutputs) {
-			const val = (curr as Record<string, unknown>)?.[mergePath];
-			if (Array.isArray(val)) {
-				aggregatedData = aggregatedData.concat(val);
-			} else if (val != null) {
-				aggregatedData.push(val);
+		// 2. Identify if any task is still upstream and could generate more siblings.
+		const isStreamFinished = scopeTasks.every((t) => {
+			if (t.id === task.id) return true;
+			if (
+				(t.status === "plan" ||
+					t.status === "processing" ||
+					t.status === "pending") &&
+				t.stage_key !== stageKey &&
+				(t.step_number || 0) < (task.step_number || 0)
+			) {
+				return false;
 			}
+			return true;
+		});
+
+		if (!isStreamFinished) {
+			console.log("[Worker] Upstream tasks still active, waiting...");
+			return;
 		}
-	} else {
-		aggregatedData = allOutputs as unknown[];
-	}
 
-	const mergePathStr = mergePath as string | null;
-	const mergedInputData = mergePathStr
-		? { [mergePathStr]: aggregatedData }
-		: { merged_data: aggregatedData };
-
-	// 3. Create next tasks
-	let nextStageConfigs =
-		(extra.next_stage_configs as Record<string, unknown>[]) || [];
-	if (nextStageConfigs.length === 0 && template.next_stage_template_ids) {
-		nextStageConfigs = await Promise.all(
-			template.next_stage_template_ids.map(async (id) => {
-				const tpl = await db.prompt_templates.get(id);
-				const sc = (tpl?.stage_config as Record<string, unknown>) || {};
-				return {
-					template_id: id,
-					cardinality: sc.cardinality || "one_to_one",
-					split_path: sc.split_path || null,
-					split_mode: sc.split_mode || "per_item",
-					merge_path: sc.merge_path || null,
-					output_mapping: sc.output_mapping || "result",
-					batch_grouping: sc.batch_grouping || null,
-					requires_approval: sc.requires_approval || false,
-				};
-			}),
+		// 3. Check if all siblings in THIS stage are done
+		const siblings = scopeTasks.filter((t) => t.stage_key === stageKey);
+		const allSiblingsDone = siblings.every(
+			(s) =>
+				s.id === task.id ||
+				s.status === "completed" ||
+				s.status === "failed",
 		);
-	}
 
-	for (const nextConfig of nextStageConfigs) {
-		const nextTemplateId = nextConfig.template_id;
-		const nextTemplate = await db.prompt_templates.get(nextTemplateId);
-		if (!nextTemplateId) continue;
+		if (!allSiblingsDone) {
+			return;
+		}
 
-		await db.ai_tasks.add({
-			id: crypto.randomUUID(),
-			batch_id: batchId,
-			stage_key:
+		// 4. Aggregate data
+		const mergePath = (currentStageConfig.merge_path as string) || null;
+		const completedSiblings = siblings.filter(
+			(s) => s.status === "completed" || s.id === task.id,
+		);
+		const allOutputs = completedSiblings
+			.map((s) =>
+				s.id === task.id
+					? (result as Record<string, unknown>)
+					: (s.output_data as Record<string, unknown>),
+			)
+			.filter(Boolean);
+
+		let aggregatedData: unknown[] = [];
+		if (mergePath) {
+			for (const curr of allOutputs) {
+				const val = (curr as Record<string, unknown>)?.[mergePath];
+				if (Array.isArray(val)) {
+					aggregatedData = aggregatedData.concat(val);
+				} else if (val != null) {
+					aggregatedData.push(val);
+				}
+			}
+		} else {
+			aggregatedData = allOutputs as unknown[];
+		}
+
+		const mergePathStr = mergePath as string | null;
+		const mergedInputData = mergePathStr
+			? { [mergePathStr]: aggregatedData }
+			: { merged_data: aggregatedData };
+
+		// 5. Use existing nextStageConfigs from arguments
+		// No need to hydrate again
+
+		// 6. Create next tasks (IF NOT ALREADY CREATED)
+		for (const nextConfig of nextStageConfigs) {
+			const nextTemplateId = nextConfig.template_id;
+			if (!nextTemplateId) continue;
+
+			const nextTemplate = await db.prompt_templates.get(nextTemplateId);
+			const nextStageKey =
 				nextTemplate?.stage_key ||
-				extractStageKey(nextTemplateId as string),
-			step_number: (task.step_number || 0) + 1,
-			status: "plan",
-			input_data: {
-				...mergedInputData,
-			},
-			parent_task_id: task.id,
-			root_task_id: task.root_task_id || task.id,
-			hierarchy_path: [...(task.hierarchy_path || []), task.id],
-			launch_id:
-				task.launch_id ||
-				((task as unknown as Record<string, unknown>)
-					.launch_id as string),
-			split_group_id:
-				((task as unknown as Record<string, unknown>)
-					.split_group_id as string) || task.id,
-			task_type: extractStageKey(nextTemplateId as string),
-			prompt_template_id: nextTemplateId as string,
-			created_at: new Date().toISOString(),
-			extra: {
-				current_stage_config: {
-					template_id: nextTemplateId as string,
-					cardinality:
-						(nextConfig.cardinality as string) || "one_to_one",
-					split_path: (nextConfig.split_path as string) || null,
-					split_mode: (nextConfig.split_mode as string) || "per_item",
-					output_mapping:
-						(nextConfig.output_mapping as string) || "result",
-					merge_path: (nextConfig.merge_path as string) || null,
+				extractStageKey(nextTemplateId as string);
+
+			// Check for existing merge task to prevent duplicates
+			// For global grouping, check across launch_id. For batch, check across batch_id.
+			let existing;
+			if (grouping === "global" && launchId) {
+				existing = await db.ai_tasks
+					.where("[launch_id+stage_key]")
+					.equals([launchId, nextStageKey])
+					.first();
+			} else {
+				existing = await db.ai_tasks
+					.where("[batch_id+stage_key]")
+					.equals([batchId, nextStageKey])
+					.first();
+			}
+
+			if (existing) {
+				console.log(
+					`[Worker] Merge task for ${nextStageKey} already exists. Skipping.`,
+				);
+				continue;
+			}
+
+			await db.ai_tasks.add({
+				id: crypto.randomUUID(),
+				batch_id: batchId,
+				stage_key: nextStageKey,
+				step_number: (task.step_number || 0) + 1,
+				status: "plan",
+				input_data: {
+					...mergedInputData,
 				},
-				parent_stage_key: task.stage_key,
 				parent_task_id: task.id,
-				_merged_from_count: siblings.length,
-			},
-		} as unknown as AiTask);
-		await incrementBatchTotalTasks(batchId, 1);
-	}
+				root_task_id: task.root_task_id || task.id,
+				hierarchy_path: [...(task.hierarchy_path || []), task.id],
+				launch_id: launchId,
+				split_group_id:
+					((task as unknown as Record<string, unknown>)
+						.split_group_id as string) || task.id,
+				task_type: extractStageKey(nextTemplateId as string),
+				prompt_template_id: nextTemplateId as string,
+				created_at: new Date().toISOString(),
+				extra: {
+					current_stage_config: {
+						template_id: nextTemplateId as string,
+						cardinality:
+							(nextConfig.cardinality as string) || "one_to_one",
+						split_path: (nextConfig.split_path as string) || null,
+						split_mode:
+							(nextConfig.split_mode as string) || "per_item",
+						output_mapping:
+							(nextConfig.output_mapping as string) || "result",
+						merge_path: (nextConfig.merge_path as string) || null,
+					},
+					parent_stage_key: task.stage_key,
+					parent_task_id: task.id,
+					_merged_from_count: completedSiblings.length,
+				},
+			} as unknown as AiTask);
+			await incrementBatchTotalTasks(batchId, 1);
+		}
+	});
 }
 
 function getValueByPath(obj: unknown, path: string): unknown {

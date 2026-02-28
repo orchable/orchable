@@ -34,11 +34,11 @@ export class OrchableDatabase extends Dexie {
 
 	constructor() {
 		super("orchable_db");
-		this.version(6).stores({
+		this.version(7).stores({
 			task_batches:
 				"id, status, created_at, orchestrator_config_id, launch_id",
 			ai_tasks:
-				"id, batch_id, status, stage_key, [batch_id+stage_key], launch_id",
+				"id, batch_id, status, stage_key, [batch_id+stage_key], launch_id, [launch_id+stage_key]",
 			prompt_templates: "id, name, stage_key, organization_code",
 			custom_components: "id, name",
 			metadata: "key", // for usage, config, etc.

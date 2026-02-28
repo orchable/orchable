@@ -42,22 +42,55 @@ class ExecutorService {
 			await import("../lib/storage/executionRouter");
 		const path = await getExecutionPath(tier);
 
+		console.log(
+			`[ExecutorService] Starting for tier: ${tier}, path: ${path}`,
+		);
+
 		if (path === "web-worker") {
-			if (!this.worker) this.initWorker();
+			if (!this.worker) {
+				console.log("[ExecutorService] Initializing new worker...");
+				this.initWorker();
+			}
 			if (this.worker) {
 				const { keyPoolService } = await import("./keyPoolService");
 				const configs = await keyPoolService.resolveKeys(tier);
 
+				console.log(
+					`[ExecutorService] Sending START to worker (${configs.length} keys)`,
+				);
 				this.worker.postMessage({ type: "START", configs, tier });
 				this.isProcessing = true;
 			}
 		} else {
 			// Supabase + n8n path
-			// The tasks are already created on Supabase via the storage adapter (SupabaseAdapter)
-			// We don't set isProcessing here because n8n runs asynchronously on server.
-			// The UI should derive status from real-time Supabase subscriptions.
 			console.log("[ExecutorService] Execution routed to Supabase + n8n");
 			this.isProcessing = false;
+		}
+	}
+
+	/**
+	 * Ensures the worker is running if there are pending tasks.
+	 * Can be called by UI components when they mount.
+	 */
+	async wakeup(tier: UserTier) {
+		if (this.isProcessing) return;
+
+		const { getExecutionPath } =
+			await import("../lib/storage/executionRouter");
+		const path = await getExecutionPath(tier);
+
+		if (path === "web-worker") {
+			const { db } = await import("../lib/storage/IndexedDBAdapter");
+			const pending = await db.ai_tasks
+				.where("status")
+				.equals("plan")
+				.count();
+			if (pending > 0) {
+				console.log(
+					`[ExecutorService] Wakeup: ${pending} pending tasks found. Starting worker.`,
+				);
+				await this.start(tier);
+			}
 		}
 	}
 

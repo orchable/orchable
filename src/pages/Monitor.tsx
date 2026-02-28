@@ -9,6 +9,7 @@ import { useExecutions, useExecution, useAiTasks } from '@/hooks/useExecutions';
 import { useStepExecutions } from '@/hooks/useStepExecutions';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import { executorService } from '@/services/executorService';
 import {
   Execution,
   StepExecution,
@@ -289,6 +290,13 @@ export function MonitorPage() {
   const { data: aiTasks, isLoading: isLoadingAi } = useAiTasks();
 
   const [viewMode, setViewMode] = useState<'batches' | 'executions'>('batches');
+
+  useEffect(() => {
+    if (tier) {
+      executorService.wakeup(tier);
+    }
+  }, [tier]);
+
   const [batches, setBatches] = useState<BatchSummary[]>([]);
   const [isLoadingBatches, setIsLoadingBatches] = useState(false);
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
@@ -563,8 +571,8 @@ export function MonitorPage() {
               unifiedList?.map((execution, idx) => {
                 const item = execution as ExecutionOrTask;
                 const isAiTask = isExtendedTask(item);
-                const label = item.syllabus_row?.lessonId || (isAiTask ? item.task_type : 'Task');
-                const title = item.syllabus_row?.lessonTitle || (isAiTask ? item.task_type : 'Unknown AI Task');
+                const label = item.syllabus_row?.lessonId || (isExtendedTask(item) ? item.task_type : 'Task');
+                const title = item.syllabus_row?.lessonTitle || (isExtendedTask(item) ? item.task_type : 'Unknown AI Task');
 
                 return (
                   <motion.div
@@ -626,7 +634,7 @@ export function MonitorPage() {
               </div>
             </motion.div>
           ) : selectedExecution ? (
-            <ExecutionDetailPanel executionData={selectedExecution} />
+            <ExecutionDetailPanel key={selectedExecution.id} executionData={selectedExecution} />
           ) : (
             <motion.div
               initial={{ opacity: 0 }}
