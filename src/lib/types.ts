@@ -65,6 +65,22 @@ export interface StepConfig {
 
 	// Custom Visual Component (Optional)
 	custom_component_id?: string;
+
+	// 🔨 Stage IO: Export Configuration
+	export_config?: ExportConfig;
+	auxiliary_inputs?: string[]; // IDs of DocumentAsset
+}
+
+export interface ExportConfig {
+	enabled: boolean;
+	destination: "google_sheets" | "webhook" | "email";
+	settings: {
+		sheet_id?: string;
+		worksheet_name?: string;
+		webhook_url?: string;
+		email_recipient?: string;
+		format?: "json" | "csv" | "tsv";
+	};
 }
 
 // Pre-Process Hook Configuration
@@ -145,6 +161,8 @@ export interface AISettings {
 		topK?: number;
 		maxOutputTokens?: number;
 		responseMimeType?: "application/json" | "text/plain";
+		thinkingLevel?: string;
+		thinkingBudget?: number;
 	};
 }
 
@@ -263,6 +281,20 @@ export interface StageContract {
 	};
 }
 
+export interface DocumentAsset {
+	id: string;
+	name: string;
+	file_path: string;
+	file_type: "md" | "txt" | "csv" | "tsv";
+	size_bytes: number;
+	token_count_est: number;
+	config_id?: string;
+	user_id: string;
+	storage_type: "supabase" | "indexeddb";
+	created_at: string;
+	updated_at: string;
+}
+
 export interface StageConfig {
 	id: string;
 	stage_key: string; // e.g. "stage_1", "qgen", "formatter"
@@ -369,6 +401,7 @@ export interface Execution {
 	n8n_execution_id?: string | null;
 	finished_tasks?: number;
 	pending_tasks?: number; // Added for parity
+	global_context?: Record<string, any>; // 🔨 Snapshotting/Caching
 }
 
 export interface StepExecution {

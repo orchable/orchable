@@ -174,17 +174,25 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
                 tier
             });
 
-            // If in Lite mode, ensure executor is running
-            const geminiApiKey = localStorage.getItem("orchable_gemini_api_key");
-            if (geminiApiKey) {
-                const { executorService } = await import('@/services/executorService');
-                executorService.start(tier);
-                toast.success("Local Task Executor started.");
+            // Determine execution path and start executor appropriately
+            const { getExecutionPath } = await import('@/lib/storage/executionRouter');
+            const execPath = await getExecutionPath(tier);
+
+            if (execPath === 'web-worker') {
+                // BYOK path: check for local API key
+                const geminiApiKey = localStorage.getItem("orchable_gemini_api_key");
+                if (geminiApiKey) {
+                    const { executorService } = await import('@/services/executorService');
+                    executorService.start(tier);
+                    toast.success(`Local executor started for ${inputItems.length} pipelines (Batch: ${batch.id.slice(0, 8)})`);
+                } else {
+                    toast.warning("No Gemini API Key found in settings. Task processing will wait until a key is provided.");
+                }
             } else {
-                toast.warning("No Gemini API Key found in settings. Task processing will wait until a key is provided.");
+                // Supabase + n8n path: tasks already on server, n8n will pick them up
+                toast.success(`Launched ${inputItems.length} pipelines via n8n (Batch: ${batch.id.slice(0, 8)})`);
             }
 
-            toast.success(`Launched ${inputItems.length} pipelines (Batch: ${batch.id.slice(0, 8)})`);
             setExecutionId(launchId);
 
         } catch (error) {

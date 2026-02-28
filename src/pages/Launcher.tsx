@@ -24,6 +24,7 @@ import { useTier } from '@/hooks/useTier';
 import { storage, UserTier } from '@/lib/storage';
 import { getTierSource } from '@/lib/storage/executionRouter';
 import { executorService } from '@/services/executorService';
+import { batchService } from '@/services/batchService';
 
 export function LauncherPage() {
   const { user } = useAuth();
@@ -263,92 +264,41 @@ export function LauncherPage() {
         const firstStageTemplateId = `${config.id}_${firstStage.stage_key}_${firstStage.id}`;
         const nextStageTemplateId = nextStage ? `${config.id}_${nextStage.stage_key}_${nextStage.id}` : null;
 
-        // 2. Process each row into its own batch
+        // 2. Process each row and launch via batchService
         toast.info(`Preparing ${selectedTasks.length} pipelines...`);
 
-        const tierSource = await getTierSource(tier);
-        const allTasksToInsert: Record<string, unknown>[] = [];
-
-        for (let i = 0; i < selectedTasks.length; i++) {
-          const task = selectedTasks[i];
-          const processed = processTaskData(
-            task,
-            jsonData,
-            fieldSelection,
-            fieldMapping,
-            rootStages[0]?.contract?.input.fields.map(f => f.name) || []
-          );
-
-          // Create a task_batches record for THIS ROW
-          const batch = await storage.adapter.createBatch({
-            name: `${config.name} - Row ${selectedTaskIndices[i] + 1}`,
-            total_tasks: 1, // Will be updated by triggers if more tasks are created in stages
-            pending_tasks: 1,
-            status: 'processing',
-            batch_type: 'manual_run',
-            orchestrator_config_id: config.id,
-            launch_id: launchId, // Campaign grouping
-            preset_key: 'manual', // Legacy compatibility
-            grade_code: 'none',    // Legacy compatibility
-            created_by: user?.id
-          });
-
-          const batchId = batch.id;
-
-          allTasksToInsert.push({
-            task_type: firstStage?.task_type || 'generic',
-            status: 'plan',
-            input_data: processed.input_data,
-            launch_id: launchId, // Grouping at Campaign level
-            batch_id: batchId,   // Grouping at Row level
-            user_id: user?.id,
-            tier_source: tierSource,
-            extra: {
-              ...processed.extra,
-              launcher_metadata: {
-                original_index: selectedTaskIndices[i],
-                source_file: fileName,
-                config_id: selectedConfigId,
-                launch_id: launchId
-              },
-              current_stage_config: {
-                template_id: firstStageTemplateId,
-                cardinality: (firstStage.cardinality === '1:N' || firstStage.cardinality === 'one_to_many')
-                  ? 'one_to_many'
-                  : 'one_to_one',
-                split_path: firstStage.split_path || null,
-                split_mode: firstStage.split_mode || 'per_item',
-                output_mapping: firstStage.output_mapping || 'result',
-                delimiters: firstStage.contract?.input?.delimiters
-              },
-              // next_stage_configs will be populated by Load Batch from prompt_templates.next_stage_template_ids
-              // Setting here as fallback for legacy compatibility
-              next_stage_config: nextStageTemplateId ? {
-                template_id: nextStageTemplateId,
-                cardinality: (nextStage?.cardinality === '1:N' || nextStage?.cardinality === 'one_to_many')
-                  ? 'one_to_many'
-                  : 'one_to_one',
-                split_path: nextStage?.split_path || null,
-                split_mode: nextStage?.split_mode || 'per_item',
-                output_mapping: nextStage?.output_mapping || 'result',
-                delimiters: nextStage?.contract?.input?.delimiters
-              } : null,
-              pre_process: firstStage.pre_process?.enabled ? firstStage.pre_process : undefined,
-              post_process: firstStage.post_process?.enabled ? firstStage.post_process : undefined,
-              'return-along-with': firstStage.return_along_with || []
-            },
-            stage_key: firstStage?.stage_key || 'start',
-            prompt_template_id: firstStageTemplateId,
-            sequence: i,
-            test_mode: false
-          });
-        }
-
-        // 3. Perform bulk insert of all initial tasks (Stage 1)
         try {
-          await storage.adapter.createTasks(allTasksToInsert);
-        } catch (err: any) {
-          if (err.message === 'QUOTA_EXCEEDED') {
+          for (let i = 0; i < selectedTasks.length; i++) {
+            const task = selectedTasks[i];
+            const processed = processTaskData(
+              task,
+              jsonData,
+              fieldSelection,
+              fieldMapping,
+              rootStages[0]?.contract?.input.fields.map(f => f.name) || []
+            );
+
+            await batchService.createLaunch({
+              config,
+              inputItems: [processed.input_data],
+              batchName: `${config.name} - Row ${selectedTaskIndices[i] + 1}`,
+              userId: user?.id,
+              launchId,
+              tier,
+              extraMetadata: {
+                ...processed.extra,
+                launcher_metadata: {
+                  original_index: selectedTaskIndices[i],
+                  source_file: fileName,
+                  config_id: selectedConfigId,
+                  launch_id: launchId
+                }
+              }
+            });
+          }
+        } catch (err: unknown) {
+          const error = err as Error;
+          if (error.message === 'QUOTA_EXCEEDED') {
             toast.error("Monthly quota exceeded (30 tasks). Please upgrade to Premium or use your own API keys.", {
               duration: 5000,
               action: {
@@ -363,11 +313,15 @@ export function LauncherPage() {
         }
 
         // All authenticated users use unified execution path
-        executorService.start(tier);
+        const { getExecutionPath } = await import('@/lib/storage/executionRouter');
+        const execPath = await getExecutionPath(tier);
+        if (execPath === 'web-worker') {
+          executorService.start(tier);
+        }
 
-        toast.success(`Successfully launched campaign with ${allTasksToInsert.length} pipelines`);
+        toast.success(`Successfully launched campaign with ${selectedTasks.length} pipelines`);
       } else {
-        // TSV Mode (Legacy / Standard) - We should also update this to follow the new semantics
+        // TSV Mode (Legacy / Standard)
         const dataToProcess = syllabusData.length > 0 ? syllabusData : [{
           lessonId: `manual-${Date.now()}`,
           lessonTitle: 'Manual Execution',
@@ -377,26 +331,21 @@ export function LauncherPage() {
           difficulty: 'N/A'
         } as SyllabusRow];
 
-        const launchId = crypto.randomUUID();
-        const config = configs?.find(c => c.id === selectedConfigId);
+        const { getExecutionPath } = await import('@/lib/storage/executionRouter');
+        const execPath = await getExecutionPath(tier);
 
         for (let i = 0; i < dataToProcess.length; i++) {
           const row = dataToProcess[i];
 
-          // Note: createExecutionMutation creates a lab_execution record.
-          // We should ideally create a task_batch here too if we want it in Monitor.
-          // For now, let's keep legacy standard as is or unify?
-          // Map each CSV/TSV row to its own batch, mirroring JSON behavior
-          // So let's unify it!
-
-          const execution = await createExecutionMutation.mutateAsync({
+          await createExecutionMutation.mutateAsync({
             configId: selectedConfigId!,
             syllabusRow: row,
             tier
           });
 
-          // All authenticated users use unified execution path
-          executorService.start(tier);
+          if (execPath === 'web-worker') {
+            executorService.start(tier);
+          }
         }
         toast.success(`Successfully launched ${dataToProcess.length} execution(s)`);
       }

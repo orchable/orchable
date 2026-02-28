@@ -78,4 +78,14 @@ export interface IStorageAdapter {
 		updates: Partial<OrchestratorConfig>,
 	): Promise<OrchestratorConfig>;
 	deleteConfig(id: string): Promise<void>;
+
+	// Assets
+	createAsset(
+		asset: Partial<import("../types").DocumentAsset>,
+	): Promise<import("../types").DocumentAsset>;
+	listAssets(): Promise<import("../types").DocumentAsset[]>;
+	getAsset(id: string): Promise<import("../types").DocumentAsset | null>;
+	deleteAsset(id: string): Promise<void>;
+	getAssetContent(asset: import("../types").DocumentAsset): Promise<string>;
+	saveAsset(name: string, content: string, type: string): Promise<string>;
 }

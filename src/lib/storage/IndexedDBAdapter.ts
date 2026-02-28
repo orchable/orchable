@@ -4,7 +4,11 @@ import {
 	PromptTemplate,
 	CustomComponent,
 } from "./StorageAdapter";
-import { Execution as TaskBatch, OrchestratorConfig } from "../types";
+import {
+	Execution as TaskBatch,
+	OrchestratorConfig,
+	DocumentAsset,
+} from "../types";
 import { TaskSummary as AiTask } from "../../services/executionTrackingService";
 
 export interface MetadataValue {
@@ -19,10 +23,18 @@ export class OrchableDatabase extends Dexie {
 	custom_components!: Table<CustomComponent>;
 	orchestrator_configs!: Table<OrchestratorConfig>;
 	metadata!: Table<{ key: string; value: MetadataValue }>;
+	assets!: Table<{
+		id: string;
+		name: string;
+		content: string;
+		type: string;
+		created_at: string;
+	}>;
+	document_assets!: Table<DocumentAsset>;
 
 	constructor() {
 		super("orchable_db");
-		this.version(5).stores({
+		this.version(6).stores({
 			task_batches:
 				"id, status, created_at, orchestrator_config_id, launch_id",
 			ai_tasks:
@@ -31,6 +43,8 @@ export class OrchableDatabase extends Dexie {
 			custom_components: "id, name",
 			metadata: "key", // for usage, config, etc.
 			orchestrator_configs: "id, name, created_at",
+			assets: "id, name, type",
+			document_assets: "id, name, user_id, config_id",
 		});
 	}
 
@@ -216,5 +230,68 @@ export class IndexedDBAdapter implements IStorageAdapter {
 
 	async deleteConfig(id: string): Promise<void> {
 		await db.orchestrator_configs.delete(id);
+	}
+
+	// Assets
+	async createAsset(asset: Partial<DocumentAsset>): Promise<DocumentAsset> {
+		const newAsset = {
+			id: crypto.randomUUID(),
+			created_at: new Date().toISOString(),
+			updated_at: new Date().toISOString(),
+			...asset,
+		} as DocumentAsset;
+
+		await db.document_assets.add(newAsset);
+		return newAsset;
+	}
+
+	async listAssets(): Promise<DocumentAsset[]> {
+		return db.document_assets.orderBy("created_at").reverse().toArray();
+	}
+
+	async getAsset(id: string): Promise<DocumentAsset | null> {
+		return db.document_assets.get(id) || null;
+	}
+
+	async deleteAsset(id: string): Promise<void> {
+		await db.transaction("rw", db.document_assets, db.assets, async () => {
+			const asset = await db.document_assets.get(id);
+			if (asset && asset.storage_type === "indexeddb") {
+				// Strip "local://documents/" to find the asset id in db.assets
+				const blobId = asset.file_path.replace(
+					"local://documents/",
+					"",
+				);
+				await db.assets.delete(blobId);
+			}
+			await db.document_assets.delete(id);
+		});
+	}
+
+	async getAssetContent(asset: DocumentAsset): Promise<string> {
+		if (asset.storage_type === "indexeddb") {
+			const blobId = asset.file_path.replace("local://documents/", "");
+			const blob = await db.assets.get(blobId);
+			return blob?.content || "";
+		}
+		throw new Error("Supabase assets not supported in IndexedDBAdapter");
+	}
+
+	async saveAsset(
+		name: string,
+		content: string,
+		type: string,
+	): Promise<string> {
+		const assetId = `${Date.now()}_${name}`;
+
+		await db.assets.add({
+			id: assetId,
+			name,
+			content,
+			type,
+			created_at: new Date().toISOString(),
+		});
+
+		return `local://documents/${assetId}`;
 	}
 }

@@ -7,15 +7,18 @@
  */
 
 import { useState, useMemo, useEffect } from 'react';
-import { ChevronDown, ChevronRight, FileInput, FileOutput, Edit, Copy, Eye, RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileInput, FileOutput, Edit, Copy, Eye, RefreshCw, Database, Share2, Plus, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import type { StageContract, InputField, GeminiJsonSchema, JsonSchemaProperty } from '@/lib/types';
+import type { StageContract, InputField, GeminiJsonSchema, JsonSchemaProperty, DocumentAsset, ExportConfig } from '@/lib/types';
 import { extractInputFields, generateOutputFormatSection, createDefaultContract } from '@/lib/schemaUtils';
 import { OutputSchemaEditor } from '@/components/designer/OutputSchemaEditor';
 
@@ -25,11 +28,31 @@ interface ContractSectionProps {
     availableScope?: string[] | null;
     onContractChange: (contract: StageContract) => void;
     onPromptTemplateChange?: (newPrompt: string) => void;
+
+    // 🔨 Stage IO additions
+    availableDocuments?: DocumentAsset[];
+    selectedDocumentIds?: string[];
+    onAuxiliaryInputsChange?: (ids: string[]) => void;
+    exportConfig?: ExportConfig;
+    onExportConfigChange?: (config: ExportConfig) => void;
 }
 
-export function ContractSection({ promptTemplate, contract, availableScope, onContractChange, onPromptTemplateChange }: ContractSectionProps) {
+export function ContractSection({
+    promptTemplate,
+    contract,
+    availableScope,
+    onContractChange,
+    onPromptTemplateChange,
+    availableDocuments = [],
+    selectedDocumentIds = [],
+    onAuxiliaryInputsChange,
+    exportConfig,
+    onExportConfigChange
+}: ContractSectionProps) {
     const [isInputOpen, setIsInputOpen] = useState(true);
     const [isOutputOpen, setIsOutputOpen] = useState(true);
+    const [isAuxOpen, setIsAuxOpen] = useState(true);
+    const [isExportOpen, setIsExportOpen] = useState(true);
     const [showFormatPreview, setShowFormatPreview] = useState(false);
     const [showRawSchema, setShowRawSchema] = useState(false);
     const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -64,7 +87,7 @@ export function ContractSection({ promptTemplate, contract, availableScope, onCo
                 }
             });
         }
-    }, [extractedInputs, currentContract.input.auto_extracted, currentContract.input.fields, onContractChange]);
+    }, [extractedInputs, currentContract, onContractChange]);
 
     // Generate format section preview
     const formatSection = useMemo(() => {
@@ -127,8 +150,121 @@ export function ContractSection({ promptTemplate, contract, availableScope, onCo
         toast.success('Contract fields synced from prompt template');
     };
 
+    const handleExportToggle = (enabled: boolean) => {
+        if (!onExportConfigChange) return;
+        const current: ExportConfig = exportConfig || {
+            enabled: false,
+            destination: 'webhook',
+            settings: { format: 'json' }
+        };
+        onExportConfigChange({ ...current, enabled });
+    };
+
+    const handleExportDestChange = (destination: "google_sheets" | "webhook" | "email") => {
+        if (!onExportConfigChange) return;
+        const current: ExportConfig = exportConfig || {
+            enabled: true,
+            destination: 'webhook',
+            settings: { format: 'json' }
+        };
+        onExportConfigChange({ ...current, destination });
+    };
+
+    const handleExportSettingChange = (key: string, value: string) => {
+        if (!onExportConfigChange) return;
+        const current: ExportConfig = exportConfig || {
+            enabled: true,
+            destination: 'webhook',
+            settings: { format: 'json' }
+        };
+        onExportConfigChange({
+            ...current,
+            settings: { ...current.settings, [key]: value } as ExportConfig['settings']
+        });
+    };
+
+    const toggleDocument = (id: string) => {
+        if (!onAuxiliaryInputsChange) return;
+        const newIds = selectedDocumentIds.includes(id)
+            ? selectedDocumentIds.filter(idx => idx !== id)
+            : [...selectedDocumentIds, id];
+        onAuxiliaryInputsChange(newIds);
+    };
+
     return (
         <div className="space-y-4">
+            {/* AUXILIARY INPUTS Section */}
+            <Collapsible open={isAuxOpen} onOpenChange={setIsAuxOpen}>
+                <div className="border rounded-lg bg-indigo-500/5 border-indigo-500/10">
+                    <CollapsibleTrigger asChild>
+                        <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-indigo-500/10 rounded-t-lg">
+                            <div className="flex items-center gap-2">
+                                {isAuxOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                <Database className="w-4 h-4 text-indigo-500" />
+                                <span className="font-medium text-sm">AUXILIARY INPUTS</span>
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-indigo-100 text-indigo-700 border-indigo-200">
+                                    {selectedDocumentIds.length} docs
+                                </Badge>
+                            </div>
+                        </div>
+                    </CollapsibleTrigger>
+
+                    <CollapsibleContent>
+                        <div className="p-3 pt-0 border-t border-indigo-500/10 space-y-3">
+                            <div className="mt-3">
+                                <Label className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2 block">Available Documents</Label>
+                                {availableDocuments.length > 0 ? (
+                                    <div className="grid grid-cols-1 gap-1.5 max-h-[150px] overflow-y-auto pr-1">
+                                        {availableDocuments.map(doc => (
+                                            <div
+                                                key={doc.id}
+                                                className={cn(
+                                                    "flex items-center gap-2 p-2 rounded-md border transition-colors cursor-pointer",
+                                                    selectedDocumentIds.includes(doc.id)
+                                                        ? "bg-indigo-50 border-indigo-200 dark:bg-indigo-900/20 dark:border-indigo-800"
+                                                        : "bg-background hover:bg-muted/50"
+                                                )}
+                                                onClick={() => toggleDocument(doc.id)}
+                                            >
+                                                <Checkbox
+                                                    checked={selectedDocumentIds.includes(doc.id)}
+                                                    onCheckedChange={() => toggleDocument(doc.id)}
+                                                    id={`doc-${doc.id}`}
+                                                />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs font-medium truncate">{doc.name}</p>
+                                                    <p className="text-[10px] text-muted-foreground">
+                                                        {doc.file_type.toUpperCase()} • {Math.round(doc.size_bytes / 1024)} KB • ~{doc.token_count_est} tokens
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-4 border border-dashed rounded-lg bg-muted/30">
+                                        <p className="text-xs text-muted-foreground mb-1">No documents in library</p>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 text-[10px]"
+                                            onClick={() => window.open('/assets', '_blank')}
+                                        >
+                                            <Plus className="w-3 h-3 mr-1" />
+                                            Add to Library
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex items-start gap-2 p-2 bg-indigo-50/50 rounded border border-indigo-100 dark:bg-indigo-900/10 dark:border-indigo-900/30">
+                                <Info className="w-3 h-3 text-indigo-500 mt-0.5 shrink-0" />
+                                <p className="text-[10px] text-indigo-700/80 dark:text-indigo-400/80 leading-relaxed">
+                                    Selected documents will be snapshotted when you launch an execution and provided as global context to this stage.
+                                </p>
+                            </div>
+                        </div>
+                    </CollapsibleContent>
+                </div>
+            </Collapsible>
             {/* INPUT Section */}
             <Collapsible open={isInputOpen} onOpenChange={setIsInputOpen}>
                 <div className="border rounded-lg bg-muted/20">
@@ -326,6 +462,92 @@ export function ContractSection({ promptTemplate, contract, availableScope, onCo
                                     </Button>
                                 </div>
                             )}
+                        </div>
+                    </CollapsibleContent>
+                </div>
+            </Collapsible>
+
+            {/* EXPORT Section */}
+            <Collapsible open={isExportOpen} onOpenChange={setIsExportOpen}>
+                <div className={cn(
+                    "border rounded-lg transition-colors",
+                    exportConfig?.enabled ? "border-amber-500/30 bg-amber-500/5" : "bg-muted/20"
+                )}>
+                    <CollapsibleTrigger asChild>
+                        <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 rounded-t-lg">
+                            <div className="flex items-center gap-2">
+                                {isExportOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                <Share2 className="w-4 h-4 text-amber-500" />
+                                <span className="font-medium text-sm">STAGE EXPORT</span>
+                                {exportConfig?.enabled ? (
+                                    <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-amber-600">
+                                        enabled
+                                    </Badge>
+                                ) : (
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                        disabled
+                                    </Badge>
+                                )}
+                            </div>
+                            <Switch
+                                checked={exportConfig?.enabled || false}
+                                onCheckedChange={handleExportToggle}
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                        </div>
+                    </CollapsibleTrigger>
+
+                    <CollapsibleContent>
+                        <div className="p-3 pt-0 border-t space-y-4">
+                            <div className="mt-3 space-y-3">
+                                <div>
+                                    <Label className="text-xs mb-1.5 block">Destination</Label>
+                                    <Select
+                                        value={exportConfig?.destination || 'webhook'}
+                                        onValueChange={handleExportDestChange}
+                                        disabled={!exportConfig?.enabled}
+                                    >
+                                        <SelectTrigger className="h-8 text-xs">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="webhook">Webhook (n8n/Custom)</SelectItem>
+                                            <SelectItem value="google_sheets" disabled>Google Sheets (Coming Soon)</SelectItem>
+                                            <SelectItem value="email" disabled>Email (Coming Soon)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {exportConfig?.destination === 'webhook' && (
+                                    <div>
+                                        <Label className="text-xs mb-1.5 block">Webhook URL</Label>
+                                        <Input
+                                            placeholder="https://n8n.example.com/webhook/..."
+                                            value={exportConfig?.settings?.webhook_url || ''}
+                                            onChange={(e) => handleExportSettingChange('webhook_url', e.target.value)}
+                                            className="h-8 text-xs font-mono"
+                                            disabled={!exportConfig?.enabled}
+                                        />
+                                    </div>
+                                )}
+
+                                <div>
+                                    <Label className="text-xs mb-1.5 block">Format</Label>
+                                    <Select
+                                        value={exportConfig?.settings?.format || 'json'}
+                                        onValueChange={(v) => handleExportSettingChange('format', v)}
+                                        disabled={!exportConfig?.enabled}
+                                    >
+                                        <SelectTrigger className="h-8 text-xs">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="json">JSON (Full Payload)</SelectItem>
+                                            <SelectItem value="csv">CSV (Table only)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
                         </div>
                     </CollapsibleContent>
                 </div>

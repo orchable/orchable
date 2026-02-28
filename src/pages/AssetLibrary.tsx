@@ -17,8 +17,14 @@ import {
     Database,
     Sparkles,
     Share2,
-    Globe
+    Globe,
+    FileCode
 } from 'lucide-react';
+import {
+    DocumentAsset
+} from '@/lib/types';
+import { DocumentLibrary } from '@/components/assets/DocumentLibrary';
+import { UploadDocumentModal } from '@/components/assets/UploadDocumentModal';
 import {
     Tabs,
     TabsContent,
@@ -70,6 +76,7 @@ export function AssetLibrary() {
     const [activeTab, setActiveTab] = useState('components');
     const [components, setComponents] = useState<CustomComponent[]>([]);
     const [templates, setTemplates] = useState<PromptTemplateRecord[]>([]);
+    const [documents, setDocuments] = useState<DocumentAsset[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [showEditor, setShowEditor] = useState(false);
@@ -96,6 +103,9 @@ export function AssetLibrary() {
     const [sharingAssetId, setSharingAssetId] = useState<string>('');
     const [sharingAssetInitialData, setSharingAssetInitialData] = useState<{ title: string, description?: string, tags?: string[] }>({ title: '' });
 
+    // Document Specific State
+    const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+
     const { user } = useAuth();
     const navigate = useNavigate();
 
@@ -106,15 +116,16 @@ export function AssetLibrary() {
     const fetchAssets = async () => {
         setLoading(true);
         try {
-            const [comps, tplList, aiList] = await Promise.all([
+            const [comps, tplList, aiList, docList] = await Promise.all([
                 getCustomComponents(),
-                // For now fetch all, filtering can be added later
                 supabase.from('prompt_templates').select('*').order('name'),
-                supabase.from('ai_model_settings').select('*').order('name')
+                supabase.from('ai_model_settings').select('*').order('name'),
+                supabase.from('document_assets').select('*').order('created_at', { ascending: false })
             ]);
             setComponents(comps);
             if (tplList.data) setTemplates(tplList.data);
             if (aiList.data) setAiSettings(aiList.data);
+            if (docList.data) setDocuments(docList.data as DocumentAsset[]);
         } catch (error) {
             console.error('Failed to fetch assets:', error);
             toast.error('Failed to load resource list');
@@ -188,11 +199,8 @@ export function AssetLibrary() {
     const handleEditTemplate = async (template: PromptTemplateRecord) => {
         setEditingTemplate(template);
         setEditedPrompt(template.template || '');
-
-        // Initialize delimiters from view_config or default to %%
         const savedDelimiters = template.view_config?.delimiters as { start: string, end: string } | undefined;
         setPromptDelimiters(savedDelimiters || { start: '%%', end: '%%' });
-
         setIsPromptEditorOpen(true);
     };
 
@@ -258,7 +266,7 @@ export function AssetLibrary() {
         }
     };
 
-    const handleShareToHub = (type: HubAssetType, asset: any) => {
+    const handleShareToHub = (type: HubAssetType, asset: { id: string; name: string; description?: string; tags?: string[] }) => {
         setSharingAssetType(type);
         setSharingAssetId(asset.id);
         setSharingAssetInitialData({
@@ -323,6 +331,14 @@ export function AssetLibrary() {
                         <FileText className="w-4 h-4" />
                         Prompt Templates
                         <Badge variant="secondary" className="ml-1">{templates.length}</Badge>
+                    </TabsTrigger>
+                    <TabsTrigger
+                        value="documents"
+                        className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-2 h-full gap-2"
+                    >
+                        <FileCode className="w-4 h-4" />
+                        Documents
+                        <Badge variant="secondary" className="ml-1">{documents.length}</Badge>
                     </TabsTrigger>
                     <TabsTrigger
                         value="ai_settings"
@@ -532,9 +548,17 @@ export function AssetLibrary() {
                         )}
                     </TabsContent>
 
+                    <TabsContent value="documents" className="m-0 focus-visible:outline-none">
+                        <DocumentLibrary
+                            documents={documents}
+                            loading={loading}
+                            onUpload={() => setIsUploadModalOpen(true)}
+                            onRefresh={fetchAssets}
+                        />
+                    </TabsContent>
+
                     <TabsContent value="ai_settings" className="m-0 focus-visible:outline-none h-full">
                         <div className="space-y-4">
-                            {/* Filter bar */}
                             {(() => {
                                 const allTags = Array.from(new Set(aiSettings.flatMap(s => s.use_case_tags ?? [])));
                                 return allTags.length > 0 ? (
@@ -566,13 +590,12 @@ export function AssetLibrary() {
                                 ) : null;
                             })()}
 
-                            {/* Cards grid */}
                             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                                 {aiSettings
                                     .filter(s => !selectedAiTag || (s.use_case_tags && s.use_case_tags.includes(selectedAiTag)))
                                     .map((setting) => {
                                         const isFree = setting.free_tier_rpd != null;
-                                        const capIcons: { key: string; label: string }[] = [
+                                        const capIcons = [
                                             { key: 'thinking', label: '🧠 Thinking' },
                                             { key: 'function_calling', label: '⚙️ Functions' },
                                             { key: 'search_grounding', label: '🔍 Search' },
@@ -586,7 +609,6 @@ export function AssetLibrary() {
 
                                         return (
                                             <Card key={setting.id} className={`flex flex-col group transition-all duration-300 hover:shadow-lg hover:border-primary/40 ${!setting.is_active ? 'opacity-60' : ''}`}>
-                                                {/* Header */}
                                                 <CardHeader className="pb-3 space-y-2">
                                                     <div className="flex items-start justify-between gap-2">
                                                         <div className="flex-1 min-w-0">
@@ -622,11 +644,9 @@ export function AssetLibrary() {
                                                             }}
                                                         />
                                                     </div>
-                                                    {/* Tagline */}
                                                     {setting.tagline && (
                                                         <p className="text-xs text-muted-foreground italic leading-tight">{setting.tagline}</p>
                                                     )}
-                                                    {/* Usage description */}
                                                     {setting.description && (
                                                         <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3 border-l-2 border-primary/30 pl-2">
                                                             {setting.description}
@@ -635,7 +655,6 @@ export function AssetLibrary() {
                                                 </CardHeader>
 
                                                 <CardContent className="pb-3 flex-1 space-y-3">
-                                                    {/* I/O + Context */}
                                                     <div className="space-y-1.5 text-xs">
                                                         {setting.supported_inputs && setting.supported_inputs.length > 0 && (
                                                             <div className="flex flex-wrap gap-1 items-center">
@@ -655,13 +674,12 @@ export function AssetLibrary() {
                                                         )}
                                                         {(setting.input_token_limit || setting.output_token_limit) && (
                                                             <div className="flex gap-3 text-muted-foreground">
-                                                                {setting.input_token_limit && <span>In: <strong className="text-foreground">{(setting.input_token_limit / 1000).toFixed(0)}K</strong> tokens</span>}
-                                                                {setting.output_token_limit && <span>Out: <strong className="text-foreground">{(setting.output_token_limit / 1000).toFixed(0)}K</strong> tokens</span>}
+                                                                {setting.input_token_limit && <span>In: <strong className="text-foreground">{(setting.input_token_limit / 1000).toFixed(0)}K</strong></span>}
+                                                                {setting.output_token_limit && <span>Out: <strong className="text-foreground">{(setting.output_token_limit / 1000).toFixed(0)}K</strong></span>}
                                                             </div>
                                                         )}
                                                     </div>
 
-                                                    {/* Capabilities */}
                                                     {enabledCaps.length > 0 && (
                                                         <div className="flex flex-wrap gap-1">
                                                             {enabledCaps.map(c => (
@@ -672,7 +690,6 @@ export function AssetLibrary() {
                                                         </div>
                                                     )}
 
-                                                    {/* Free Tier Quota */}
                                                     {isFree && (
                                                         <div className="rounded-md bg-emerald-950/30 border border-emerald-500/20 px-2.5 py-1.5 text-[10px] space-y-0.5">
                                                             <div className="text-emerald-400 font-medium mb-0.5">Free Tier Quota</div>
@@ -684,7 +701,6 @@ export function AssetLibrary() {
                                                         </div>
                                                     )}
 
-                                                    {/* Default Gen Params */}
                                                     <div className="rounded-md bg-muted/30 border border-border/50 px-2.5 py-1.5 text-[10px]">
                                                         <div className="text-muted-foreground font-medium mb-1">Default Parameters</div>
                                                         <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-muted-foreground">
@@ -693,43 +709,19 @@ export function AssetLibrary() {
                                                             <span>Top-K: <strong className="text-foreground">{setting.top_k}</strong></span>
                                                             <span>Max Out: <strong className="text-foreground">{(setting.max_output_tokens / 1000).toFixed(0)}K</strong></span>
                                                         </div>
-                                                        {setting.thinking_config_type && setting.thinking_config_type !== 'none' && (
-                                                            <div className="mt-1 text-muted-foreground">
-                                                                Thinking (<span className="text-foreground">{setting.thinking_config_type}</span>):
-                                                                <strong className="text-primary ml-1">{setting.recommended_thinking ?? '—'}</strong>
-                                                            </div>
-                                                        )}
                                                     </div>
-
-                                                    {/* Use-case tags */}
-                                                    {setting.use_case_tags && setting.use_case_tags.length > 0 && (
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {setting.use_case_tags.map(tag => (
-                                                                <Badge key={tag} variant="secondary" className="text-[9px] px-1.5 py-0 font-normal opacity-70 capitalize">
-                                                                    {tag.replace(/-/g, ' ')}
-                                                                </Badge>
-                                                            ))}
-                                                        </div>
-                                                    )}
                                                 </CardContent>
 
                                                 <CardFooter className="pt-0 justify-end pb-4 pr-4 gap-2">
-                                                    {setting.hub_asset_id ? (
-                                                        <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
-                                                            <Globe className="w-3 h-3 mr-1" />
-                                                            Public on Hub
-                                                        </Badge>
-                                                    ) : (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className="gap-2 text-muted-foreground hover:text-primary"
-                                                            onClick={() => handleShareToHub('ai_preset', setting)}
-                                                        >
-                                                            <Share2 className="w-3.5 h-3.5" />
-                                                            Share
-                                                        </Button>
-                                                    )}
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="gap-2 text-muted-foreground hover:text-primary"
+                                                        onClick={() => handleShareToHub('ai_preset', setting)}
+                                                    >
+                                                        <Share2 className="w-3.5 h-3.5" />
+                                                        Share
+                                                    </Button>
                                                     <Button
                                                         variant="secondary"
                                                         size="sm"
@@ -746,7 +738,6 @@ export function AssetLibrary() {
                             </div>
                         </div>
                     </TabsContent>
-
                 </div>
             </Tabs>
 
@@ -776,138 +767,18 @@ export function AssetLibrary() {
                 onDelimitersChange={setPromptDelimiters}
             />
 
-            {/* AI Settings Editor Dialog */}
-            <Dialog open={isAiSettingEditorOpen} onOpenChange={setIsAiSettingEditorOpen}>
-                <DialogContent className="max-w-md">
-                    <div className="space-y-6">
-                        <div>
-                            <h2 className="text-lg font-semibold">Edit Default Settings</h2>
-                            <p className="text-sm text-muted-foreground font-mono mt-1">
-                                {editingAiSetting?.model_id}
-                            </p>
-                        </div>
-                        {editingAiSetting && (
-                            <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <div className="flex justify-between items-center">
-                                        <Label>Temperature</Label>
-                                        <span className="text-xs text-muted-foreground w-8 text-right font-mono">
-                                            {editingAiSetting.temperature}
-                                        </span>
-                                    </div>
-                                    <Slider
-                                        value={[editingAiSetting.temperature]}
-                                        min={0}
-                                        max={2}
-                                        step={0.1}
-                                        onValueChange={([val]) => setEditingAiSetting({ ...editingAiSetting, temperature: val })}
-                                    />
-                                    <p className="text-[10px] text-muted-foreground">Higher = more creative</p>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between items-center">
-                                            <Label>Top P</Label>
-                                            <span className="text-xs text-muted-foreground w-8 text-right font-mono">{editingAiSetting.top_p}</span>
-                                        </div>
-                                        <Slider
-                                            value={[editingAiSetting.top_p]}
-                                            min={0}
-                                            max={1}
-                                            step={0.05}
-                                            onValueChange={([val]) => setEditingAiSetting({ ...editingAiSetting, top_p: val })}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between items-center">
-                                            <Label>Top K</Label>
-                                            <span className="text-xs text-muted-foreground w-8 text-right font-mono">{editingAiSetting.top_k}</span>
-                                        </div>
-                                        <Slider
-                                            value={[editingAiSetting.top_k]}
-                                            min={1}
-                                            max={100}
-                                            step={1}
-                                            onValueChange={([val]) => setEditingAiSetting({ ...editingAiSetting, top_k: val })}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>Max Output Tokens</Label>
-                                    <Input
-                                        type="number"
-                                        value={editingAiSetting.max_output_tokens}
-                                        onChange={(e) => setEditingAiSetting({ ...editingAiSetting, max_output_tokens: parseInt(e.target.value) || 0 })}
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>Timeout (ms)</Label>
-                                        <Input
-                                            type="number"
-                                            value={editingAiSetting.timeout_ms}
-                                            onChange={(e) => setEditingAiSetting({ ...editingAiSetting, timeout_ms: parseInt(e.target.value) || 0 })}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Retries</Label>
-                                        <Input
-                                            type="number"
-                                            value={editingAiSetting.retries}
-                                            onChange={(e) => setEditingAiSetting({ ...editingAiSetting, retries: parseInt(e.target.value) || 0 })}
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Thinking Config */}
-                                {editingAiSetting.thinking_config_type && editingAiSetting.thinking_config_type !== 'none' && (
-                                    <div className="space-y-3 rounded-md border border-border/50 p-3 bg-muted/20">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm font-medium">🧠 Thinking Config</span>
-                                            <Badge variant="secondary" className="text-[10px]">
-                                                {editingAiSetting.thinking_config_type === 'level' ? 'thinkingLevel' : 'thinkingBudget'}
-                                            </Badge>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-xs text-muted-foreground">
-                                                {editingAiSetting.thinking_config_type === 'level'
-                                                    ? 'Level (minimal / low / medium / high)'
-                                                    : 'Budget (tokens, e.g. 0, 512, 2048, 8192)'}
-                                            </Label>
-                                            <Input
-                                                value={editingAiSetting.recommended_thinking ?? ''}
-                                                onChange={(e) => setEditingAiSetting({ ...editingAiSetting, recommended_thinking: e.target.value })}
-                                                placeholder={editingAiSetting.thinking_config_type === 'level' ? 'e.g. medium' : 'e.g. 2048'}
-                                            />
-                                            <p className="text-[10px] text-muted-foreground">
-                                                This value is applied as the default when this model is selected in Stage Config
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                        )}
-                        <div className="flex justify-end gap-2 pt-4 border-t">
-                            <Button variant="ghost" onClick={() => setIsAiSettingEditorOpen(false)}>
-                                Cancel
-                            </Button>
-                            <Button onClick={handleSaveAiSetting} disabled={isSavingAiSetting}>
-                                {isSavingAiSetting ? 'Saving...' : 'Save Defaults'}
-                            </Button>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
             <ShareToHubDialog
                 open={isShareDialogOpen}
                 onOpenChange={setIsShareDialogOpen}
                 assetType={sharingAssetType}
                 assetId={sharingAssetId}
                 initialData={sharingAssetInitialData}
+                onSuccess={fetchAssets}
+            />
+
+            <UploadDocumentModal
+                open={isUploadModalOpen}
+                onOpenChange={setIsUploadModalOpen}
                 onSuccess={fetchAssets}
             />
         </div>

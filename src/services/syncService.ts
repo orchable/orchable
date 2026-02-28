@@ -51,6 +51,15 @@ export const syncService = {
 					);
 				}
 			}
+
+			// 1.2 Full sweep if requested (to catch orphans and ensure clean state)
+			if (options.clearAfterSync) {
+				await db.ai_tasks.clear();
+				await db.task_batches.clear();
+				console.log(
+					"[SyncService] Full sweep of local storage completed",
+				);
+			}
 		} else {
 			console.log(
 				"[SyncService] Skipping tasks/batches sync (running in web-worker mode)",

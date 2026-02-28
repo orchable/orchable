@@ -10,6 +10,7 @@ export interface CreateBatchOptions {
 	userId?: string;
 	launchId?: string;
 	tier: UserTier;
+	extraMetadata?: Record<string, unknown>;
 }
 
 export const batchService = {
@@ -24,6 +25,7 @@ export const batchService = {
 			userId,
 			tier,
 			launchId: existingLaunchId,
+			extraMetadata,
 		} = options;
 
 		const { getTierSource } =
@@ -39,11 +41,40 @@ export const batchService = {
 				typeof topologicalSortStages
 			>[0],
 			[],
-		); // Edges are in steps.dependsOn mostly
+		);
 		const firstStage = sortedStages[0];
 
 		if (!firstStage) {
 			throw new Error("Orchestrator has no stages configured");
+		}
+
+		// 2. Snapshot Auxiliary Documents into global_context
+		const globalContext: Record<string, string> = {};
+		const allAuxIds = new Set<string>();
+		config.steps.forEach((s) => {
+			if (s.auxiliary_inputs) {
+				s.auxiliary_inputs.forEach((id) => allAuxIds.add(id));
+			}
+		});
+
+		if (allAuxIds.size > 0) {
+			console.log(
+				`[BatchService] Snapshotting ${allAuxIds.size} auxiliary documents...`,
+			);
+			for (const id of allAuxIds) {
+				try {
+					const asset = await adapter.getAsset(id);
+					if (asset) {
+						const content = await adapter.getAssetContent(asset);
+						globalContext[asset.name] = content;
+					}
+				} catch (err) {
+					console.warn(
+						`[BatchService] Failed to snapshot asset ${id}:`,
+						err,
+					);
+				}
+			}
 		}
 
 		// Identify next stages for the first stage
@@ -57,15 +88,14 @@ export const batchService = {
 			);
 		});
 
-		// 2. Create the batch
+		// 3. Create the batch
 		const batch = await adapter.createBatch({
 			name:
 				batchName || `${config.name} - Launch ${launchId.slice(0, 8)}`,
 			status: "processing",
 			orchestrator_config_id: config.id,
 			created_by: userId || "anonymous",
-			// Store launchId in extra or as a separate field if adapter supports it
-			// For Supabase, we have a launch_id column.
+			global_context: globalContext,
 			...({ launch_id: launchId } as Record<string, unknown>),
 		});
 
@@ -120,6 +150,7 @@ export const batchService = {
 					delimiters: ns.contract?.input?.delimiters,
 				})),
 				delimiters: firstStage.contract?.input?.delimiters,
+				...extraMetadata,
 			},
 		}));
 
@@ -132,8 +163,9 @@ export const batchService = {
 			}
 
 			return { batch, launchId, tasks: createdTasks };
-		} catch (err: any) {
-			if (err.message === "QUOTA_EXCEEDED") {
+		} catch (err: unknown) {
+			const error = err as Error;
+			if (error.message === "QUOTA_EXCEEDED") {
 				throw new Error("QUOTA_EXCEEDED");
 			}
 			throw err;

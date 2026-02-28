@@ -99,7 +99,7 @@ export function TierProvider({ children }: { children: React.ReactNode }) {
                 import('@/lib/storage/IndexedDBAdapter').then(({ db }) => {
                     db.ai_tasks.where('status').equals('plan').count().then(pending => {
                         if (pending > 0) {
-                            executorService.start('free');
+                            executorService.start(tier);
                         }
                     });
                 }).catch(e => console.warn('Worker auto-start check failed', e));

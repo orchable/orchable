@@ -71,7 +71,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { PrePostProcessSection } from './PrePostProcessSection';
 import { ContractSection } from './ContractSection';
-import type { AIModel, Cardinality, PreProcessConfig, PostProcessConfig, StageContract, AIModelSetting, StepConfig, AISettings } from '@/lib/types';
+import type { AIModel, Cardinality, PreProcessConfig, PostProcessConfig, StageContract, AIModelSetting, StepConfig, AISettings, DocumentAsset, ExportConfig } from '@/lib/types';
 import { PromptEditorDialog } from './PromptEditorDialog';
 import { ICONS } from '@/lib/icons';
 
@@ -83,7 +83,7 @@ interface PromptTemplate {
     template: string;
     version: number;
     default_ai_settings: AISettings | null;
-    stage_config?: any;
+    stage_config?: StepConfig | null;
     custom_component_id?: string | null;
     custom_component?: { id: string; name: string; description?: string };
 }
@@ -132,7 +132,19 @@ const stageConfigSchema = z.object({
     requires_approval: z.boolean().default(false),
     return_along_with: z.string().optional(),
     thinkingLevel: z.string().optional(),
-    thinkingBudget: z.number().optional()
+    thinkingBudget: z.number().optional(),
+    auxiliary_inputs: z.array(z.string()).optional(),
+    export_config: z.object({
+        enabled: z.boolean(),
+        destination: z.enum(['google_sheets', 'webhook', 'email']),
+        settings: z.object({
+            sheet_id: z.string().optional(),
+            worksheet_name: z.string().optional(),
+            webhook_url: z.string().optional(),
+            email_recipient: z.string().optional(),
+            format: z.enum(['json', 'csv', 'tsv']).optional()
+        })
+    }).optional()
 });
 
 type StageFormData = z.infer<typeof stageConfigSchema>;
@@ -222,6 +234,10 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
     const [aiModels, setAiModels] = useState<AIModelSetting[]>([]);
     const [loadingAiModels, setLoadingAiModels] = useState(false);
 
+    // 🔨 Stage IO: Available Documents state
+    const [availableDocuments, setAvailableDocuments] = useState<DocumentAsset[]>([]);
+    const [loadingDocs, setLoadingDocs] = useState(false);
+
     // Delete template state
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -252,7 +268,13 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
             requires_approval: false,
             return_along_with: '',
             thinkingLevel: '',
-            thinkingBudget: 0
+            thinkingBudget: 0,
+            auxiliary_inputs: [],
+            export_config: {
+                enabled: false,
+                destination: 'webhook',
+                settings: { format: 'json' }
+            }
         }
     });
 
@@ -312,13 +334,30 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
         }
     }, [form]);
 
+    const fetchDocuments = useCallback(async () => {
+        setLoadingDocs(true);
+        try {
+            const { data, error } = await supabase
+                .from('document_assets')
+                .select('*')
+                .order('name');
+            if (error) throw error;
+            setAvailableDocuments(data || []);
+        } catch (err) {
+            console.error('Failed to fetch documents:', err);
+        } finally {
+            setLoadingDocs(false);
+        }
+    }, []);
+
     const watchedVariables = form.watch(['model_id', 'temperature', 'topP', 'topK', 'maxOutputTokens', 'generate_content_api', 'thinkingLevel', 'thinkingBudget']);
 
     useEffect(() => {
         fetchTemplates();
         fetchComponents();
         fetchAiModels();
-    }, [fetchTemplates, fetchComponents, fetchAiModels]);
+        fetchDocuments();
+    }, [fetchTemplates, fetchComponents, fetchAiModels, fetchDocuments]);
 
     // Prompt Editor State
     const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -338,7 +377,11 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
         setIsSavingPrompt(true);
         try {
             // Construct stage config
-            const stageConfig = {
+            const stageConfig: StepConfig = {
+                id: stageId,
+                name: form.getValues('name') || '',
+                label: form.getValues('label') || '',
+                dependsOn: [],
                 task_type: form.getValues('task_type') || '',
                 cardinality: form.getValues('cardinality') || '1:1',
                 split_path: form.getValues('split_path') || '',
@@ -351,17 +394,23 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                     maxRetries: form.getValues('maxRetries') || 0,
                     retryDelay: form.getValues('retryDelay') || 5000
                 },
-                return_along_with: form.getValues('return_along_with')?.split(',').map(s => s.trim()).filter(Boolean) || []
+                return_along_with: form.getValues('return_along_with')?.split(',').map(s => s.trim()).filter(Boolean) || [],
+                auxiliary_inputs: form.getValues('auxiliary_inputs') || [],
+                export_config: form.getValues('export_config') as ExportConfig
             };
 
             // Construct AI settings
-            const aiSettings = {
-                model_id: form.getValues('model_id'),
-                temperature: form.getValues('temperature'),
-                topP: form.getValues('topP'),
-                topK: form.getValues('topK'),
-                maxOutputTokens: form.getValues('maxOutputTokens'),
-                generate_content_api: form.getValues('generate_content_api'),
+            const aiSettings: AISettings = {
+                model_id: form.getValues('model_id') as AIModel,
+                generate_content_api: form.getValues('generate_content_api') as unknown as "generateContent" | "streamGenerateContent",
+                generationConfig: {
+                    temperature: form.getValues('temperature'),
+                    topP: form.getValues('topP'),
+                    topK: form.getValues('topK'),
+                    maxOutputTokens: form.getValues('maxOutputTokens'),
+                    thinkingLevel: form.getValues('thinkingLevel'),
+                    thinkingBudget: form.getValues('thinkingBudget')
+                }
             };
 
             console.log('Saving Stage Config:', stageConfig);
@@ -486,19 +535,25 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                 output_mapping: data.output_mapping || 'result',
                 prompt_template_id: templateId,
                 model_id: ai.model_id || 'gemini-2.0-flash',
-                temperature: gc.temperature ?? (ai as any).temperature ?? 1.0,
-                topP: gc.topP ?? (ai as any).topP ?? 0.95,
-                topK: gc.topK ?? (ai as any).topK ?? 40,
-                maxOutputTokens: gc.maxOutputTokens ?? (ai as any).maxOutputTokens ?? 8192,
-                generate_content_api: ai.generate_content_api || gc.generate_content_api || 'generateContent',
-                requires_approval: data.requires_approval ?? (data as any).stage_config?.requires_approval ?? false,
+                temperature: (gc.temperature as number) ?? (ai as unknown as Record<string, number>).temperature ?? 1.0,
+                topP: (gc.topP as number) ?? (ai as unknown as Record<string, number>).topP ?? 0.95,
+                topK: (gc.topK as number) ?? (ai as unknown as Record<string, number>).topK ?? 40,
+                maxOutputTokens: (gc.maxOutputTokens as number) ?? (ai as unknown as Record<string, number>).maxOutputTokens ?? 8192,
+                generate_content_api: ai.generate_content_api || (gc.generate_content_api as string) || 'generateContent',
+                requires_approval: data.requires_approval === true,
                 timeout: data.timeout ?? (ai as unknown as Record<string, number>).timeout ?? 300000,
                 maxRetries: (data.retryConfig?.maxRetries ?? (ai as unknown as Record<string, number>).maxRetries) ?? 3,
                 retryDelay: (data.retryConfig?.retryDelay ?? (ai as unknown as Record<string, number>).retryDelay) ?? 5000,
                 custom_component_id: data.custom_component_id || '',
                 return_along_with: Array.isArray(data.return_along_with) ? data.return_along_with.join(', ') : data.return_along_with || '',
                 thinkingLevel: (gc.thinkingLevel as string) || (ai as unknown as Record<string, string>).thinkingLevel || '',
-                thinkingBudget: (gc.thinkingBudget as number) ?? (ai as unknown as Record<string, number>).thinkingBudget ?? 0
+                thinkingBudget: (gc.thinkingBudget as number) ?? (ai as unknown as Record<string, number>).thinkingBudget ?? 0,
+                auxiliary_inputs: data.auxiliary_inputs || [],
+                export_config: data.export_config || {
+                    enabled: false,
+                    destination: 'webhook',
+                    settings: { format: 'json' }
+                }
             });
 
             // Find and set selected template
@@ -516,11 +571,11 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                 // Auto-migrate legacy OutputSchemaField[] to GeminiJsonSchema
                 if (data.contract.output) {
                     const output = data.contract.output as Record<string, unknown>;
-                    const legacySchema = output.schema as any;
+                    const legacySchema = output.schema;
                     const legacyRootType = output.rootType as string | undefined;
-                    data.contract.output.schema = ensureGeminiSchema(legacySchema, legacyRootType);
+                    data.contract.output.schema = ensureGeminiSchema(legacySchema as Record<string, unknown>, legacyRootType as 'object' | 'array' | undefined);
                     // Clean up legacy rootType field
-                    delete (data.contract.output as any).rootType;
+                    delete (data.contract.output as unknown as Record<string, unknown>).rootType;
                 }
                 setContract(data.contract);
             }
@@ -546,34 +601,41 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                 if (sc.output_mapping) form.setValue('output_mapping', sc.output_mapping);
                 if (sc.requires_approval !== undefined) form.setValue('requires_approval', sc.requires_approval);
                 if (sc.timeout) form.setValue('timeout', sc.timeout);
-                if (sc.maxRetries !== undefined) form.setValue('maxRetries', sc.maxRetries);
-                if (sc.retryDelay !== undefined) form.setValue('retryDelay', sc.retryDelay);
-                // Handle nested retryConfig if present in legacy/DB data
-                const scRaw = sc as Record<string, unknown>;
-                if (scRaw.retryConfig) {
-                    const rc = scRaw.retryConfig as Record<string, unknown>;
-                    if (rc.maxRetries) form.setValue('maxRetries', rc.maxRetries as number);
-                    if (rc.retryDelay) form.setValue('retryDelay', rc.retryDelay as number);
+
+                // Handle retryConfig
+                if (sc.retryConfig) {
+                    form.setValue('maxRetries', sc.retryConfig.maxRetries);
+                    form.setValue('retryDelay', sc.retryConfig.retryDelay);
+                } else {
+                    const scAny = sc as unknown as Record<string, unknown>;
+                    if (scAny.maxRetries !== undefined) form.setValue('maxRetries', scAny.maxRetries as number);
+                    if (scAny.retryDelay !== undefined) form.setValue('retryDelay', scAny.retryDelay as number);
                 }
+
                 if (sc.return_along_with && Array.isArray(sc.return_along_with)) {
                     form.setValue('return_along_with', sc.return_along_with.join(', '));
                 }
+
+                if (sc.auxiliary_inputs) form.setValue('auxiliary_inputs', sc.auxiliary_inputs);
+                if (sc.export_config) form.setValue('export_config', sc.export_config);
             }
 
             // Auto-fill AI settings from template defaults
             if (found.default_ai_settings) {
                 const settings = found.default_ai_settings;
+                const gc = settings.generationConfig || {};
+
                 if (settings.model_id) {
                     form.setValue('model_id', settings.model_id);
                 }
-                if (settings.temperature !== undefined) {
-                    form.setValue('temperature', settings.temperature);
+                if (gc.temperature !== undefined) {
+                    form.setValue('temperature', gc.temperature);
                 }
-                if (settings.thinkingLevel !== undefined) {
-                    form.setValue('thinkingLevel', settings.thinkingLevel);
+                if (gc.thinkingLevel !== undefined) {
+                    form.setValue('thinkingLevel', gc.thinkingLevel);
                 }
-                if (settings.thinkingBudget !== undefined) {
-                    form.setValue('thinkingBudget', settings.thinkingBudget);
+                if (gc.thinkingBudget !== undefined) {
+                    form.setValue('thinkingBudget', gc.thinkingBudget);
                 }
             }
 
@@ -625,7 +687,7 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
             const parentNode = nodes.find(n => n.id === id);
             if (parentNode?.data) {
                 const data = parentNode.data as unknown as StepConfig;
-                const schemaObj = (data.contract as unknown as Record<string, any>)?.output?.schema;
+                const schemaObj = data.contract?.output?.schema;
                 const outputFields: string[] = schemaObj?.properties
                     ? Object.keys(schemaObj.properties)
                     : (Array.isArray(schemaObj) ? schemaObj.map((f: { name: string }) => f.name) : []);
@@ -811,8 +873,12 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                     );
                 }
 
-                const stageConfig = {
-                    cardinality: (data.cardinality === 'N:1' ? 'N:1' : ((data.cardinality === '1:N' || data.cardinality === 'one_to_many') ? 'one_to_many' : 'one_to_one')) as Cardinality,
+                const stageConfig: StepConfig = {
+                    id: selectedTemplate.id,
+                    name: selectedTemplate.name,
+                    label: selectedTemplate.name,
+                    dependsOn: [],
+                    cardinality: (data.cardinality === 'N:1' ? 'N:1' : ((data.cardinality === 'one_to_many' || data.cardinality === '1:N') ? 'one_to_many' : 'one_to_one')) as Cardinality,
                     split_path: data.split_path || '',
                     split_mode: data.split_mode || 'per_item',
                     batch_grouping: data.batch_grouping || 'global',
@@ -824,7 +890,9 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                         maxRetries: data.maxRetries || 3,
                         retryDelay: data.retryDelay || 5000
                     },
-                    return_along_with: data.return_along_with ? data.return_along_with.split(',').map(s => s.trim()).filter(Boolean) : []
+                    return_along_with: data.return_along_with ? data.return_along_with.split(',').map(s => s.trim()).filter(Boolean) : [],
+                    auxiliary_inputs: data.auxiliary_inputs || [],
+                    export_config: data.export_config as ExportConfig
                 };
 
                 // Auto-set responseMimeType when schema is defined
@@ -846,7 +914,7 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                 const updatedTemplate: PromptTemplate = {
                     ...selectedTemplate,
                     template: finalPrompt,
-                    stage_config: stageConfig as unknown, // Cast because StageFormData 100% matches what we need
+                    stage_config: stageConfig,
                     default_ai_settings: aiSettings as unknown as AISettings
                 };
                 setSelectedTemplate(updatedTemplate);
@@ -1716,6 +1784,25 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                                         }
                                     }}
                                     onPromptTemplateChange={handlePromptTemplateUpdate}
+                                    availableDocuments={availableDocuments}
+                                    selectedDocumentIds={form.watch('auxiliary_inputs')}
+                                    onAuxiliaryInputsChange={(ids) => {
+                                        form.setValue('auxiliary_inputs', ids);
+                                        // Update designer store
+                                        updateStepData(stageId, { auxiliary_inputs: ids });
+                                    }}
+                                    exportConfig={form.watch('export_config') as ExportConfig}
+                                    onExportConfigChange={(config) => {
+                                        // Ensure all required fields are present to satisfy ExportConfig type
+                                        const fullConfig: ExportConfig = {
+                                            enabled: config.enabled === true,
+                                            destination: (config.destination as "google_sheets" | "webhook" | "email") || 'webhook',
+                                            settings: config.settings || { format: 'json' }
+                                        };
+                                        form.setValue('export_config', fullConfig);
+                                        // Update designer store
+                                        updateStepData(stageId, { export_config: fullConfig });
+                                    }}
                                 />
                             </TabsContent>
 

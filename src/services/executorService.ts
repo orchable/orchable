@@ -54,9 +54,10 @@ class ExecutorService {
 		} else {
 			// Supabase + n8n path
 			// The tasks are already created on Supabase via the storage adapter (SupabaseAdapter)
-			// We just need to mark as processing so the UI shows the status
+			// We don't set isProcessing here because n8n runs asynchronously on server.
+			// The UI should derive status from real-time Supabase subscriptions.
 			console.log("[ExecutorService] Execution routed to Supabase + n8n");
-			this.isProcessing = true;
+			this.isProcessing = false;
 		}
 	}
 

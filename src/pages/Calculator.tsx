@@ -30,7 +30,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { pricingService, ModelPricing } from '@/services/pricingService';
 import { tokenUtils } from '@/lib/tokenUtils';
-import { OrchestratorConfig, AISettings } from '@/lib/types';
+import { OrchestratorConfig, AISettings, DocumentAsset, AIModel } from '@/lib/types';
 
 export function CalculatorPage() {
     const { data: configs, isLoading: isLoadingConfigs } = useConfigs();
@@ -48,6 +48,8 @@ export function CalculatorPage() {
     const [stageOutputEstimates, setStageOutputEstimates] = useState<Record<string, number>>({});
     const [stageMultipliers, setStageMultipliers] = useState<Record<string, number>>({});
     const [fetchedTemplates, setFetchedTemplates] = useState<Record<string, string>>({});
+    const [availableDocuments, setAvailableDocuments] = useState<DocumentAsset[]>([]);
+    const [loadingDocs, setLoadingDocs] = useState(false);
 
     const selectedConfig = useMemo(() =>
         configs?.find(c => c.id === selectedConfigId),
@@ -99,6 +101,26 @@ export function CalculatorPage() {
         };
         fetchTemplates();
     }, [selectedConfig]);
+
+    useEffect(() => {
+        const fetchDocuments = async () => {
+            setLoadingDocs(true);
+            try {
+                const { data, error } = await supabase
+                    .from('document_assets')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+                setAvailableDocuments(data || []);
+            } catch (err) {
+                console.error('Failed to fetch documents:', err);
+            } finally {
+                setLoadingDocs(false);
+            }
+        };
+        fetchDocuments();
+    }, []);
 
     const [isDragging, setIsDragging] = useState(false);
 
@@ -212,7 +234,16 @@ export function CalculatorPage() {
             // 1. Estimate Input Tokens
             const templateId = step.prompt_template_id;
             const template = (templateId ? fetchedTemplates[templateId] : null) || (step.ai_settings as AISettings & { prompt_template?: string })?.prompt_template || '';
-            const inputTokensPerRecord = tokenUtils.estimatePromptTokens(template, sampleData);
+            const promptInputTokens = tokenUtils.estimatePromptTokens(template, sampleData);
+
+            // 🔨 Stage IO: Add Auxiliary Input tokens
+            const auxiliaryInputIds = step.auxiliary_inputs || [];
+            const auxiliaryTokens = auxiliaryInputIds.reduce((sum, id) => {
+                const doc = availableDocuments.find(d => d.id === id);
+                return sum + (doc?.token_count_est || 0);
+            }, 0);
+
+            const inputTokensPerRecord = promptInputTokens + auxiliaryTokens;
             const stageInputTokens = inputTokensPerRecord * currentStageTaskCount;
 
             // 2. Estimate Output Tokens
@@ -252,7 +283,7 @@ export function CalculatorPage() {
             totalCost,
             recordCount
         };
-    }, [selectedConfig, recordCount, sampleData, stageOutputEstimates, stageMultipliers, pricingList, fetchedTemplates]);
+    }, [selectedConfig, recordCount, sampleData, stageOutputEstimates, stageMultipliers, pricingList, fetchedTemplates, availableDocuments]);
 
     return (
         <div className="flex-1 flex flex-col h-screen bg-background p-6 overflow-hidden">

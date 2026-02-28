@@ -1,5 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import type { OrchestratorConfig, AISettings } from "@/lib/types";
+import { storage } from "@/lib/storage";
+import { PromptTemplate, CustomComponent } from "@/lib/storage/StorageAdapter";
 
 export type HubAssetType =
 	| "orchestration"
@@ -333,6 +335,9 @@ export const hubService = {
 		importedAsset.hub_asset_id = hubAsset.id;
 		importedAsset.is_public = false;
 
+		// Use storage adapter to route to either IndexedDB (Free/BYOK) or Supabase (Premium)
+		const adapter = storage.adapter;
+
 		if (hubAsset.asset_type === "orchestration" && snapshot.bundle) {
 			const { templates, components } = snapshot.bundle as {
 				templates: Record<string, unknown>;
@@ -343,14 +348,21 @@ export const hubService = {
 
 			// A. Import Components first
 			for (const [oldId, compData] of Object.entries(components)) {
-				const cData = { ...(compData as Record<string, unknown>) };
+				const cData = { ...(compData as Record<string, any>) };
 				if (user) cData.created_by = user.id;
-				const { data: newComp } = await supabase
-					.from("custom_components")
-					.insert(cData)
-					.select()
-					.single();
-				if (newComp) componentMap[oldId] = newComp.id;
+
+				// Generate new local ID for the user's workspace copies
+				const newId = crypto.randomUUID();
+				const component = {
+					...cData,
+					id: newId,
+					hub_asset_id: hubAsset.id,
+					created_at: new Date().toISOString(),
+					updated_at: new Date().toISOString(),
+				} as CustomComponent;
+
+				await adapter.upsertComponent(component);
+				componentMap[oldId] = newId;
 			}
 
 			// B. Import Templates second, re-linking components
@@ -364,12 +376,18 @@ export const hubService = {
 					tData.custom_component_id =
 						componentMap[tData.custom_component_id];
 				}
-				const { data: newTemp } = await supabase
-					.from("prompt_templates")
-					.insert(tData)
-					.select()
-					.single();
-				if (newTemp) templateMap[oldId] = newTemp.id;
+
+				const newId = crypto.randomUUID();
+				const template = {
+					...tData,
+					id: newId,
+					hub_asset_id: hubAsset.id,
+					created_at: new Date().toISOString(),
+					updated_at: new Date().toISOString(),
+				} as PromptTemplate;
+
+				await adapter.upsertTemplate(template);
+				templateMap[oldId] = newId;
 			}
 
 			// C. Re-link templates in orchestration steps
@@ -390,18 +408,40 @@ export const hubService = {
 		}
 
 		// 4. Insert the final asset
-		const { data: imported, error: importErr } = await supabase
-			.from(targetTableName)
-			.insert(importedAsset)
-			.select()
-			.single();
+		let importedResult: any;
 
-		if (importErr) throw importErr;
+		if (hubAsset.asset_type === "orchestration") {
+			importedResult = await adapter.saveConfig(
+				importedAsset as Partial<OrchestratorConfig>,
+			);
+		} else if (hubAsset.asset_type === "template") {
+			const newId = crypto.randomUUID();
+			const template = { ...importedAsset, id: newId } as PromptTemplate;
+			await adapter.upsertTemplate(template);
+			importedResult = template;
+		} else if (hubAsset.asset_type === "component") {
+			const newId = crypto.randomUUID();
+			const component = {
+				...importedAsset,
+				id: newId,
+			} as CustomComponent;
+			await adapter.upsertComponent(component);
+			importedResult = component;
+		} else {
+			// For AI Preset or any other type not in adapter, fallback to direct Supabase
+			const { data, error: importErr } = await supabase
+				.from(targetTableName)
+				.insert(importedAsset)
+				.select()
+				.single();
+			if (importErr) throw importErr;
+			importedResult = data;
+		}
 
-		// 5. Increment install count on Hub
+		// 5. Increment install count on Hub (Cloud only operation)
 		await supabase.rpc("increment_install_count", { asset_id: hubAssetId });
 
-		return imported;
+		return importedResult;
 	},
 
 	/**

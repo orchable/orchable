@@ -4,7 +4,11 @@ import {
 	PromptTemplate,
 	CustomComponent,
 } from "./StorageAdapter";
-import { Execution as TaskBatch, OrchestratorConfig } from "../types";
+import {
+	Execution as TaskBatch,
+	OrchestratorConfig,
+	DocumentAsset,
+} from "../types";
 import { TaskSummary as AiTask } from "../../services/executionTrackingService";
 
 export class SupabaseAdapter implements IStorageAdapter {
@@ -283,5 +287,103 @@ export class SupabaseAdapter implements IStorageAdapter {
 			.eq("id", id);
 
 		if (error) throw error;
+	}
+
+	// Assets
+	async createAsset(asset: Partial<DocumentAsset>): Promise<DocumentAsset> {
+		const { data, error } = await supabase
+			.from("document_assets")
+			.insert(asset)
+			.select()
+			.single();
+
+		if (error) throw error;
+		return data as DocumentAsset;
+	}
+
+	async listAssets(): Promise<DocumentAsset[]> {
+		const { data, error } = await supabase
+			.from("document_assets")
+			.select("*")
+			.order("created_at", { ascending: false });
+
+		if (error) throw error;
+		return data as DocumentAsset[];
+	}
+
+	async getAsset(id: string): Promise<DocumentAsset | null> {
+		const { data, error } = await supabase
+			.from("document_assets")
+			.select("*")
+			.eq("id", id)
+			.maybeSingle();
+
+		if (error) throw error;
+		return data as DocumentAsset;
+	}
+
+	async deleteAsset(id: string): Promise<void> {
+		// 1. Get asset to find file path
+		const asset = await this.getAsset(id);
+		if (!asset) return;
+
+		// 2. Delete from storage if it's a supabase storage asset
+		if (asset.storage_type === "supabase") {
+			const path = asset.file_path.split("/").slice(-2).join("/"); // userId/fileName
+			await supabase.storage.from("documents").remove([path]);
+		}
+
+		// 3. Delete DB record
+		const { error } = await supabase
+			.from("document_assets")
+			.delete()
+			.eq("id", id);
+
+		if (error) throw error;
+	}
+
+	async getAssetContent(asset: DocumentAsset): Promise<string> {
+		if (asset.storage_type === "supabase") {
+			// Extract relative path from public URL or use specific logic
+			// publicUrl: .../storage/v1/object/public/documents/userId/fileName
+			const path = asset.file_path.split("/").slice(-2).join("/");
+
+			const { data, error } = await supabase.storage
+				.from("documents")
+				.download(path);
+
+			if (error) throw error;
+			return await data.text();
+		}
+
+		throw new Error("Local assets not supported in SupabaseAdapter");
+	}
+
+	async saveAsset(
+		name: string,
+		content: string,
+		type: string,
+	): Promise<string> {
+		const {
+			data: { user },
+		} = await supabase.auth.getUser();
+
+		if (!user) throw new Error("Unauthorized");
+
+		const fileName = `${Date.now()}_${name}`;
+		const filePath = `${user.id}/${fileName}`;
+		const blob = new Blob([content], { type: "text/plain" });
+
+		const { data, error } = await supabase.storage
+			.from("documents")
+			.upload(filePath, blob);
+
+		if (error) throw error;
+
+		const {
+			data: { publicUrl },
+		} = supabase.storage.from("documents").getPublicUrl(data.path);
+
+		return publicUrl;
 	}
 }
