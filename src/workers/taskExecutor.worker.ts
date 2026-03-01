@@ -1,9 +1,18 @@
 import { db } from "../lib/storage/IndexedDBAdapter";
 import { TaskSummary as AiTask } from "../services/executionTrackingService";
 import { PromptTemplate } from "../lib/storage/StorageAdapter";
-import type { AISettings, StepConfig, Execution } from "@/lib/types";
+import type {
+	AISettings,
+	StepConfig,
+	Execution,
+	StageContract,
+} from "@/lib/types";
 import type { KeyConfig } from "@/services/keyPoolService";
 import type { UserTier } from "@/lib/storage";
+import {
+	generateOutputFormatSection,
+	injectOutputFormatIntoPrompt,
+} from "@/lib/schemaUtils";
 
 // Types for the worker messages
 export type WorkerMessage =
@@ -579,8 +588,27 @@ async function processTask(task: AiTask) {
 			...taskAiSettings,
 		} as AISettings;
 
+		let finalPrompt = prompt;
+
+		// Inject JSON Format Schema into string prompt if required (specially useful for Deepseek/Qwen)
+		if (
+			stageConfig.contract?.output?.schema &&
+			stageConfig.contract.output.format_injection !== "none"
+		) {
+			const formatSection = generateOutputFormatSection(
+				stageConfig.contract as StageContract,
+			);
+			if (formatSection) {
+				finalPrompt = injectOutputFormatIntoPrompt(
+					prompt,
+					formatSection,
+					stageConfig.contract.output.format_injection,
+				);
+			}
+		}
+
 		const { data: apiResult, usedKeyName } = await callGemini(
-			prompt,
+			finalPrompt,
 			mergedAiSettings,
 			task.batch_id,
 			globalContextStr,

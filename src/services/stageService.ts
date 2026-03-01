@@ -1,4 +1,5 @@
 import { storage } from "@/lib/storage";
+import { supabase } from "@/lib/supabase";
 import type {
 	AISettings,
 	PreProcessConfig,
@@ -169,16 +170,35 @@ export async function syncStagesToPromptTemplates(
 		const templateId = `${orchestratorId}_${uniqueSuffix}`;
 		templateIdMap.set(stage.id, templateId);
 
-		// Fetch source template content if referenced
+		// First, check if there's a source template referenced
 		let templateContent = DEFAULT_PROMPT_TEMPLATE;
-		if (stage.prompt_template_id) {
-			const sourceTemplate = await storage.adapter.getTemplate(
-				stage.prompt_template_id,
-			);
+		const existingSnapshot = await storage.adapter.getTemplate(templateId);
 
-			if (sourceTemplate?.template) {
+		if (stage.prompt_template_id) {
+			// Fetch latest source template content from Supabase
+			const { data: sourceTemplate, error } = await supabase
+				.from("prompt_templates")
+				.select("template")
+				.eq("id", stage.prompt_template_id)
+				.single();
+
+			if (!error && sourceTemplate?.template) {
 				templateContent = sourceTemplate.template;
+			} else {
+				// Fallback to local storage (crucial for Free Tier users who just saved it)
+				const localTemplate = await storage.adapter.getTemplate(
+					stage.prompt_template_id,
+				);
+				if (localTemplate?.template) {
+					templateContent = localTemplate.template;
+				} else if (existingSnapshot?.template) {
+					// If the source is missing entirely, fallback to the snapshot if it exists
+					templateContent = existingSnapshot.template;
+				}
 			}
+		} else if (existingSnapshot?.template) {
+			// No source referenced, preserve the existing snapshot content
+			templateContent = existingSnapshot.template;
 		}
 		// Build Input/Output schemas from contract
 		const inputSchema = mapContractToInputSchema(stage.contract);

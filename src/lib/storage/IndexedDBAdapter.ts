@@ -14,6 +14,13 @@ import {
 import { TaskSummary as AiTask } from "../../services/executionTrackingService";
 import { AIModelSetting } from "../types";
 
+export interface RegistryComponent {
+	id: string;
+	name: string;
+	description?: string | null;
+	is_active?: boolean;
+}
+
 export interface MetadataValue {
 	count: number;
 	month: string;
@@ -24,6 +31,7 @@ export class OrchableDatabase extends Dexie {
 	ai_tasks!: Table<AiTask>;
 	prompt_templates!: Table<PromptTemplate>;
 	custom_components!: Table<CustomComponent>;
+	registry_components!: Table<RegistryComponent>;
 	orchestrator_configs!: Table<OrchestratorConfig>;
 	metadata!: Table<{ key: string; value: MetadataValue }>;
 	assets!: Table<{
@@ -112,6 +120,9 @@ export class OrchableDatabase extends Dexie {
 		});
 		this.version(14).stores({
 			user_api_keys: "id, key_name, pool_type, user_id, provider",
+		});
+		this.version(15).stores({
+			registry_components: "id, name, is_active",
 		});
 	}
 
