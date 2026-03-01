@@ -971,12 +971,31 @@ async function callGemini(
 				stream: false,
 			} as Record<string, unknown>;
 
+			const genConfig = payload.generationConfig as {
+				responseMimeType?: string;
+				responseSchema?: Record<string, unknown>;
+				responseJsonSchema?: Record<string, unknown>;
+			};
 			if (
-				(payload.generationConfig as { responseMimeType?: string })
-					?.responseMimeType === "application/json" &&
+				genConfig?.responseMimeType === "application/json" &&
 				finalModel !== "deepseek-reasoner"
 			) {
-				bodyPayload.response_format = { type: "json_object" };
+				const schema =
+					genConfig.responseSchema || genConfig.responseJsonSchema;
+				// Qwen and MiniMax support JSON Schema Structured Output natively
+				if (schema && (isQwen || isMiniMax)) {
+					bodyPayload.response_format = {
+						type: "json_schema",
+						json_schema: {
+							name: "output_schema",
+							schema: schema,
+							strict: true,
+						},
+					};
+				} else {
+					// Fallback to simple json_object for Deepseek which lacks json_schema support
+					bodyPayload.response_format = { type: "json_object" };
+				}
 			}
 		}
 
