@@ -4,6 +4,7 @@ import { db } from "@/lib/storage/IndexedDBAdapter";
 
 export interface KeyConfig {
 	type: "personal" | "pool";
+	name?: string;
 	apiKey?: string;
 	webhookUrl?: string;
 	poolType?: "free_pool" | "premium_pool";
@@ -17,7 +18,8 @@ export const keyPoolService = {
 		if (!user) throw new Error("Authentication required to resolve keys.");
 
 		// 1. Fetch personal keys based on tier
-		let personalKeys: { api_key_encrypted: string }[] = [];
+		let personalKeys: { api_key_encrypted: string; key_name?: string }[] =
+			[];
 
 		if (tier === "free") {
 			// Fetch from local IndexedDB
@@ -27,6 +29,7 @@ export const keyPoolService = {
 				.toArray();
 			personalKeys = localKeys.map((k) => ({
 				api_key_encrypted: k.api_key_encrypted,
+				key_name: k.key_name,
 			}));
 		} else {
 			// Premium: Fetch from Supabase
@@ -51,6 +54,7 @@ export const keyPoolService = {
 			const limit = tier === "premium" ? Infinity : 3;
 			return personalKeys.slice(0, limit).map((k) => ({
 				type: "personal",
+				name: k.key_name,
 				apiKey: k.api_key_encrypted,
 			}));
 		}
@@ -64,6 +68,7 @@ export const keyPoolService = {
 		return [
 			{
 				type: "pool",
+				name: "System Key",
 				webhookUrl: `${hubBaseUrl}?pool=${tier === "premium" ? "premium_pool" : "free_pool"}`,
 				poolType: tier === "premium" ? "premium_pool" : "free_pool",
 			},

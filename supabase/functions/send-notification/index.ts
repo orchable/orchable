@@ -1,3 +1,5 @@
+/* eslint-disable */
+// @ts-nocheck
 // Supabase Edge Function: send-notification
 // Implements email notifications for Free Tier usage and expiration.
 

@@ -202,7 +202,7 @@ export const hubService = {
 		if (fetchErr) throw fetchErr;
 
 		// 2. Prepare content bundle (Phase 2 logic)
-		let contentSnapshot: Record<string, any> = { ...sourceData };
+		let contentSnapshot: Record<string, unknown> = { ...sourceData };
 		delete contentSnapshot.id;
 		delete contentSnapshot.created_at;
 		delete contentSnapshot.updated_at;
@@ -245,8 +245,8 @@ export const hubService = {
 
 			// Strip sensitive data from the orchestration snapshot
 			contentSnapshot = stripSensitiveData(
-				contentSnapshot as OrchestratorConfig,
-			);
+				contentSnapshot as unknown as OrchestratorConfig,
+			) as unknown as Record<string, unknown>;
 		}
 
 		// 3. Generate slug
@@ -348,7 +348,7 @@ export const hubService = {
 
 			// A. Import Components first
 			for (const [oldId, compData] of Object.entries(components)) {
-				const cData = { ...(compData as Record<string, any>) };
+				const cData = { ...(compData as Record<string, unknown>) };
 				if (user) cData.created_by = user.id;
 
 				// Generate new local ID for the user's workspace copies
@@ -367,14 +367,14 @@ export const hubService = {
 
 			// B. Import Templates second, re-linking components
 			for (const [oldId, tempData] of Object.entries(templates)) {
-				const tData = { ...(tempData as any) };
+				const tData = { ...(tempData as Record<string, unknown>) };
 				if (user) tData.created_by = user.id;
 				if (
 					tData.custom_component_id &&
-					componentMap[tData.custom_component_id]
+					componentMap[tData.custom_component_id as string]
 				) {
 					tData.custom_component_id =
-						componentMap[tData.custom_component_id];
+						componentMap[tData.custom_component_id as string];
 				}
 
 				const newId = crypto.randomUUID();
@@ -391,14 +391,14 @@ export const hubService = {
 			}
 
 			// C. Re-link templates in orchestration steps
-			importedAsset.steps = (importedAsset.steps as any[]).map(
-				(step: any) => {
+			importedAsset.steps = (importedAsset.steps as unknown[]).map(
+				(step: Record<string, unknown>) => {
 					if (
 						step.prompt_template_id &&
-						templateMap[step.prompt_template_id]
+						templateMap[step.prompt_template_id as string]
 					) {
 						step.prompt_template_id =
-							templateMap[step.prompt_template_id];
+							templateMap[step.prompt_template_id as string];
 					}
 					return step;
 				},
@@ -408,7 +408,7 @@ export const hubService = {
 		}
 
 		// 4. Insert the final asset
-		let importedResult: any;
+		let importedResult: unknown;
 
 		if (hubAsset.asset_type === "orchestration") {
 			importedResult = await adapter.saveConfig(

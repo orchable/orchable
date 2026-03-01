@@ -386,4 +386,34 @@ export class SupabaseAdapter implements IStorageAdapter {
 
 		return publicUrl;
 	}
+
+	// API Keys & Health
+	async listKeys(): Promise<Record<string, unknown>[]> {
+		const { data, error } = await supabase
+			.from("user_api_keys")
+			.select("*");
+		if (error) throw error;
+		return data as Record<string, unknown>[];
+	}
+
+	async getApiKeyHealth(
+		userApiKeyId: string,
+	): Promise<import("./StorageAdapter").ApiKeyHealth | null> {
+		const { data, error } = await supabase
+			.from("api_key_health")
+			.select("*")
+			.eq("user_api_key_id", userApiKeyId)
+			.maybeSingle();
+
+		if (error) throw error;
+		return data;
+	}
+
+	async upsertApiKeyHealth(
+		health: import("./StorageAdapter").ApiKeyHealth,
+	): Promise<void> {
+		const { error } = await supabase.from("api_key_health").upsert(health);
+
+		if (error) throw error;
+	}
 }

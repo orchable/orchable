@@ -19,7 +19,7 @@ import {
     Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabase';
+import { storage } from '@/lib/storage';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useConfigs } from '@/hooks/useConfigs';
@@ -85,15 +85,15 @@ export function CalculatorPage() {
             if (templateIds.length === 0) return;
 
             try {
-                const { data, error } = await supabase
-                    .from('prompt_templates')
-                    .select('id, template')
-                    .in('id', templateIds);
-
-                if (error) throw error;
+                // Phase 17: Use storage adapter instead of direct Supabase
+                const results = await Promise.all(
+                    templateIds.map(id => storage.adapter.getTemplate(id))
+                );
 
                 const templateMap: Record<string, string> = {};
-                data.forEach(t => { templateMap[t.id] = t.template; });
+                results.forEach(t => {
+                    if (t) templateMap[t.id] = t.template;
+                });
                 setFetchedTemplates(prev => ({ ...prev, ...templateMap }));
             } catch (err) {
                 console.error("Failed to fetch templates:", err);
@@ -106,12 +106,8 @@ export function CalculatorPage() {
         const fetchDocuments = async () => {
             setLoadingDocs(true);
             try {
-                const { data, error } = await supabase
-                    .from('document_assets')
-                    .select('*')
-                    .order('created_at', { ascending: false });
-
-                if (error) throw error;
+                // Phase 17: Use storage adapter instead of direct Supabase
+                const data = await storage.adapter.listAssets();
                 setAvailableDocuments(data || []);
             } catch (err) {
                 console.error('Failed to fetch documents:', err);
@@ -234,6 +230,12 @@ export function CalculatorPage() {
             // 1. Estimate Input Tokens
             const templateId = step.prompt_template_id;
             const template = (templateId ? fetchedTemplates[templateId] : null) || (step.ai_settings as AISettings & { prompt_template?: string })?.prompt_template || '';
+
+            // Log for debugging Phase 17
+            if (!template && templateId) {
+                console.warn(`[Calculator] Template ${templateId} not found for stage ${step.name}`);
+            }
+
             const promptInputTokens = tokenUtils.estimatePromptTokens(template, sampleData);
 
             // 🔨 Stage IO: Add Auxiliary Input tokens

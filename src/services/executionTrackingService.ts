@@ -152,6 +152,9 @@ export async function getExecutionProgress(
 		safeTasks = rawTasks.map((t) => ({
 			...(t as unknown as TaskSummary),
 			input_data: parseSafe(t.input_data) as Record<string, unknown>,
+			extra: parseSafe(
+				(t as unknown as Record<string, unknown>).extra,
+			) as Record<string, unknown>,
 		}));
 	} else {
 		// 1. Get batch info AND join with orchestration config to get expected stages
@@ -214,7 +217,7 @@ export async function getExecutionProgress(
 		const { data: tasks, error: tasksError } = await supabase
 			.from("ai_tasks")
 			.select(
-				"id, stage_key, step_number, status, created_at, started_at, completed_at, input_data",
+				"id, stage_key, step_number, status, created_at, started_at, completed_at, input_data, extra",
 			)
 			.or(orFilter);
 
@@ -227,6 +230,9 @@ export async function getExecutionProgress(
 		safeTasks = (tasks || []).map((t) => ({
 			...(t as unknown as TaskSummary),
 			input_data: parseSafe(t.input_data) as Record<string, unknown>,
+			extra: parseSafe(
+				(t as unknown as Record<string, unknown>).extra,
+			) as Record<string, unknown>,
 		}));
 	}
 
@@ -420,6 +426,37 @@ export async function getExecutionTasks(
 			tasks = tasks.filter((t) => t.stage_key === stageKey);
 		}
 
+		// Phase 15: Enhance with logs from IndexedDB api_key_usage_log
+		if (tasks.length > 0) {
+			const enhancedTasks = [];
+			for (const t of tasks) {
+				const logs = await db.api_key_usage_log
+					.where("job_id")
+					.equals(t.id)
+					.toArray();
+
+				const extra =
+					(typeof t.extra === "string"
+						? parseSafe(t.extra)
+						: (t.extra as Record<string, unknown>)) || {};
+
+				if (logs.length > 0) {
+					// Count attempts
+					extra.attempts_count = logs.length;
+					// Get the latest key name
+					const sortedLogs = logs.sort(
+						(a, b) =>
+							new Date(b.used_at).getTime() -
+							new Date(a.used_at).getTime(),
+					);
+					extra.used_api_key_name =
+						sortedLogs[0].key_name || "Unknown";
+				}
+				enhancedTasks.push({ ...t, extra });
+			}
+			tasks = enhancedTasks as typeof tasks;
+		}
+
 		tasks.sort((a, b) => {
 			if ((a.step_number || 0) !== (b.step_number || 0)) {
 				return (a.step_number || 0) - (b.step_number || 0);
@@ -465,7 +502,7 @@ export async function getExecutionTasks(
 		let query = supabase
 			.from("ai_tasks")
 			.select(
-				"id, stage_key, step_number, task_type, status, lo_code, created_at, updated_at, started_at, completed_at, error_message, user_id, parent_task_id, root_task_id, hierarchy_path, input_data, output_data, prompt_template_id",
+				"id, stage_key, step_number, task_type, status, lo_code, created_at, updated_at, started_at, completed_at, error_message, user_id, parent_task_id, root_task_id, hierarchy_path, input_data, output_data, prompt_template_id, extra",
 			)
 			.or(orParts.join(","))
 			.order("step_number")
@@ -482,6 +519,61 @@ export async function getExecutionTasks(
 			return [];
 		}
 		rawTasks = (data as unknown as Partial<TaskSummary>[]) || [];
+
+		if (rawTasks.length > 0) {
+			const taskIds = rawTasks
+				.map((t) => t.id)
+				.filter(Boolean) as string[];
+
+			// We chunk the IDs just in case there are thousands, but supbase in() usually handles 1000 easily
+			const { data: keyLogs, error: keyLogsErr } = await supabase
+				.from("api_key_usage_log")
+				.select("job_id, user_api_keys(key_name)")
+				.in("job_id", taskIds);
+
+			if (!keyLogsErr && keyLogs && keyLogs.length > 0) {
+				const keyLogMap = new Map<
+					string,
+					{ name: string; count: number }
+				>();
+				keyLogs.forEach((log: Record<string, unknown>) => {
+					const jobId = log.job_id as string;
+					const userApiKeys = log.user_api_keys as
+						| Record<string, unknown>
+						| null
+						| undefined;
+					const keyName =
+						(userApiKeys?.key_name as string) || "Unknown";
+
+					const existing = keyLogMap.get(jobId) || {
+						name: keyName,
+						count: 0,
+					};
+					existing.count += 1;
+					existing.name = keyName; // Keep the latest seen key name
+					keyLogMap.set(jobId, existing);
+				});
+
+				rawTasks = rawTasks.map((t) => {
+					if (t.id && keyLogMap.has(t.id)) {
+						const stats = keyLogMap.get(t.id)!;
+						const extra =
+							typeof t.extra === "string"
+								? JSON.parse(t.extra)
+								: {
+										...((t.extra as Record<
+											string,
+											unknown
+										>) || {}),
+									};
+						extra.used_api_key_name = stats.name;
+						extra.attempts_count = stats.count;
+						return { ...t, extra };
+					}
+					return t;
+				});
+			}
+		}
 	}
 
 	return rawTasks.map((task) => ({
@@ -501,6 +593,7 @@ export async function getExecutionTasks(
 		hierarchy_path: parseSafe(task.hierarchy_path) || [],
 		input_data: parseSafe(task.input_data),
 		output_data: parseSafe(task.output_data),
+		extra: parseSafe(task.extra),
 		prompt_template_id: task.prompt_template_id,
 	}));
 }

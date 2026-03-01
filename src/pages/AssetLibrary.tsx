@@ -114,6 +114,7 @@ export function AssetLibrary() {
 
     useEffect(() => {
         fetchAssets();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const fetchAssets = async () => {
@@ -141,7 +142,17 @@ export function AssetLibrary() {
                     });
                     setAiSettings(mergedSettings);
                 } else {
-                    setAiSettings(aiList.data);
+                    // For Premium: Merge system defaults with user's overrides
+                    const systemSettings = aiList.data.filter(s => s.user_id === null);
+                    const userOverrides = aiList.data.filter(s => s.user_id === user?.id);
+                    const mergedSettings = systemSettings.map(globalSetting => {
+                        const override = userOverrides.find(o => o.model_id === globalSetting.model_id);
+                        if (override) {
+                            return { ...globalSetting, ...override, id: override.id };
+                        }
+                        return globalSetting;
+                    });
+                    setAiSettings(mergedSettings);
                 }
             }
             if (docList.data) setDocuments(docList.data as DocumentAsset[]);
@@ -261,8 +272,21 @@ export function AssetLibrary() {
         if (!editingAiSetting) return;
         setIsSavingAiSetting(true);
         try {
-            // Check if the setting is owned by the user or a system global setting.
-            // Fast approach: we perform an upsert on model_id + user_id.
+            if (tier === 'free') {
+                const payload = { ...editingAiSetting };
+                const existing = await db.ai_model_settings.where('model_id').equals(editingAiSetting.model_id).first();
+                if (existing) {
+                    await db.ai_model_settings.update(existing.id!, payload);
+                } else {
+                    payload.id = editingAiSetting.model_id + '_local';
+                    await db.ai_model_settings.put(payload);
+                }
+                toast.success('AI default settings saved locally');
+                setIsAiSettingEditorOpen(false);
+                fetchAssets();
+                return;
+            }
+
             if (!user) throw new Error("Must be logged in to save settings.");
 
             const { data: existingUserSetting } = await supabase
@@ -270,7 +294,7 @@ export function AssetLibrary() {
                 .select('id')
                 .eq('user_id', user.id)
                 .eq('model_id', editingAiSetting.model_id)
-                .single();
+                .maybeSingle();
 
             const payload = {
                 model_id: editingAiSetting.model_id,
@@ -692,6 +716,18 @@ export function AssetLibrary() {
                                                         <Switch
                                                             checked={setting.is_active}
                                                             onCheckedChange={async (checked) => {
+                                                                if (tier === 'free') {
+                                                                    const existing = await db.ai_model_settings.where('model_id').equals(setting.model_id).first();
+                                                                    if (existing) {
+                                                                        await db.ai_model_settings.update(existing.id!, { is_active: checked });
+                                                                    } else {
+                                                                        await db.ai_model_settings.put({ ...setting, is_active: checked, id: setting.model_id + '_local' });
+                                                                    }
+                                                                    setAiSettings(prev => prev.map(s => s.id === setting.id ? { ...s, is_active: checked } : s));
+                                                                    toast.success(checked ? 'Model enabled locally' : 'Model disabled locally');
+                                                                    return;
+                                                                }
+
                                                                 const { error } = await supabase
                                                                     .from('ai_model_settings')
                                                                     .update({ is_active: checked })

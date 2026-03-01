@@ -25,6 +25,7 @@ let currentTier: Exclude<UserTier, null> = "free";
 
 interface KeyState {
 	apiKey: string;
+	name?: string;
 	healthStatus:
 		| "healthy"
 		| "degraded"
@@ -36,6 +37,15 @@ interface KeyState {
 	blockedUntil: number; // timestamp
 	consecutiveFailures: number;
 	lastUsedAt: number; // timestamp
+
+	// Phase 16: Persistent Health Fields
+	totalRequests: number;
+	successfulRequests: number;
+	failedRequests: number;
+	lastSuccessAt?: number;
+	lastFailureAt?: number;
+	blockReason?: string;
+	lastErrorCode?: string;
 }
 
 class KeyManager {
@@ -49,23 +59,45 @@ class KeyManager {
 	private BLOCK_DURATION_HOURS = 2;
 	private COOLDOWN_MINUTES = 5; // To prevent hammering one key
 
-	public initialize(configs: KeyConfig[]) {
+	private getNowIso() {
+		return new Date().toISOString();
+	}
+
+	public async initialize(configs: KeyConfig[]) {
 		this.keys = [];
 		this.poolConfig = null;
 
 		for (const config of configs) {
 			if (config.type === "personal" && config.apiKey) {
+				const health = await db.api_key_health.get(config.apiKey);
 				this.keys.push({
 					apiKey: config.apiKey,
-					healthStatus: "healthy",
-					remainingRequests: 999999, // default max before first parse
+					name: config.name,
+					healthStatus:
+						(health?.health_status as KeyState["healthStatus"]) ??
+						"healthy",
+					remainingRequests: 999999,
 					remainingTokens: 999999999,
-					blockedUntil: 0,
-					consecutiveFailures: 0,
-					lastUsedAt: 0,
+					blockedUntil: health?.blocked_until
+						? new Date(health.blocked_until).getTime()
+						: 0,
+					consecutiveFailures: health?.consecutive_failures || 0,
+					lastUsedAt: health?.last_used_at
+						? new Date(health.last_used_at).getTime()
+						: 0,
+					totalRequests: health?.total_requests || 0,
+					successfulRequests: health?.successful_requests || 0,
+					failedRequests: health?.failed_requests || 0,
+					lastSuccessAt: health?.last_success_at
+						? new Date(health.last_success_at).getTime()
+						: undefined,
+					lastFailureAt: health?.last_failure_at
+						? new Date(health.last_failure_at).getTime()
+						: undefined,
+					blockReason: health?.block_reason,
+					lastErrorCode: health?.last_error_code,
 				});
 			} else if (config.type === "pool") {
-				// We only expect one pool config per worker session based on tier
 				this.poolConfig = config;
 			}
 		}
@@ -167,7 +199,36 @@ class KeyManager {
 		}
 	}
 
-	public reportError(
+	private async saveHealth(key: KeyState) {
+		try {
+			await db.upsertApiKeyHealth({
+				user_api_key_id: key.apiKey,
+				last_used_at: new Date(key.lastUsedAt).toISOString(),
+				last_success_at: key.lastSuccessAt
+					? new Date(key.lastSuccessAt).toISOString()
+					: null,
+				last_failure_at: key.lastFailureAt
+					? new Date(key.lastFailureAt).toISOString()
+					: null,
+				consecutive_failures: key.consecutiveFailures,
+				total_requests: key.totalRequests,
+				successful_requests: key.successfulRequests,
+				failed_requests: key.failedRequests,
+				blocked_until:
+					key.blockedUntil > 0
+						? new Date(key.blockedUntil).toISOString()
+						: null,
+				block_reason: key.blockReason,
+				last_error_code: key.lastErrorCode,
+				health_status: key.healthStatus,
+				updated_at: new Date().toISOString(),
+			});
+		} catch (error) {
+			console.error("[KeyManager] Failed to persist key health:", error);
+		}
+	}
+
+	public async reportError(
 		apiKey: string,
 		status: number,
 		errorMessage: string,
@@ -176,6 +237,12 @@ class KeyManager {
 		const key = this.keys.find((k) => k.apiKey === apiKey);
 		if (!key) return;
 		const now = Date.now();
+		key.lastUsedAt = now;
+		key.lastFailureAt = now;
+		key.totalRequests++;
+		key.failedRequests++;
+
+		key.lastErrorCode = status ? status.toString() : "ERROR";
 
 		// Update limits if header is provided
 		if (headers) this.updateKeyStatus(apiKey, headers);
@@ -191,12 +258,14 @@ class KeyManager {
 		if (isRateLimit) {
 			key.healthStatus = "rate_limited";
 			key.consecutiveFailures++;
+			key.blockReason = "Rate limited (429)";
 			let blockMinutes = 15;
 			if (msg.includes("per day") || msg.includes("daily")) {
 				blockMinutes = 720; // 12h
+				key.blockReason = "Daily quota exceeded";
 			} else {
 				// Parse retry-after from header or message if possible
-				const retryAfter = headers.get("retry-after");
+				const retryAfter = headers?.get("retry-after");
 				if (retryAfter)
 					blockMinutes = Math.ceil(parseInt(retryAfter, 10) / 60);
 			}
@@ -206,6 +275,7 @@ class KeyManager {
 			);
 		} else if (status === 403 || msg.includes("permission denied")) {
 			key.healthStatus = "blocked";
+			key.blockReason = "Permission Denied (403)";
 			key.blockedUntil = now + 24 * 60 * 60 * 1000; // 24h
 			key.consecutiveFailures++;
 		} else if (
@@ -214,29 +284,42 @@ class KeyManager {
 			msg.includes("invalid api key")
 		) {
 			key.healthStatus = "disabled";
+			key.blockReason = "Invalid Key (401)";
 			key.consecutiveFailures++;
 		} else if (status >= 500) {
 			key.healthStatus = "degraded";
 			key.consecutiveFailures++;
 			if (key.consecutiveFailures >= this.MAX_CONSECUTIVE_FAILS) {
+				key.healthStatus = "blocked";
+				key.blockReason = "Too many server errors (5xx)";
 				key.blockedUntil =
 					now + this.BLOCK_DURATION_HOURS * 60 * 60 * 1000;
 			}
 		} else {
-			// e.g., 400 Bad Request (not the key's fault structurally, maybe prompt issue)
-			// Don't punish the key too heavily
+			// e.g., 400 Bad Request
 			key.consecutiveFailures++;
 		}
+
+		await this.saveHealth(key);
 	}
 
-	public reportSuccess(apiKey: string, headers: Headers) {
+	public async reportSuccess(apiKey: string, headers: Headers) {
 		const key = this.keys.find((k) => k.apiKey === apiKey);
 		if (!key) return;
 
+		const now = Date.now();
+		key.lastUsedAt = now;
+		key.lastSuccessAt = now;
+		key.totalRequests++;
+		key.successfulRequests++;
 		key.healthStatus = "healthy";
 		key.consecutiveFailures = 0;
 		key.blockedUntil = 0;
+		key.blockReason = undefined;
+		key.lastErrorCode = "OK";
+
 		if (headers) this.updateKeyStatus(apiKey, headers);
+		await this.saveHealth(key);
 	}
 }
 
@@ -250,21 +333,25 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 	const { data } = e;
 
-	if (data.type === "START") {
-		isRunning = true;
-		if (data.configs.length === 0) {
-			throw new Error("No execution configs provided.");
+	try {
+		if (data.type === "START") {
+			isRunning = true;
+			if (data.configs.length === 0) {
+				throw new Error("No execution configs provided.");
+			}
+			await keyManager.initialize(data.configs);
+			currentTier = data.tier || "free";
+			console.log(
+				`[Worker] Started processing loop (Tier: ${currentTier}, Keys: ${data.configs.length})`,
+			);
+			if (!isLooping) runLoop();
+		} else if (data.type === "STOP") {
+			isRunning = false;
+			await keyManager.initialize([]); // Clear keys on stop
+			console.log("[Worker] Stopped");
 		}
-		keyManager.initialize(data.configs);
-		currentTier = data.tier || "free";
-		console.log(
-			`[Worker] Started processing loop (Tier: ${currentTier}, Keys: ${data.configs.length})`,
-		);
-		if (!isLooping) runLoop();
-	} else if (data.type === "STOP") {
-		isRunning = false;
-		keyManager.initialize([]); // Clear keys on stop
-		console.log("[Worker] Stopped");
+	} catch (err: unknown) {
+		console.error("[Worker] Error in message handler:", err);
 	}
 };
 
@@ -485,13 +572,18 @@ async function processTask(task: AiTask) {
 			...taskAiSettings,
 		} as AISettings;
 
-		let result = await callGemini(
+		const { data: apiResult, usedKeyName } = await callGemini(
 			prompt,
 			mergedAiSettings,
 			task.batch_id,
 			globalContextStr,
 			task.id,
 		);
+		let result = apiResult;
+
+		if (usedKeyName) {
+			extra.used_api_key_name = usedKeyName;
+		}
 
 		// --- SUPPORT: return-along-with ---
 		const returnAlongWith = (extra["return-along-with"] as string[]) || [];
@@ -554,6 +646,7 @@ async function processTask(task: AiTask) {
 		await db.ai_tasks.update(task.id, {
 			status: "completed",
 			output_data: result,
+			extra: extra, // Save the updated extra containing used_api_key_name
 			error_message: null,
 			completed_at: new Date().toISOString(),
 		});
@@ -659,102 +752,101 @@ async function callGemini(
 	globalContextStr?: string,
 	taskId?: string,
 ) {
-	const keySelection = keyManager.getBestKey();
-
-	if (!keySelection) {
-		throw new Error("No API keys or pools available.");
-	}
-
-	let apiKey: string | undefined;
-	let currentConfig: KeyConfig | undefined;
-
-	if (keySelection.type === "personal") {
-		apiKey = keySelection.keyState.apiKey;
-		currentConfig = { type: "personal", apiKey: apiKey }; // Create a dummy KeyConfig for consistency
-	} else {
-		currentConfig = keySelection.config;
-	}
-
-	if (currentConfig.type === "pool") {
-		// Route to platform Key Pool via webhook
-		return await executeWebhook(
-			{
-				webhook_url: currentConfig.webhookUrl,
-				webhook_method: "POST",
-			},
-			{
-				prompt,
-				settings: aiSettings,
-				tier: currentTier,
-				// rotation manager will use poolType to filter internal keys
-				pool: currentConfig.poolType,
-			},
-		);
-	}
-
 	const model = aiSettings?.model_id || "gemini-2.0-flash";
-	let api = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${currentConfig.apiKey}`;
-	let bodyPayload: Record<string, unknown> = {
+	const bodyPayload: Record<string, unknown> = {
 		contents: [{ parts: [{ text: prompt }] }],
 		generationConfig: aiSettings?.generationConfig || {},
 	};
 
-	// --- PHASE 2: PREMIUM EDGE FUNCTION CACHING ---
-	// If the user is on Premium, they don't use their own key (except if they force BYOK, but typically Premium uses platform credits).
-	// Actually, the Web Worker handles Free Tier (using their BYOK key).
-	// The problem requested routing via Edge Function if applicable. Wait, if it's the Web Worker,
-	// BYOK users (Free) just hit Gemini directly to avoid server costs.
-	// They don't get the caching efficiency unless they use the Edge Function.
-	// For now, if currentTier is premium (unlikely to run in Worker, but just in case), target the Edge Function.
 	if (currentTier === "premium") {
-		const { supabase } = await import("@/lib/supabase");
-		const {
-			data: { session },
-		} = await supabase.auth.getSession();
-
-		api = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-proxy`;
-		bodyPayload = {
-			batch_id: batchId,
-			prompt: prompt,
-			ai_settings: aiSettings,
-			system_instruction: (
-				aiSettings as unknown as Record<string, unknown>
-			).systemInstruction, // Assuming systemInstruction is in aiSettings
-			// Global context must be an object for the Edge function, but we already stringified it above.
-			// The Edge function expects an object `{ "doc1": "text" }`.
-			// Let's pass the raw string into prompt instead for Worker if we can't get the raw object.
-		};
-		// We can't perfectly map the stringified global_context back to an object here without refactoring.
-		// Since WebWorker is mainly Free tier, we will stick to standard BYOK execution for Free tier.
+		bodyPayload.batch_id = batchId;
+		bodyPayload.prompt = prompt;
+		bodyPayload.ai_settings = aiSettings;
+		bodyPayload.system_instruction = (
+			aiSettings as unknown as Record<string, unknown>
+		).systemInstruction;
 	} else if (globalContextStr) {
-		// Free Tier BYOK: Just prepend context to the prompt manually
 		(bodyPayload.contents as unknown[])[0] = {
 			parts: [{ text: `${globalContextStr}\n\n${prompt}` }],
 		};
 	}
 
-	const headers: Record<string, string> = {
-		"Content-Type": "application/json",
-	};
-	if (currentTier === "premium") {
-		const { supabase } = await import("@/lib/supabase");
-		const {
-			data: { session },
-		} = await supabase.auth.getSession();
-		headers["Authorization"] = `Bearer ${session?.access_token}`;
-	}
-
-	// Phase 8: Exponential backoff for 429 Rate Limit
+	// Phase 15: Tracking Attempts & Latency
+	const startTime = Date.now();
 	let response: Response | null = null;
 	const maxRetries = 5;
 	let attempt = 0;
 
+	let apiKey: string | undefined;
+	let currentConfig: KeyConfig | undefined;
+	let usedKeyName: string | undefined;
+
 	while (attempt <= maxRetries) {
-		response = await fetch(api, {
-			method: "POST",
-			headers,
-			body: JSON.stringify(bodyPayload),
-		});
+		const keySelection = keyManager.getBestKey();
+
+		if (!keySelection) {
+			throw new Error("No API keys or pools available.");
+		}
+
+		if (keySelection.type === "personal") {
+			apiKey = keySelection.keyState.apiKey;
+			currentConfig = { type: "personal", apiKey: apiKey };
+			usedKeyName = keySelection.keyState.name;
+		} else {
+			currentConfig = keySelection.config;
+			usedKeyName = currentConfig.name;
+		}
+
+		if (currentConfig.type === "pool") {
+			const webhookResult = await executeWebhook(
+				{
+					webhook_url: currentConfig.webhookUrl,
+					webhook_method: "POST",
+				},
+				{
+					prompt,
+					settings: aiSettings,
+					tier: currentTier,
+					pool: currentConfig.poolType,
+				},
+			);
+			return { data: webhookResult, usedKeyName };
+		}
+
+		let api = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${currentConfig.apiKey}`;
+		const headers: Record<string, string> = {
+			"Content-Type": "application/json",
+		};
+
+		if (currentTier === "premium") {
+			const { supabase } = await import("@/lib/supabase");
+			const {
+				data: { session },
+			} = await supabase.auth.getSession();
+			headers["Authorization"] = `Bearer ${session?.access_token}`;
+			api = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-proxy`;
+		}
+
+		try {
+			response = await fetch(api, {
+				method: "POST",
+				headers,
+				body: JSON.stringify(bodyPayload),
+			});
+		} catch (fetchError: unknown) {
+			console.error(`[Worker] Network error:`, fetchError);
+			if (currentConfig.type === "personal" && apiKey) {
+				await keyManager.reportError(
+					apiKey,
+					0,
+					fetchError instanceof Error
+						? fetchError.message
+						: "Network Error",
+					new Headers(),
+				);
+			}
+			throw fetchError;
+		}
 
 		if (!response.ok) {
 			const json = await response.json().catch(() => ({}));
@@ -763,9 +855,34 @@ async function callGemini(
 				json.error ||
 				`HTTP ${response.status} ${response.statusText}`;
 
+			// Phase 15: Log failed attempt
+			if (taskId) {
+				const latency = Date.now() - startTime;
+				await db.addApiKeyUsageLog({
+					user_api_key_id: apiKey || currentConfig.apiKey || "pool",
+					key_name: usedKeyName,
+					job_id: taskId,
+					request_type: "generateContent",
+					model_used: model,
+					success: false,
+					error_code: String(response.status),
+					error_message: errMsg,
+					latency_ms: latency,
+					user_id: "local_user",
+				});
+
+				// Increment retry count in DB for the task
+				await db.ai_tasks
+					.where("id")
+					.equals(taskId)
+					.modify((task: AiTask) => {
+						task.retry_count = (task.retry_count || 0) + 1;
+					});
+			}
+
 			// Report to KeyManager if using a personal key
 			if (currentConfig.type === "personal" && apiKey) {
-				keyManager.reportError(
+				await keyManager.reportError(
 					apiKey,
 					response.status,
 					errMsg,
@@ -820,7 +937,22 @@ async function callGemini(
 
 		// If success
 		if (currentConfig.type === "personal" && apiKey) {
-			keyManager.reportSuccess(apiKey, response.headers);
+			await keyManager.reportSuccess(apiKey, response.headers);
+		}
+
+		// Phase 15: Log successful attempt
+		if (taskId) {
+			const latency = Date.now() - startTime;
+			await db.addApiKeyUsageLog({
+				user_api_key_id: apiKey || currentConfig.apiKey || "pool",
+				key_name: usedKeyName,
+				job_id: taskId,
+				request_type: "generateContent",
+				model_used: model,
+				success: true,
+				latency_ms: latency,
+				user_id: "local_user",
+			});
 		}
 		break;
 	}
@@ -839,11 +971,11 @@ async function callGemini(
 			aiSettings?.generationConfig?.responseMimeType ===
 			"application/json"
 		) {
-			return JSON.parse(text);
+			return { data: JSON.parse(text), usedKeyName };
 		}
-		return { result: text };
+		return { data: { result: text }, usedKeyName };
 	} catch (e) {
-		return { result: text, parse_error: true };
+		return { data: { result: text, parse_error: true }, usedKeyName };
 	}
 }
 

@@ -41,6 +41,41 @@ export interface CustomComponent {
 	hub_asset_id?: string;
 }
 
+export interface ApiKeyHealth {
+	user_api_key_id: string;
+	last_used_at?: string | null;
+	last_success_at?: string | null;
+	last_failure_at?: string | null;
+	consecutive_failures: number;
+	total_requests: number;
+	successful_requests: number;
+	failed_requests: number;
+	health_status?: string | null;
+	blocked_until?: string | null;
+	block_reason?: string | null;
+	last_error_code?: string | null;
+	updated_at: string;
+	user_id?: string | null;
+}
+
+export interface ApiKeyUsageLog {
+	id: string;
+	user_api_key_id: string;
+	task_id?: string | null;
+	job_id?: string | null;
+	request_type?: string | null;
+	model_used?: string | null;
+	tokens_used?: number | null;
+	success?: boolean | null;
+	error_code?: string | null;
+	error_message?: string | null;
+	latency_ms?: number | null;
+	used_at: string;
+	metadata_json?: Record<string, unknown> | null;
+	user_id?: string | null;
+	key_name?: string | null;
+}
+
 export interface IStorageAdapter {
 	// Batches
 	createBatch(batch: Partial<TaskBatch>): Promise<TaskBatch>;
@@ -88,4 +123,9 @@ export interface IStorageAdapter {
 	deleteAsset(id: string): Promise<void>;
 	getAssetContent(asset: import("../types").DocumentAsset): Promise<string>;
 	saveAsset(name: string, content: string, type: string): Promise<string>;
+
+	// API Keys & Health
+	listKeys(): Promise<Record<string, unknown>[]>;
+	getApiKeyHealth(userApiKeyId: string): Promise<ApiKeyHealth | null>;
+	upsertApiKeyHealth(health: ApiKeyHealth): Promise<void>;
 }

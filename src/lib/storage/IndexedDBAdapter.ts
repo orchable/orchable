@@ -3,6 +3,8 @@ import {
 	IStorageAdapter,
 	PromptTemplate,
 	CustomComponent,
+	ApiKeyHealth,
+	ApiKeyUsageLog,
 } from "./StorageAdapter";
 import {
 	Execution as TaskBatch,
@@ -41,6 +43,39 @@ export class OrchableDatabase extends Dexie {
 		user_id: string;
 	}>;
 	ai_model_settings!: Table<AIModelSetting>;
+	api_key_usage_log!: Table<{
+		id: string;
+		user_api_key_id: string;
+		task_id?: string | null;
+		job_id?: string | null;
+		request_type?: string | null;
+		model_used?: string | null;
+		tokens_used?: number | null;
+		success?: boolean | null;
+		error_code?: string | null;
+		error_message?: string | null;
+		latency_ms?: number | null;
+		key_name?: string | null;
+		used_at: string;
+		metadata_json?: Record<string, unknown> | null;
+		user_id?: string | null;
+	}>;
+	api_key_health!: Table<{
+		user_api_key_id: string;
+		last_used_at?: string | null;
+		last_success_at?: string | null;
+		last_failure_at?: string | null;
+		consecutive_failures: number;
+		total_requests: number;
+		successful_requests: number;
+		failed_requests: number;
+		health_status?: string | null;
+		blocked_until?: string | null;
+		block_reason?: string | null;
+		last_error_code?: string | null;
+		updated_at: string;
+		user_id?: string | null;
+	}>;
 
 	constructor() {
 		super("orchable_db");
@@ -67,6 +102,13 @@ export class OrchableDatabase extends Dexie {
 		this.version(11).stores({
 			ai_model_settings: "id, model_id, is_active",
 		});
+		this.version(12).stores({
+			api_key_usage_log: "id, job_id, user_api_key_id, success, used_at",
+		});
+		this.version(13).stores({
+			api_key_health:
+				"user_api_key_id, blocked_until, updated_at, health_status",
+		});
 	}
 
 	/**
@@ -87,6 +129,29 @@ export class OrchableDatabase extends Dexie {
 			await this.metadata.put({ key, value: newValue });
 			return newValue;
 		});
+	}
+
+	// Helper for logging (used by worker and adapter)
+	async addApiKeyUsageLog(
+		log: Omit<ApiKeyUsageLog, "id" | "used_at">,
+	): Promise<void> {
+		await this.api_key_usage_log.add({
+			...log,
+			id: crypto.randomUUID(),
+			used_at: new Date().toISOString(),
+		});
+	}
+
+	async getApiKeyUsageLogs(jobId: string): Promise<ApiKeyUsageLog[]> {
+		return this.api_key_usage_log.where("job_id").equals(jobId).toArray();
+	}
+
+	async getApiKeyHealth(userApiKeyId: string) {
+		return this.api_key_health.get(userApiKeyId);
+	}
+
+	async upsertApiKeyHealth(health: ApiKeyHealth) {
+		await this.api_key_health.put(health);
 	}
 }
 
@@ -352,5 +417,24 @@ export class IndexedDBAdapter implements IStorageAdapter {
 
 	async deleteKey(id: string): Promise<void> {
 		await db.user_api_keys.delete(id);
+	}
+
+	// API Usage Logs (Mirror of Supabase)
+	async addApiKeyUsageLog(
+		log: Omit<ApiKeyUsageLog, "id" | "used_at">,
+	): Promise<void> {
+		await db.addApiKeyUsageLog(log);
+	}
+
+	async getApiKeyUsageLogs(jobId: string): Promise<ApiKeyUsageLog[]> {
+		return db.getApiKeyUsageLogs(jobId);
+	}
+
+	async getApiKeyHealth(userApiKeyId: string): Promise<ApiKeyHealth | null> {
+		return db.getApiKeyHealth(userApiKeyId);
+	}
+
+	async upsertApiKeyHealth(health: ApiKeyHealth): Promise<void> {
+		await db.upsertApiKeyHealth(health);
 	}
 }

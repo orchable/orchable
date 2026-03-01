@@ -12,7 +12,7 @@ import {
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { TaskSummary } from "@/services/executionTrackingService";
 import { Badge } from "@/components/ui/badge";
-import { ChevronRight, ChevronDown, ListTree, Layers, Eye, Copy, Check, Clock, Code2, Download, RotateCcw } from "lucide-react";
+import { ChevronRight, ChevronDown, ListTree, Layers, Eye, Copy, Check, Clock, Code2, Download, RotateCcw, Key } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn, formatDistanceToNow } from "@/lib/utils";
 import {
@@ -151,6 +151,27 @@ export function TaskHierarchyTree({ tasks }: TaskHierarchyTreeProps) {
                         </div>
                     </TableCell>
                     <TableCell className="py-2">
+                        {/* API Key Column */}
+                        {(task.extra as Record<string, unknown>)?.used_api_key_name ? (
+                            <div className="flex items-center gap-1.5 text-[10px] text-emerald-600 font-medium">
+                                <Key className="w-3 h-3 text-emerald-500/70" />
+                                <span className="max-w-[120px] truncate">{String((task.extra as Record<string, unknown>).used_api_key_name)}</span>
+                            </div>
+                        ) : (
+                            <span className="text-[10px] text-muted-foreground opacity-30 italic">N/A</span>
+                        )}
+                    </TableCell>
+                    <TableCell className="py-2">
+                        {/* Attempts Column */}
+                        {(task.extra as Record<string, unknown>)?.attempts_count ? (
+                            <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal bg-blue-500/5 text-blue-600 border-blue-500/10">
+                                {String((task.extra as Record<string, unknown>).attempts_count)}
+                            </Badge>
+                        ) : (
+                            <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal bg-muted opacity-40">1</Badge>
+                        )}
+                    </TableCell>
+                    <TableCell className="py-2">
                         <div className="flex flex-col gap-1">
                             <StatusBadge status={(task.status || 'pending') as ExecutionStatus} size="sm" />
                             {task.status === 'processing' && task.error_message && (
@@ -247,6 +268,8 @@ export function TaskHierarchyTree({ tasks }: TaskHierarchyTreeProps) {
                     <TableHeader className="bg-muted/10">
                         <TableRow className="border-b border-muted/50 hover:bg-transparent">
                             <TableHead className="w-[400px]">Stage / Task ID</TableHead>
+                            <TableHead>API Key</TableHead>
+                            <TableHead>Attempts</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Started At</TableHead>
                             <TableHead>Finished At</TableHead>
