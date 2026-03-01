@@ -105,7 +105,9 @@ class KeyManager {
 		}
 	}
 
-	public getBestKey():
+	public getBestKey(
+		requestedProvider?: "gemini" | "deepseek" | "qwen" | "minimax",
+	):
 		| { type: "personal"; keyState: KeyState }
 		| { type: "pool"; config: KeyConfig }
 		| null {
@@ -126,6 +128,9 @@ class KeyManager {
 				return false;
 			// Fast quota guard
 			if (k.remainingRequests < 1 || k.remainingTokens < 100)
+				return false;
+			// Strict Provider Matching (if requested)
+			if (requestedProvider && k.provider !== requestedProvider)
 				return false;
 
 			// Cooldown logic for heavy usage
@@ -755,7 +760,7 @@ async function callGemini(
 	taskId?: string,
 ) {
 	const model = aiSettings?.model_id || "gemini-2.0-flash";
-	const bodyPayload: Record<string, unknown> = {
+	let bodyPayload: Record<string, unknown> = {
 		contents: [{ parts: [{ text: prompt }] }],
 		generationConfig: aiSettings?.generationConfig || {},
 	};
@@ -793,7 +798,19 @@ async function callGemini(
 	let usedKeyName: string | undefined;
 
 	while (attempt <= maxRetries) {
-		const keySelection = keyManager.getBestKey();
+		const expectedProvider =
+			aiSettings?.provider ||
+			(model.startsWith("deepseek")
+				? "deepseek"
+				: model.startsWith("qwen")
+					? "qwen"
+					: model.startsWith("minimax")
+						? "minimax"
+						: "gemini");
+
+		const keySelection = keyManager.getBestKey(
+			expectedProvider as "gemini" | "deepseek" | "qwen" | "minimax",
+		);
 
 		if (!keySelection) {
 			throw new Error("No API keys or pools available.");
@@ -801,7 +818,12 @@ async function callGemini(
 
 		if (keySelection.type === "personal") {
 			apiKey = keySelection.keyState.apiKey;
-			currentConfig = { type: "personal", apiKey: apiKey };
+			currentConfig = {
+				type: "personal",
+				apiKey: apiKey,
+				provider: keySelection.keyState.provider,
+				name: keySelection.keyState.name,
+			};
 			usedKeyName = keySelection.keyState.name;
 		} else {
 			currentConfig = keySelection.config;
@@ -867,22 +889,67 @@ async function callGemini(
 
 			if (payload.contents?.[0]?.parts?.[0]?.text) {
 				const systemInstr = payload.systemInstruction?.parts?.[0]?.text;
+				const userPrompt = payload.contents[0].parts[0].text;
+
 				if (systemInstr) {
-					messages.push({ role: "system", content: systemInstr });
+					// DeepSeek Reasoner often ignores or doesn't support system prompts well,
+					// so we inject the system instructions directly into the user prompt.
+					if (model === "deepseek-reasoner") {
+						messages.push({
+							role: "user",
+							content: `[System Instructions]\n${systemInstr}\n\n[User Request]\n${userPrompt}`,
+						});
+					} else {
+						messages.push({ role: "system", content: systemInstr });
+						messages.push({
+							role: "user",
+							content: userPrompt,
+						});
+					}
+				} else {
+					messages.push({
+						role: "user",
+						content: userPrompt,
+					});
 				}
-				messages.push({
-					role: "user",
-					content: payload.contents[0].parts[0].text,
-				});
 			}
 
-			(bodyPayload as unknown) = {
-				model: model,
+			let finalModel = model;
+			if (isDeepSeek && !model.startsWith("deepseek")) {
+				finalModel = "deepseek-chat";
+			} else if (isQwen && !model.startsWith("qwen")) {
+				finalModel = "qwen-max";
+			} else if (
+				isMiniMax &&
+				!model.startsWith("minimax") &&
+				!model.startsWith("abab")
+			) {
+				finalModel = "minimax-01";
+			}
+
+			let maxTokens = payload.generationConfig?.maxOutputTokens ?? 4096;
+			if (isDeepSeek && maxTokens > 8192) {
+				maxTokens = 8192;
+			}
+
+			bodyPayload = {
+				model: finalModel,
 				messages: messages,
-				temperature: payload.generationConfig?.temperature ?? 1.0,
-				max_tokens: payload.generationConfig?.maxOutputTokens ?? 4096,
+				temperature:
+					finalModel === "deepseek-reasoner"
+						? undefined
+						: (payload.generationConfig?.temperature ?? 1.0),
+				max_tokens: maxTokens,
 				stream: false,
-			};
+			} as Record<string, unknown>;
+
+			if (
+				(payload.generationConfig as { responseMimeType?: string })
+					?.responseMimeType === "application/json" &&
+				finalModel !== "deepseek-reasoner"
+			) {
+				bodyPayload.response_format = { type: "json_object" };
+			}
 		}
 
 		if (currentTier === "premium") {
@@ -1048,7 +1115,11 @@ async function callGemini(
 		parserIsDeepSeek || parserIsQwen || parserIsMiniMax;
 
 	if (parserIsOpenAICompatible) {
-		text = json.choices?.[0]?.message?.content;
+		const msg = json.choices?.[0]?.message;
+		text = msg?.content;
+		if (!text && msg?.reasoning_content) {
+			text = msg.reasoning_content;
+		}
 	}
 
 	if (!text) {
