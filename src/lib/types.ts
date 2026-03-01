@@ -156,10 +156,19 @@ export type AIModel =
 	| "gemini-2.5-flash"
 	| "gemini-2.5-flash-lite"
 	| "gemini-2.5-pro"
-	| "gemini-3-flash-preview";
+	| "gemini-3-flash-preview"
+	| "deepseek-chat"
+	| "deepseek-reasoner"
+	| "qwen-max"
+	| "qwen-plus"
+	| "qwen-coder-plus"
+	| "qwen-coder-base"
+	| "minimax-01"
+	| "minimax-m2.5-lightning";
 
 export interface AISettings {
 	model_id: AIModel;
+	provider?: "gemini" | "deepseek" | "qwen" | "minimax";
 	generate_content_api?: "generateContent" | "streamGenerateContent";
 	generationConfig: {
 		temperature?: number;

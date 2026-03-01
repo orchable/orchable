@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, Key, Loader2, ShieldCheck, AlertCircle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Trash2, Plus, Key, Loader2, ShieldCheck, AlertCircle, Bot } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +18,7 @@ export interface ApiKey {
     id: string;
     key_name: string;
     pool_type: 'personal' | 'free_pool' | 'premium_pool';
+    provider?: 'gemini' | 'deepseek' | 'qwen' | 'minimax';
     created_at: string;
 }
 
@@ -28,6 +30,7 @@ export function ApiKeyManager() {
     const [isAdding, setIsAdding] = useState(false);
     const [newKeyName, setNewKeyName] = useState("");
     const [newKeyValue, setNewKeyValue] = useState("");
+    const [newProvider, setNewProvider] = useState<'gemini' | 'deepseek' | 'qwen' | 'minimax'>('gemini');
 
     const keyLimit = tier === 'premium' ? Infinity : 3;
     const isAtLimit = keys.length >= keyLimit;
@@ -45,7 +48,7 @@ export function ApiKeyManager() {
             } else {
                 const { data, error } = await supabase
                     .from('user_api_keys')
-                    .select('id, key_name, pool_type, created_at')
+                    .select('id, key_name, pool_type, provider, created_at')
                     .eq('user_id', user.id)
                     .eq('pool_type', 'personal')
                     .order('created_at', { ascending: false });
@@ -73,9 +76,21 @@ export function ApiKeyManager() {
         }
 
         const trimmedKey = newKeyValue.trim();
-        if (!trimmedKey.startsWith("AIza") || trimmedKey.length < 30) {
-            toast.error("Invalid Gemini API Key format. It should start with 'AIza'.");
-            return;
+        if (newProvider === 'gemini') {
+            if (!trimmedKey.startsWith("AIza") || trimmedKey.length < 30) {
+                toast.error("Invalid Gemini API Key format. It should start with 'AIza'.");
+                return;
+            }
+        } else if (newProvider === 'deepseek') {
+            if (!trimmedKey.startsWith("sk-") || trimmedKey.length < 30) {
+                toast.error("Invalid DeepSeek API Key format. It should start with 'sk-'.");
+                return;
+            }
+        } else if (newProvider === 'qwen' || newProvider === 'minimax') {
+            if (!trimmedKey.startsWith("sk-") || trimmedKey.length < 20) {
+                toast.error(`Invalid ${newProvider.toUpperCase()} API Key format.`);
+                return;
+            }
         }
 
         setIsAdding(true);
@@ -87,6 +102,7 @@ export function ApiKeyManager() {
                     key_name: newKeyName.trim(),
                     api_key_encrypted: trimmedKey,
                     pool_type: 'personal',
+                    provider: newProvider,
                     created_at: new Date().toISOString()
                 });
             } else {
@@ -96,7 +112,8 @@ export function ApiKeyManager() {
                         user_id: user.id,
                         key_name: newKeyName.trim(),
                         api_key_encrypted: trimmedKey,
-                        pool_type: 'personal'
+                        pool_type: 'personal',
+                        provider: newProvider
                     });
 
                 if (error) throw error;
@@ -158,6 +175,7 @@ export function ApiKeyManager() {
                         <TableHeader className="bg-muted/50">
                             <TableRow>
                                 <TableHead>Label</TableHead>
+                                <TableHead>Vendor</TableHead>
                                 <TableHead>Type</TableHead>
                                 <TableHead>Added</TableHead>
                                 <TableHead className="text-right">Action</TableHead>
@@ -180,6 +198,12 @@ export function ApiKeyManager() {
                                 keys.map((key) => (
                                     <TableRow key={key.id} className="group hover:bg-muted/30 transition-colors">
                                         <TableCell className="font-medium">{key.key_name}</TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center gap-1.5 capitalize text-xs">
+                                                <Bot className="w-3.5 h-3.5 opacity-50" />
+                                                {key.provider || 'gemini'}
+                                            </div>
+                                        </TableCell>
                                         <TableCell>
                                             <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider opacity-70">
                                                 {key.pool_type}
@@ -212,23 +236,37 @@ export function ApiKeyManager() {
                             <Plus className="w-4 h-4" />
                             Add Personal Key
                         </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-1.5">
-                                <Label htmlFor="key-name" className="text-xs">Friendly Name (e.g. "Work Key")</Label>
+                                <Label htmlFor="provider" className="text-xs">Model Vendor</Label>
+                                <Select value={newProvider} onValueChange={(v: "gemini" | "deepseek" | "qwen" | "minimax") => setNewProvider(v)}>
+                                    <SelectTrigger id="provider" className="h-9 glass-input">
+                                        <SelectValue placeholder="Select Vendor" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="gemini">Google Gemini</SelectItem>
+                                        <SelectItem value="deepseek">DeepSeek AI</SelectItem>
+                                        <SelectItem value="qwen">Alibaba Qwen</SelectItem>
+                                        <SelectItem value="minimax">MiniMax AI</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="key-name" className="text-xs">Friendly Name</Label>
                                 <Input
                                     id="key-name"
-                                    placeholder="Gemini Flash 1"
+                                    placeholder={newProvider === 'gemini' ? "Gemini Key 1" : newProvider === 'deepseek' ? "DeepSeek Key 1" : `${newProvider.toUpperCase()} Key 1`}
                                     value={newKeyName}
                                     onChange={(e) => setNewKeyName(e.target.value)}
                                     className="h-9 glass-input"
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <Label htmlFor="api-key" className="text-xs">Gemini API Key</Label>
+                                <Label htmlFor="api-key" className="text-xs">API Key</Label>
                                 <Input
                                     id="api-key"
                                     type="password"
-                                    placeholder="AIza..."
+                                    placeholder={newProvider === 'gemini' ? "AIza..." : "sk-..."}
                                     value={newKeyValue}
                                     onChange={(e) => setNewKeyValue(e.target.value)}
                                     className="h-9 glass-input"
@@ -244,7 +282,16 @@ export function ApiKeyManager() {
                             Save Personal Key
                         </Button>
                         <p className="text-[10px] text-muted-foreground text-center">
-                            Keys are encrypted at rest. Get keys from <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-primary hover:underline">Google AI Studio</a>.
+                            Keys are encrypted at rest. Get keys from
+                            {newProvider === 'gemini' ? (
+                                <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-primary hover:underline ml-1">Google AI Studio</a>
+                            ) : newProvider === 'deepseek' ? (
+                                <a href="https://platform.deepseek.com/api_keys" target="_blank" className="text-primary hover:underline ml-1">DeepSeek Platform</a>
+                            ) : newProvider === 'qwen' ? (
+                                <a href="https://dashscope.console.aliyun.com/apiKey" target="_blank" className="text-primary hover:underline ml-1">DashScope Console</a>
+                            ) : (
+                                <a href="https://platform.minimaxi.com/user-center/basic-information/api-key" target="_blank" className="text-primary hover:underline ml-1">MiniMax Platform</a>
+                            )}.
                         </p>
                     </div>
                 ) : (

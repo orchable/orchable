@@ -7,6 +7,7 @@ export interface KeyConfig {
 	name?: string;
 	apiKey?: string;
 	webhookUrl?: string;
+	provider?: "gemini" | "deepseek" | "qwen" | "minimax";
 	poolType?: "free_pool" | "premium_pool";
 }
 
@@ -18,8 +19,11 @@ export const keyPoolService = {
 		if (!user) throw new Error("Authentication required to resolve keys.");
 
 		// 1. Fetch personal keys based on tier
-		let personalKeys: { api_key_encrypted: string; key_name?: string }[] =
-			[];
+		let personalKeys: {
+			api_key_encrypted: string;
+			key_name?: string;
+			provider?: "gemini" | "deepseek" | "qwen" | "minimax";
+		}[] = [];
 
 		if (tier === "free") {
 			// Fetch from local IndexedDB
@@ -30,6 +34,7 @@ export const keyPoolService = {
 			personalKeys = localKeys.map((k) => ({
 				api_key_encrypted: k.api_key_encrypted,
 				key_name: k.key_name,
+				provider: k.provider,
 			}));
 		} else {
 			// Premium: Fetch from Supabase
@@ -56,6 +61,7 @@ export const keyPoolService = {
 				type: "personal",
 				name: k.key_name,
 				apiKey: k.api_key_encrypted,
+				provider: k.provider || "gemini",
 			}));
 		}
 

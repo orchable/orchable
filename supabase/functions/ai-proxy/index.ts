@@ -18,7 +18,9 @@ interface AiProxyRequest {
 		model?: string;
 		temperature?: number;
 		maxOutputTokens?: number;
+		provider?: "gemini" | "deepseek" | "qwen" | "minimax";
 	};
+	provider?: "gemini" | "deepseek" | "qwen" | "minimax";
 }
 
 serve(async (req) => {
@@ -62,10 +64,30 @@ serve(async (req) => {
 			system_instruction,
 		} = body;
 		const model = ai_settings?.model || "gemini-2.5-flash";
-		const apiKey = Deno.env.get("GEMINI_API_KEY");
+		const provider =
+			body.provider ||
+			ai_settings?.provider ||
+			(model.startsWith("deepseek")
+				? "deepseek"
+				: model.startsWith("qwen")
+					? "qwen"
+					: model.startsWith("minimax")
+						? "minimax"
+						: "gemini");
+
+		const apiKey =
+			provider === "deepseek"
+				? Deno.env.get("DEEPSEEK_API_KEY")
+				: provider === "qwen"
+					? Deno.env.get("QWEN_API_KEY")
+					: provider === "minimax"
+						? Deno.env.get("MINIMAX_API_KEY")
+						: Deno.env.get("GEMINI_API_KEY");
 
 		if (!apiKey) {
-			throw new Error("GEMINI_API_KEY not configured in Edge Function");
+			throw new Error(
+				`${provider.toUpperCase()}_API_KEY not configured in Edge Function`,
+			);
 		}
 
 		let finalCachedContentName: string | undefined = undefined;
@@ -188,22 +210,103 @@ serve(async (req) => {
 			generatePayload.cachedContent = finalCachedContentName;
 		}
 
-		// 5. Call Gemini
-		const generateRes = await fetch(
-			`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-			{
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(generatePayload),
-			},
+		// 5. Call AI Vendor
+		let generateRes;
+		const isOpenAICompatible = ["deepseek", "qwen", "minimax"].includes(
+			provider,
 		);
+
+		if (isOpenAICompatible) {
+			const messages = [];
+			if (system_instruction) {
+				messages.push({ role: "system", content: system_instruction });
+			}
+
+			let fullPrompt = prompt;
+			if (global_context) {
+				const contextValues = Object.entries(global_context)
+					.map(
+						([name, content]) =>
+							`--- DOCUMENT: ${name} ---\n${content}\n--- END OF DOCUMENT ---`,
+					)
+					.join("\n\n");
+				fullPrompt = `${contextValues}\n\n${prompt}`;
+			}
+
+			messages.push({ role: "user", content: fullPrompt });
+
+			const openaiPayload = {
+				model: model.includes(provider)
+					? model
+					: provider === "deepseek"
+						? "deepseek-chat"
+						: provider === "qwen"
+							? "qwen-plus"
+							: "minimax-01",
+				messages,
+				temperature: ai_settings?.temperature ?? 1.0,
+				max_tokens: ai_settings?.maxOutputTokens ?? 4096,
+				stream: false,
+			};
+
+			const endpointMap: Record<string, string> = {
+				deepseek: "https://api.deepseek.com/v1/chat/completions",
+				qwen: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+				minimax: "https://api.minimax.chat/v1/chat/completions",
+			};
+
+			generateRes = await fetch(endpointMap[provider], {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${apiKey}`,
+				},
+				body: JSON.stringify(openaiPayload),
+			});
+		} else {
+			generateRes = await fetch(
+				`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify(generatePayload),
+				},
+			);
+		}
 
 		if (!generateRes.ok) {
 			const err = await generateRes.text();
-			throw new Error(`Gemini API Error: ${err}`);
+			throw new Error(`${provider.toUpperCase()} API Error: ${err}`);
 		}
 
 		const data = await generateRes.json();
+
+		// Standardize output if it's OpenAI format
+		if (isOpenAICompatible) {
+			return new Response(
+				JSON.stringify({
+					candidates: [
+						{
+							content: {
+								parts: [
+									{
+										text: data.choices?.[0]?.message
+											?.content,
+									},
+								],
+							},
+						},
+					],
+				}),
+				{
+					headers: {
+						...corsHeaders,
+						"Content-Type": "application/json",
+					},
+					status: 200,
+				},
+			);
+		}
 
 		return new Response(JSON.stringify(data), {
 			headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -26,6 +26,7 @@ let currentTier: Exclude<UserTier, null> = "free";
 interface KeyState {
 	apiKey: string;
 	name?: string;
+	provider?: "gemini" | "deepseek" | "qwen" | "minimax";
 	healthStatus:
 		| "healthy"
 		| "degraded"
@@ -73,6 +74,7 @@ class KeyManager {
 				this.keys.push({
 					apiKey: config.apiKey,
 					name: config.name,
+					provider: config.provider || "gemini",
 					healthStatus:
 						(health?.health_status as KeyState["healthStatus"]) ??
 						"healthy",
@@ -762,6 +764,15 @@ async function callGemini(
 		bodyPayload.batch_id = batchId;
 		bodyPayload.prompt = prompt;
 		bodyPayload.ai_settings = aiSettings;
+		bodyPayload.provider =
+			aiSettings?.provider ||
+			(model.startsWith("deepseek")
+				? "deepseek"
+				: model.startsWith("qwen")
+					? "qwen"
+					: model.startsWith("minimax")
+						? "minimax"
+						: "gemini");
 		bodyPayload.system_instruction = (
 			aiSettings as unknown as Record<string, unknown>
 		).systemInstruction;
@@ -813,10 +824,66 @@ async function callGemini(
 			return { data: webhookResult, usedKeyName };
 		}
 
+		const isDeepSeek =
+			(currentConfig.type === "personal" &&
+				currentConfig.provider === "deepseek") ||
+			model.startsWith("deepseek");
+		const isQwen =
+			(currentConfig.type === "personal" &&
+				currentConfig.provider === "qwen") ||
+			model.startsWith("qwen");
+		const isMiniMax =
+			(currentConfig.type === "personal" &&
+				currentConfig.provider === "minimax") ||
+			model.startsWith("minimax");
+		const isOpenAICompatible = isDeepSeek || isQwen || isMiniMax;
+
 		let api = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${currentConfig.apiKey}`;
 		const headers: Record<string, string> = {
 			"Content-Type": "application/json",
 		};
+
+		if (isOpenAICompatible) {
+			if (isDeepSeek) {
+				api = "https://api.deepseek.com/v1/chat/completions";
+			} else if (isQwen) {
+				api =
+					"https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
+			} else if (isMiniMax) {
+				api = "https://api.minimax.chat/v1/chat/completions";
+			}
+			headers["Authorization"] = `Bearer ${currentConfig.apiKey}`;
+
+			// Reformat payload for OpenAI compatibility
+			const messages = [];
+			const payload = bodyPayload as {
+				contents: { role: string; parts: { text: string }[] }[];
+				systemInstruction?: { role: string; parts: { text: string }[] };
+				generationConfig?: {
+					temperature?: number;
+					maxOutputTokens?: number;
+				};
+			};
+
+			if (payload.contents?.[0]?.parts?.[0]?.text) {
+				const systemInstr = payload.systemInstruction?.parts?.[0]?.text;
+				if (systemInstr) {
+					messages.push({ role: "system", content: systemInstr });
+				}
+				messages.push({
+					role: "user",
+					content: payload.contents[0].parts[0].text,
+				});
+			}
+
+			(bodyPayload as unknown) = {
+				model: model,
+				messages: messages,
+				temperature: payload.generationConfig?.temperature ?? 1.0,
+				max_tokens: payload.generationConfig?.maxOutputTokens ?? 4096,
+				stream: false,
+			};
+		}
 
 		if (currentTier === "premium") {
 			const { supabase } = await import("@/lib/supabase");
@@ -963,8 +1030,37 @@ async function callGemini(
 
 	const json = await response.json();
 
-	const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-	if (!text) throw new Error("Empty response from Gemini");
+	let text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+
+	const parserIsDeepSeek =
+		(currentConfig?.type === "personal" &&
+			currentConfig.provider === "deepseek") ||
+		model.startsWith("deepseek");
+	const parserIsQwen =
+		(currentConfig?.type === "personal" &&
+			currentConfig.provider === "qwen") ||
+		model.startsWith("qwen");
+	const parserIsMiniMax =
+		(currentConfig?.type === "personal" &&
+			currentConfig.provider === "minimax") ||
+		model.startsWith("minimax");
+	const parserIsOpenAICompatible =
+		parserIsDeepSeek || parserIsQwen || parserIsMiniMax;
+
+	if (parserIsOpenAICompatible) {
+		text = json.choices?.[0]?.message?.content;
+	}
+
+	if (!text) {
+		const vendorName = parserIsDeepSeek
+			? "DeepSeek"
+			: parserIsQwen
+				? "Qwen"
+				: parserIsMiniMax
+					? "MiniMax"
+					: "Gemini";
+		throw new Error(`Empty response from ${vendorName}`);
+	}
 
 	try {
 		if (

@@ -39,6 +39,7 @@ export class OrchableDatabase extends Dexie {
 		key_name: string;
 		api_key_encrypted: string;
 		pool_type: "personal" | "free_pool" | "premium_pool";
+		provider?: "gemini" | "deepseek" | "qwen" | "minimax";
 		created_at: string;
 		user_id: string;
 	}>;
@@ -108,6 +109,9 @@ export class OrchableDatabase extends Dexie {
 		this.version(13).stores({
 			api_key_health:
 				"user_api_key_id, blocked_until, updated_at, health_status",
+		});
+		this.version(14).stores({
+			user_api_keys: "id, key_name, pool_type, user_id, provider",
 		});
 	}
 
@@ -396,6 +400,7 @@ export class IndexedDBAdapter implements IStorageAdapter {
 			id: string;
 			key_name: string;
 			pool_type: "personal" | "free_pool" | "premium_pool";
+			provider?: "gemini" | "deepseek" | "qwen" | "minimax";
 			created_at: string;
 		}[]
 	> {
@@ -407,6 +412,7 @@ export class IndexedDBAdapter implements IStorageAdapter {
 		key_name: string;
 		api_key_encrypted: string;
 		pool_type: "personal" | "free_pool" | "premium_pool";
+		provider?: "gemini" | "deepseek" | "qwen" | "minimax";
 		user_id: string;
 	}): Promise<void> {
 		await db.user_api_keys.put({
