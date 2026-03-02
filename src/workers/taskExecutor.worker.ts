@@ -74,13 +74,13 @@ class KeyManager {
 	}
 
 	public async initialize(configs: KeyConfig[]) {
-		this.keys = [];
-		this.poolConfig = null;
+		const newKeys: KeyState[] = [];
+		let newPoolConfig: KeyConfig | null = null;
 
 		for (const config of configs) {
 			if (config.type === "personal" && config.apiKey) {
 				const health = await db.api_key_health.get(config.apiKey);
-				this.keys.push({
+				newKeys.push({
 					apiKey: config.apiKey,
 					name: config.name,
 					provider: config.provider || "gemini",
@@ -109,9 +109,12 @@ class KeyManager {
 					lastErrorCode: health?.last_error_code,
 				});
 			} else if (config.type === "pool") {
-				this.poolConfig = config;
+				newPoolConfig = config;
 			}
 		}
+
+		this.keys = newKeys;
+		this.poolConfig = newPoolConfig;
 	}
 
 	public getBestKey(

@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Trash2, Plus, Key, Loader2, ShieldCheck, AlertCircle, Bot } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { executorService } from "@/services/executorService";
 
 export interface ApiKey {
     id: string;
@@ -20,6 +21,9 @@ export interface ApiKey {
     pool_type: 'personal' | 'free_pool' | 'premium_pool';
     provider?: 'gemini' | 'deepseek' | 'qwen' | 'minimax';
     created_at: string;
+    api_key_encrypted?: string; // Need this for getting health
+    health_status?: string;
+    last_error_code?: string;
 }
 
 export function ApiKeyManager() {
@@ -39,23 +43,48 @@ export function ApiKeyManager() {
         if (!user) return;
         setIsLoading(true);
         try {
+            let fetchedKeys: ApiKey[] = [];
             if (tier === 'free') {
                 const localKeys = await db.user_api_keys
                     .where('pool_type')
                     .equals('personal')
                     .toArray();
-                setKeys(localKeys || []);
+                fetchedKeys = localKeys || [];
+
+                // Cleanup orphaned health records
+                const validKeyValues = new Set(localKeys.map(k => k.api_key_encrypted));
+                const allHealths = await db.api_key_health.toArray();
+                for (const h of allHealths) {
+                    if (!validKeyValues.has(h.user_api_key_id)) {
+                        await db.api_key_health.delete(h.user_api_key_id);
+                    }
+                }
             } else {
                 const { data, error } = await supabase
                     .from('user_api_keys')
-                    .select('id, key_name, pool_type, provider, created_at')
+                    .select('id, key_name, pool_type, provider, created_at, api_key_encrypted')
                     .eq('user_id', user.id)
                     .eq('pool_type', 'personal')
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
-                setKeys(data || []);
+                fetchedKeys = data || [];
+
+                // For premium, we might need a Supabase rpc or trigger to cleanup health, 
+                // but doing it locally if we store health locally for them too doesn't hurt.
             }
+
+            // Fetch health status for the keys
+            const keysWithHealth = await Promise.all(fetchedKeys.map(async (key) => {
+                const health = await db.api_key_health.get(key.api_key_encrypted || key.id);
+                return {
+                    ...key,
+                    health_status: health?.health_status || 'healthy',
+                    last_error_code: health?.last_error_code
+                };
+            }));
+
+            setKeys(keysWithHealth);
         } catch (err) {
             console.error("Failed to fetch keys:", err);
             toast.error("Failed to load API keys");
@@ -122,7 +151,8 @@ export function ApiKeyManager() {
             toast.success("API Key added successfully");
             setNewKeyName("");
             setNewKeyValue("");
-            fetchKeys();
+            await fetchKeys();
+            await executorService.reloadKeys(tier);
         } catch (err) {
             console.error("Failed to add key:", err);
             toast.error("Failed to add API key");
@@ -133,9 +163,17 @@ export function ApiKeyManager() {
 
     async function handleDeleteKey(id: string) {
         try {
+            const keyToDelete = keys.find(k => k.id === id);
             if (tier === 'free') {
+                if (keyToDelete?.api_key_encrypted) {
+                    await db.api_key_health.delete(keyToDelete.api_key_encrypted);
+                }
                 await db.user_api_keys.delete(id);
             } else {
+                // Remove health if stored locally, though premium might use remote 
+                if (keyToDelete?.api_key_encrypted) {
+                    await db.api_key_health.delete(keyToDelete.api_key_encrypted);
+                }
                 const { error } = await supabase
                     .from('user_api_keys')
                     .delete()
@@ -145,10 +183,81 @@ export function ApiKeyManager() {
             }
 
             toast.success("API Key removed");
-            fetchKeys();
+            await fetchKeys();
+            await executorService.reloadKeys(tier);
         } catch (err) {
             console.error("Failed to delete key:", err);
             toast.error("Failed to delete API key");
+        }
+    }
+
+    async function handleTestKey(key: ApiKey) {
+        if (!key.api_key_encrypted) {
+            toast.error("Key value not available for testing");
+            return;
+        }
+
+        const toastId = toast.loading(`Testing ${key.key_name}...`);
+
+        try {
+            let isSuccess = false;
+            let errorMsg = '';
+
+            if (key.provider === 'gemini' || !key.provider) {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key.api_key_encrypted}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: "Hi" }] }] })
+                });
+                isSuccess = res.ok;
+                if (!res.ok) errorMsg = await res.text();
+            } else if (key.provider === 'deepseek') {
+                const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key.api_key_encrypted}` },
+                    body: JSON.stringify({ model: 'deepseek-chat', messages: [{ role: 'user', content: 'Hi' }] })
+                });
+                isSuccess = res.ok;
+                if (!res.ok) errorMsg = await res.text();
+            } else if (key.provider === 'qwen') {
+                const res = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key.api_key_encrypted}` },
+                    body: JSON.stringify({ model: 'qwen-plus', messages: [{ role: 'user', content: 'Hi' }] })
+                });
+                isSuccess = res.ok;
+                if (!res.ok) errorMsg = await res.text();
+            } else if (key.provider === 'minimax') {
+                const res = await fetch('https://api.minimax.chat/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key.api_key_encrypted}` },
+                    body: JSON.stringify({ model: 'minimax-01', messages: [{ role: 'user', content: 'Hi' }] })
+                });
+                isSuccess = res.ok;
+                if (!res.ok) errorMsg = await res.text();
+            }
+
+            if (isSuccess) {
+                toast.success(`${key.key_name} is working perfectly!`, { id: toastId });
+                // Reset health to healthy
+                await db.api_key_health.put({
+                    user_api_key_id: key.api_key_encrypted,
+                    health_status: 'healthy',
+                    consecutive_failures: 0,
+                    successful_requests: 1,
+                    total_requests: 1,
+                    failed_requests: 0,
+                    blocked_until: null,
+                    last_success_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                });
+                await fetchKeys();
+                await executorService.reloadKeys(tier);
+            } else {
+                toast.error(`${key.key_name} failed: ${errorMsg || 'Unknown error'}`, { id: toastId });
+            }
+        } catch (err) {
+            toast.error(`Test failed: ${err instanceof Error ? err.message : 'Unknown error'}`, { id: toastId });
         }
     }
 
@@ -176,7 +285,7 @@ export function ApiKeyManager() {
                             <TableRow>
                                 <TableHead>Label</TableHead>
                                 <TableHead>Vendor</TableHead>
-                                <TableHead>Type</TableHead>
+                                <TableHead>Status</TableHead>
                                 <TableHead>Added</TableHead>
                                 <TableHead className="text-right">Action</TableHead>
                             </TableRow>
@@ -184,13 +293,13 @@ export function ApiKeyManager() {
                         <TableBody>
                             {isLoading ? (
                                 <TableRow>
-                                    <TableCell colSpan={4} className="h-24 text-center">
+                                    <TableCell colSpan={5} className="h-24 text-center">
                                         <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
                                     </TableCell>
                                 </TableRow>
                             ) : keys.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={4} className="h-24 text-center text-muted-foreground italic">
+                                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground italic">
                                         No personal keys added yet. Using platform pools.
                                     </TableCell>
                                 </TableRow>
@@ -205,22 +314,43 @@ export function ApiKeyManager() {
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider opacity-70">
-                                                {key.pool_type}
+                                            <Badge
+                                                variant="outline"
+                                                className={cn(
+                                                    "text-[10px] uppercase font-bold tracking-wider",
+                                                    key.health_status === 'healthy' ? "text-success border-success/30 bg-success/10" :
+                                                        key.health_status === 'rate_limited' ? "text-warning border-warning/30 bg-warning/10" :
+                                                            "text-destructive border-destructive/30 bg-destructive/10"
+                                                )}
+                                            >
+                                                {key.health_status === 'healthy' ? 'Healthy' :
+                                                    key.health_status === 'rate_limited' ? 'Rate Limited' :
+                                                        key.health_status === 'disabled' ? 'Disabled' : 'Blocked'}
+                                                {key.last_error_code ? ` (${key.last_error_code})` : ''}
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-xs text-muted-foreground">
                                             {new Date(key.created_at).toLocaleDateString()}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10"
-                                                onClick={() => handleDeleteKey(key.id)}
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
+                                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 text-xs font-semibold text-primary hover:bg-primary/10"
+                                                    onClick={() => handleTestKey(key)}
+                                                >
+                                                    Test
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                                                    onClick={() => handleDeleteKey(key.id)}
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))

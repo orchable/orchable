@@ -68,6 +68,17 @@ class ExecutorService {
 		}
 	}
 
+	async reloadKeys(tier: UserTier) {
+		if (this.worker) {
+			const { keyPoolService } = await import("./keyPoolService");
+			const configs = await keyPoolService.resolveKeys(tier);
+			console.log(
+				`[ExecutorService] Reloading keys for worker (${configs.length} keys)`,
+			);
+			this.worker.postMessage({ type: "START", configs, tier });
+		}
+	}
+
 	/**
 	 * Ensures the worker is running if there are pending tasks.
 	 * Can be called by UI components when they mount.

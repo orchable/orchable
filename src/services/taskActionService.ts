@@ -58,6 +58,34 @@ export const taskActionService = {
 	async retryTask(taskId: string): Promise<void> {
 		const adapter = storage.adapter;
 		if (adapter.constructor.name === "IndexedDBAdapter") {
+			const { db } = await import("@/lib/storage/IndexedDBAdapter");
+			const task = await db.ai_tasks.get(taskId);
+
+			if (
+				task?.batch_id &&
+				(task.status === "failed" || task.status === "completed")
+			) {
+				const batch = await db.task_batches.get(task.batch_id);
+				if (batch) {
+					const updates: Partial<import("@/lib/types").Execution> = {
+						status: "processing",
+						updated_at: new Date().toISOString(),
+					};
+					if (task.status === "failed") {
+						updates.failed_tasks = Math.max(
+							0,
+							(batch.failed_tasks || 0) - 1,
+						);
+					} else {
+						updates.completed_tasks = Math.max(
+							0,
+							(batch.completed_tasks || 0) - 1,
+						);
+					}
+					await db.task_batches.update(task.batch_id, updates);
+				}
+			}
+
 			await adapter.updateTask(taskId, {
 				status: "plan",
 				error_message: null,
@@ -89,6 +117,27 @@ export const taskActionService = {
 
 		for (const child of children) {
 			if (child.status === "completed" || child.status === "failed") {
+				if (child.batch_id) {
+					const batch = await db.task_batches.get(child.batch_id);
+					if (batch) {
+						const updates: Partial<
+							import("@/lib/types").Execution
+						> = {};
+						if (child.status === "failed") {
+							updates.failed_tasks = Math.max(
+								0,
+								(batch.failed_tasks || 0) - 1,
+							);
+						} else {
+							updates.completed_tasks = Math.max(
+								0,
+								(batch.completed_tasks || 0) - 1,
+							);
+						}
+						await db.task_batches.update(child.batch_id, updates);
+					}
+				}
+
 				await db.ai_tasks.update(child.id, {
 					status: "plan",
 					error_message: null,
@@ -109,13 +158,30 @@ export const taskActionService = {
 	async retryAllFailedInBatch(batchId: string): Promise<number> {
 		const adapter = storage.adapter;
 		if (adapter.constructor.name === "IndexedDBAdapter") {
+			const { db } = await import("@/lib/storage/IndexedDBAdapter");
 			const tasks = await adapter.listTasks(batchId);
 			const failedTasks = tasks.filter((t) => t.status === "failed");
-			for (const task of failedTasks) {
-				await adapter.updateTask(task.id, {
-					status: "plan",
-					error_message: null,
-				});
+
+			if (failedTasks.length > 0) {
+				const batch = await db.task_batches.get(batchId);
+				if (batch) {
+					await db.task_batches.update(batchId, {
+						status: "processing",
+						failed_tasks: Math.max(
+							0,
+							(batch.failed_tasks || 0) - failedTasks.length,
+						),
+						updated_at: new Date().toISOString(),
+					});
+				}
+
+				for (const task of failedTasks) {
+					await adapter.updateTask(task.id, {
+						status: "plan",
+						error_message: null,
+					});
+					await this._cascadeResetChildren(task.id);
+				}
 			}
 			return failedTasks.length;
 		}
