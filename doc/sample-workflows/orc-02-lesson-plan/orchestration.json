@@ -1,0 +1,157 @@
+{
+	"_version": 1,
+	"_exportedAt": "2026-03-05T08:30:00.000Z",
+	"orchestratorName": "ORC-02: Smart Lesson Plan Builder",
+	"orchestratorDescription": "3-stage pipeline generating pedagogical maps, activities, and a final validated lesson plan.",
+	"config": {
+		"id": "orc-02-uuid-lesson-plan",
+		"name": "Smart Lesson Plan Builder",
+		"description": "Multi-stage education pipeline: Analysis -> Design -> Validation",
+		"steps": [
+			{
+				"id": "step_A",
+				"name": "A",
+				"label": "Pedagogical Mapper",
+				"stage_key": "mapper",
+				"task_type": "pedagogical_mapping",
+				"prompt_template_id": "orc-02-uuid-lesson-plan_mapper_step_A",
+				"cardinality": "1:1",
+				"split_path": "",
+				"split_mode": "per_item",
+				"output_mapping": "output_data",
+				"ai_settings": {
+					"model_id": "gemini-pro-latest",
+					"generate_content_api": "generateContent",
+					"generationConfig": {
+						"temperature": 0.7,
+						"topP": 0.9,
+						"maxOutputTokens": 4096
+					}
+				},
+				"dependsOn": [],
+				"contract": {
+					"input": {
+						"fields": [
+							{
+								"name": "input_data",
+								"type": "string",
+								"required": true
+							}
+						],
+						"delimiters": { "start": "%%", "end": "%%" },
+						"auto_extracted": true
+					},
+					"output": {
+						"schema": {
+							"type": "object",
+							"properties": {
+								"output_data": {
+									"type": "array",
+									"items": { "type": "object" }
+								}
+							},
+							"required": ["output_data"]
+						},
+						"validation": "loose",
+						"format_injection": "append"
+					}
+				}
+			},
+			{
+				"id": "step_B",
+				"name": "B",
+				"label": "Activity Designer",
+				"stage_key": "designer",
+				"task_type": "activity_design",
+				"prompt_template_id": "orc-02-uuid-lesson-plan_designer_step_B",
+				"cardinality": "1:N",
+				"split_path": "output_data",
+				"split_mode": "per_item",
+				"output_mapping": "output_data",
+				"ai_settings": {
+					"model_id": "gemini-flash-latest",
+					"generate_content_api": "generateContent",
+					"generationConfig": {
+						"temperature": 1.0,
+						"topP": 0.95,
+						"maxOutputTokens": 8192
+					}
+				},
+				"dependsOn": ["step_A"],
+				"contract": {
+					"input": {
+						"fields": [
+							{
+								"name": "input_data",
+								"type": "string",
+								"required": true
+							}
+						],
+						"delimiters": { "start": "%%", "end": "%%" },
+						"auto_extracted": true
+					},
+					"output": {
+						"schema": {
+							"type": "object",
+							"properties": {
+								"output_data": {
+									"type": "array",
+									"items": { "type": "object" }
+								}
+							},
+							"required": ["output_data"]
+						},
+						"validation": "loose",
+						"format_injection": "append"
+					}
+				}
+			},
+			{
+				"id": "step_C",
+				"name": "C",
+				"label": "Coherence Validator",
+				"stage_key": "validator",
+				"task_type": "lesson_qc",
+				"prompt_template_id": "orc-02-uuid-lesson-plan_validator_step_C",
+				"cardinality": "N:1",
+				"split_path": "",
+				"split_mode": "per_item",
+				"output_mapping": "output_data",
+				"ai_settings": {
+					"model_id": "gemini-flash-latest",
+					"generate_content_api": "generateContent",
+					"generationConfig": {
+						"temperature": 0.3,
+						"topP": 0.9,
+						"maxOutputTokens": 4096
+					}
+				},
+				"dependsOn": ["step_B"],
+				"contract": {
+					"input": {
+						"fields": [
+							{
+								"name": "input_data",
+								"type": "string",
+								"required": true
+							}
+						],
+						"delimiters": { "start": "%%", "end": "%%" },
+						"auto_extracted": true
+					},
+					"output": {
+						"schema": {
+							"type": "object",
+							"properties": {
+								"output_data": { "type": "array" }
+							},
+							"required": ["output_data"]
+						},
+						"validation": "loose",
+						"format_injection": "append"
+					}
+				}
+			}
+		]
+	}
+}

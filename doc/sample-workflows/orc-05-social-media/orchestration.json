@@ -1,0 +1,96 @@
+{
+	"_version": 1,
+	"_exportedAt": "2026-03-05T08:35:00.000Z",
+	"orchestratorName": "ORC-05: Social Media Pack Generator",
+	"orchestratorDescription": "Multi-stage pipeline that distills core marketing messages and adapts them for LinkedIn, X, Threads, and FB/IG.",
+	"config": {
+		"id": "orc-05-uuid-social-media",
+		"name": "Social Media Pack Generator",
+		"description": "Distill -> Adapt (1:N)",
+		"steps": [
+			{
+				"id": "step_A",
+				"name": "A",
+				"label": "Message Distiller",
+				"stage_key": "distiller",
+				"task_type": "marketing_analysis",
+				"prompt_template_id": "orc-05-uuid-social-media_distiller_step_A",
+				"cardinality": "1:1",
+				"split_path": "",
+				"split_mode": "per_item",
+				"output_mapping": "output_data",
+				"ai_settings": {
+					"model_id": "gemini-flash-latest",
+					"generate_content_api": "generateContent",
+					"generationConfig": {
+						"temperature": 0.5,
+						"maxOutputTokens": 2048
+					}
+				},
+				"dependsOn": [],
+				"contract": {
+					"input": {
+						"fields": [
+							{
+								"name": "input_data",
+								"type": "string",
+								"required": true
+							}
+						],
+						"delimiters": { "start": "%%", "end": "%%" },
+						"auto_extracted": true
+					},
+					"output": {
+						"schema": {
+							"type": "object",
+							"properties": {
+								"output_data": { "type": "array" }
+							}
+						}
+					}
+				}
+			},
+			{
+				"id": "step_B",
+				"name": "B",
+				"label": "Platform Adapter",
+				"stage_key": "adapter",
+				"task_type": "content_adaptation",
+				"prompt_template_id": "orc-05-uuid-social-media_adapter_step_B",
+				"cardinality": "1:N",
+				"split_path": "output_data",
+				"split_mode": "per_item",
+				"output_mapping": "output_data",
+				"ai_settings": {
+					"model_id": "gemini-flash-latest",
+					"generate_content_api": "generateContent",
+					"generationConfig": {
+						"temperature": 1.1,
+						"maxOutputTokens": 4096
+					}
+				},
+				"dependsOn": ["step_A"],
+				"contract": {
+					"input": {
+						"fields": [
+							{
+								"name": "input_data",
+								"type": "string",
+								"required": true
+							}
+						],
+						"delimiters": { "start": "%%", "end": "%%" }
+					},
+					"output": {
+						"schema": {
+							"type": "object",
+							"properties": {
+								"output_data": { "type": "array" }
+							}
+						}
+					}
+				}
+			}
+		]
+	}
+}

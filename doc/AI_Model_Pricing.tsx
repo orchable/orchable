@@ -6,7 +6,7 @@ const models = [
     { family: "Gemini", name: "Gemini 2.5 Pro (≤200K)", input: 1.25, output: 10.00, context: "2M", tier: "premium", tag: "long-ctx" },
     { family: "Gemini", name: "Gemini 2.5 Pro (>200K)", input: 2.50, output: 15.00, context: "2M", tier: "premium", tag: "long-ctx" },
     { family: "Gemini", name: "Gemini 2.5 Flash", input: 0.15, output: 0.60, context: "2M", tier: "mid", tag: "fast" },
-    { family: "Gemini", name: "Gemini 2.0 Flash-Lite", input: 0.075, output: 0.30, context: "1M", tier: "budget", tag: "cheapest" },
+    { family: "Gemini", name: "Gemini 2.5 Flash-Lite", input: 0.075, output: 0.30, context: "1M", tier: "budget", tag: "cheapest" },
     { family: "Gemini", name: "Gemini 2.0 Flash", input: 0.10, output: 0.40, context: "1M", tier: "budget", tag: "fast · multimodal" },
 
     // ── GPT ─────────────────────────────────────────────────────────────────
