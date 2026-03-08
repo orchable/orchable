@@ -167,11 +167,22 @@ export class SupabaseAdapter implements IStorageAdapter {
 	}
 
 	async upsertTemplate(template: PromptTemplate): Promise<void> {
-		const { error } = await supabase
-			.from("prompt_templates")
-			.upsert(template);
+		const {
+			data: { user },
+		} = await supabase.auth.getUser();
 
-		if (error) throw error;
+		const { error } = await supabase.from("prompt_templates").upsert({
+			...template,
+			created_by: template.created_by || user?.id,
+		});
+
+		if (error) {
+			console.error(
+				"[SupabaseAdapter] Failed to upsert template:",
+				error,
+			);
+			throw error;
+		}
 	}
 
 	// Custom Components
@@ -220,7 +231,10 @@ export class SupabaseAdapter implements IStorageAdapter {
 			.select()
 			.single();
 
-		if (error) throw error;
+		if (error) {
+			console.error("[SupabaseAdapter] Failed to save config:", error);
+			throw error;
+		}
 		return data as OrchestratorConfig;
 	}
 
@@ -276,7 +290,13 @@ export class SupabaseAdapter implements IStorageAdapter {
 			.select()
 			.single();
 
-		if (error) throw error;
+		if (error) {
+			console.error("[SupabaseAdapter] Failed to update config:", error, {
+				id,
+				updates,
+			});
+			throw error;
+		}
 		return data as OrchestratorConfig;
 	}
 

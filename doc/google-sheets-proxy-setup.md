@@ -5,6 +5,7 @@ Because Google Sheets API requires OAuth authentication to push data programmati
 You only need to deploy this Web App **once** for your entire Orchable instance.
 
 ## Step 1: Create the Google Apps Script
+
 1. Go to [script.google.com](https://script.google.com/).
 2. Click **New Project**.
 3. Replace all the code in `Code.gs` with the following:
@@ -55,6 +56,7 @@ function doPost(e) {
 ```
 
 ## Step 2: Deploy as a Web App
+
 1. At the top right of the Google Apps Script editor, click **Deploy > New deployment**.
 2. Click the gear icon next to "Select type" and choose **Web app**.
 3. Under **Execute as**, confirm it is set to **Me**.
@@ -63,14 +65,18 @@ function doPost(e) {
 6. Copy the generated **Web App URL**. It will look something like `https://script.google.com/macros/s/.../exec`.
 
 ## Step 3: Configure Orchable
+
 1. Open your Orchable `.env` or `.env.local` file at the root of your project.
 2. Add the URL you copied as an environment variable:
+
 ```env
 VITE_GOOGLE_SHEETS_PROXY_URL=https://script.google.com/macros/s/.../exec
 ```
+
 3. Restart your dev server (`pnpm dev`).
 
 ## Step 4: Using in Orchable
+
 In any Stage Config, under the "Contract" tab -> "Stage Export":
 - Switch the **Destination:** to "Google Sheets via Webhook"
 - Provide any "anyone can edit" **Google Sheet Link** (or just the sheet ID).
