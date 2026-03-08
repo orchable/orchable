@@ -159,6 +159,7 @@ export const batchService = {
 					batch_grouping: ns.batch_grouping || null,
 					delimiters: ns.contract?.input?.delimiters,
 					export_config: ns.export_config,
+					dependsOn: ns.dependsOn || [],
 				})),
 				delimiters: firstStage.contract?.input?.delimiters,
 				execution_delay_seconds: config.execution_delay_seconds || 0,

@@ -1405,6 +1405,7 @@ async function handleNextStages(
 					requires_approval: sc.requires_approval || false,
 					export_config: sc.export_config || undefined,
 					delimiters: sc.delimiters || undefined,
+					dependsOn: (sc.dependsOn as string[]) || [],
 				};
 			}),
 		);
@@ -1428,98 +1429,56 @@ async function handleNextStages(
 		const splitMode = currentStageConfig.split_mode || "per_item";
 		const splitPath: string =
 			(currentStageConfig.split_path as string) || "result";
-		// n8n treats "result" as identity path (the result itself, not result.result)
-		let items: unknown;
-		if (splitPath === "result" || splitPath === ".") {
-			items = result;
-		} else {
-			const cleanPath = splitPath.startsWith("result.")
-				? splitPath.slice(7)
-				: splitPath;
-			items = getValueByPath(result, cleanPath);
+
+		// 🔥 Parallel Join Check for 1:N
+		let effectiveResult = result;
+		let isJoinMet = true;
+
+		const first1N = nextStageConfigs.find(
+			(nc) =>
+				nc.cardinality === "one_to_many" || nc.cardinality === "1:N",
+		);
+		if (first1N) {
+			const dependsOn = (first1N.dependsOn as string[]) || [];
+			if (
+				dependsOn.length > 1 ||
+				(dependsOn.length === 1 && dependsOn[0] !== task.stage_key)
+			) {
+				const mergedInput = await checkDependenciesMet(task, first1N);
+				if (!mergedInput) {
+					console.log(
+						`[Worker] Parallel dependencies for 1:N stage ${first1N.template_id} not met. Waiting.`,
+					);
+					isJoinMet = false;
+				} else {
+					effectiveResult = mergedInput;
+				}
+			}
 		}
 
-		if (Array.isArray(items)) {
-			if (splitMode === "per_item") {
-				for (const nextConfig of nextStageConfigs) {
-					const nextTemplateId = nextConfig.template_id;
-					const nextTemplate =
-						await db.prompt_templates.get(nextTemplateId);
-					if (!nextTemplate) continue;
+		if (isJoinMet) {
+			let items: unknown;
+			if (splitPath === "result" || splitPath === ".") {
+				items = effectiveResult;
+			} else {
+				const cleanPath = splitPath.startsWith("result.")
+					? splitPath.slice(7)
+					: splitPath;
+				items = getValueByPath(
+					effectiveResult as Record<string, unknown>,
+					cleanPath,
+				);
+			}
 
-					const newTasks = items.map((item, idx) => ({
-						id: crypto.randomUUID(),
-						batch_id: task.batch_id,
-						stage_key:
-							nextTemplate.stage_key ||
-							extractStageKey(nextTemplate.id),
-						step_number: (task.step_number || 0) + 1,
-						status: "plan",
-						// 1:N branches carry the parent data down
-						input_data: {
-							...(task.input_data as Record<string, unknown>),
-							item,
-							_split_index: idx,
-							_split_total: items.length,
-						},
-						parent_task_id: task.id,
-						root_task_id: task.root_task_id || task.id,
-						hierarchy_path: [
-							...(task.hierarchy_path || []),
-							task.id,
-						],
-						launch_id:
-							task.launch_id ||
-							((task as unknown as Record<string, unknown>)
-								.launch_id as string),
-						split_group_id:
-							((task as unknown as Record<string, unknown>)
-								.split_group_id as string) || task.id,
-						task_type: extractStageKey(nextTemplate.id),
-						prompt_template_id: nextTemplate.id,
-						created_at: new Date().toISOString(),
-						sequence: idx + 1,
-						extra: {
-							current_stage_config: {
-								template_id: nextTemplateId,
-								cardinality:
-									nextConfig.cardinality || "one_to_one",
-								split_path: nextConfig.split_path || null,
-								split_mode: nextConfig.split_mode || "per_item",
-								merge_path: nextConfig.merge_path || null,
-								output_mapping:
-									nextConfig.output_mapping || "result",
-								export_config:
-									nextConfig.export_config || undefined,
-							},
-							delimiters: nextConfig.delimiters || undefined,
-							parent_stage_key: task.stage_key,
-							parent_task_id: task.id,
-						},
-					}));
-					await db.ai_tasks.bulkAdd(newTasks as unknown as AiTask[]);
-					await incrementBatchTotalTasks(
-						task.batch_id,
-						newTasks.length,
-					);
-				}
-			} else if (splitMode === "per_batch") {
-				const batchSize =
-					(currentStageConfig.batch_size as number) || 10;
-				for (const nextConfig of nextStageConfigs) {
-					const nextTemplateId = nextConfig.template_id;
-					const nextTemplate =
-						await db.prompt_templates.get(nextTemplateId);
-					if (!nextTemplate) continue;
+			if (Array.isArray(items)) {
+				if (splitMode === "per_item") {
+					for (const nextConfig of nextStageConfigs) {
+						const nextTemplateId = nextConfig.template_id;
+						const nextTemplate =
+							await db.prompt_templates.get(nextTemplateId);
+						if (!nextTemplate) continue;
 
-					const newTasks = [];
-					for (
-						let i = 0, bIdx = 0;
-						i < items.length;
-						i += batchSize, bIdx++
-					) {
-						const batchItems = items.slice(i, i + batchSize);
-						newTasks.push({
+						const newTasks = items.map((item, idx) => ({
 							id: crypto.randomUUID(),
 							batch_id: task.batch_id,
 							stage_key:
@@ -1529,14 +1488,15 @@ async function handleNextStages(
 							status: "plan",
 							input_data: {
 								...(task.input_data as Record<string, unknown>),
-								items: batchItems,
-								_batch_index: bIdx,
+								item,
+								_split_index: idx,
+								_split_total: items.length,
 							},
 							parent_task_id: task.id,
 							root_task_id: task.root_task_id || task.id,
 							hierarchy_path: [
 								...(task.hierarchy_path || []),
-								task.id,
+								`${task.id}#${idx}`,
 							],
 							launch_id:
 								task.launch_id ||
@@ -1548,7 +1508,7 @@ async function handleNextStages(
 							task_type: extractStageKey(nextTemplate.id),
 							prompt_template_id: nextTemplate.id,
 							created_at: new Date().toISOString(),
-							sequence: bIdx + 1,
+							sequence: idx + 1,
 							extra: {
 								current_stage_config: {
 									template_id: nextTemplateId,
@@ -1567,13 +1527,106 @@ async function handleNextStages(
 								parent_stage_key: task.stage_key,
 								parent_task_id: task.id,
 							},
-						});
+						}));
+						await db.ai_tasks.bulkAdd(
+							newTasks as unknown as AiTask[],
+						);
+						await incrementBatchTotalTasks(
+							task.batch_id,
+							newTasks.length,
+						);
 					}
-					await db.ai_tasks.bulkAdd(newTasks as unknown as AiTask[]);
-					await incrementBatchTotalTasks(
-						task.batch_id,
-						newTasks.length,
-					);
+				} else if (splitMode === "per_batch") {
+					const batchSize =
+						(currentStageConfig.batch_size as number) || 10;
+					for (const nextConfig of nextStageConfigs) {
+						const nextTemplateId = nextConfig.template_id;
+						const nextTemplate =
+							await db.prompt_templates.get(nextTemplateId);
+						if (!nextTemplate) continue;
+
+						const newTasks = [];
+						for (
+							let i = 0, bIdx = 0;
+							i < items.length;
+							i += batchSize, bIdx++
+						) {
+							const batchItems = items.slice(i, i + batchSize);
+							newTasks.push({
+								id: crypto.randomUUID(),
+								batch_id: task.batch_id,
+								stage_key:
+									nextTemplate.stage_key ||
+									extractStageKey(nextTemplate.id),
+								step_number: (task.step_number || 0) + 1,
+								status: "plan",
+								input_data: {
+									...(task.input_data as Record<
+										string,
+										unknown
+									>),
+									items: batchItems,
+									_batch_index: bIdx,
+								},
+								parent_task_id: task.id,
+								root_task_id: task.root_task_id || task.id,
+								hierarchy_path: [
+									...(task.hierarchy_path || []),
+									`${task.id}#b${bIdx}`,
+								],
+								launch_id:
+									task.launch_id ||
+									((
+										task as unknown as Record<
+											string,
+											unknown
+										>
+									).launch_id as string),
+								split_group_id:
+									((
+										task as unknown as Record<
+											string,
+											unknown
+										>
+									).split_group_id as string) || task.id,
+								task_type: extractStageKey(nextTemplate.id),
+								prompt_template_id: nextTemplate.id,
+								created_at: new Date().toISOString(),
+								sequence: bIdx + 1,
+								extra: {
+									current_stage_config: {
+										template_id: nextTemplateId,
+										cardinality:
+											nextConfig.cardinality ||
+											"one_to_one",
+										split_path:
+											nextConfig.split_path || null,
+										split_mode:
+											nextConfig.split_mode || "per_item",
+										merge_path:
+											nextConfig.merge_path || null,
+										output_mapping:
+											nextConfig.output_mapping ||
+											"result",
+										export_config:
+											nextConfig.export_config ||
+											undefined,
+									},
+									delimiters:
+										nextConfig.delimiters || undefined,
+									parent_stage_key: task.stage_key,
+									parent_task_id: task.id,
+								},
+							});
+						}
+						await db.ai_tasks.bulkAdd(
+							newTasks as unknown as AiTask[],
+						);
+						await incrementBatchTotalTasks(
+							task.batch_id,
+							newTasks.length,
+						);
+					}
 				}
 			}
 		}
@@ -1615,7 +1668,6 @@ async function handleNextStages(
 						cardinality: nextConfig.cardinality || "one_to_one",
 						split_path: nextConfig.split_path || null,
 						split_mode: nextConfig.split_mode || "per_item",
-						output_mapping: nextConfig.output_mapping || "result",
 						export_config: nextConfig.export_config || undefined,
 					},
 					delimiters: nextConfig.delimiters || undefined,
@@ -1623,6 +1675,28 @@ async function handleNextStages(
 					parent_task_id: task.id,
 				},
 			};
+
+			// 🔥 Parallel Join Check
+			const dependsOn = (nextConfig.dependsOn as string[]) || [];
+			if (
+				dependsOn.length > 1 ||
+				(dependsOn.length === 1 && dependsOn[0] !== task.stage_key)
+			) {
+				const mergedInput = await checkDependenciesMet(
+					task,
+					nextConfig,
+				);
+				if (!mergedInput) {
+					console.log(
+						`[Worker] Parallel dependencies for ${nextTemplate.stage_key} not met. Waiting.`,
+					);
+					continue;
+				}
+				newTask.input_data = {
+					...mergedInput,
+					_parent_id: task.id,
+				};
+			}
 
 			await db.ai_tasks.add(newTask as unknown as AiTask);
 			await incrementBatchTotalTasks(task.batch_id, 1);
@@ -1848,6 +1922,101 @@ function extractStageKey(templateId: string): string {
 	// 2. Format: uuid_stageName
 	const match = templateId.match(/^[0-9a-fA-F-]+_(.+)$/);
 	return match ? match[1] : templateId;
+}
+
+/**
+ * 🔥 Parallel Join Implementation: "Last Finisher Wins"
+ * Checks if all upstream dependencies for a next stage are completed.
+ * returns Merged payload if all met, null otherwise.
+ */
+async function checkDependenciesMet(
+	currentTask: AiTask,
+	nextConfig: Record<string, unknown>,
+): Promise<Record<string, unknown> | null> {
+	const dependsOn = (nextConfig.dependsOn as string[]) || [];
+	if (dependsOn.length === 0)
+		return (currentTask.output_data as Record<string, unknown>) || {};
+
+	const batchId = currentTask.batch_id;
+	const launchId = currentTask.launch_id;
+	const grouping = (nextConfig.batch_grouping as string) || "global";
+
+	// We use a transaction to prevent race conditions where two parents finish simultaneously
+	return await db.transaction("r", db.ai_tasks, async () => {
+		let scopeTasks: AiTask[];
+		if (grouping === "global" && launchId) {
+			scopeTasks = await db.ai_tasks
+				.where("launch_id")
+				.equals(launchId)
+				.toArray();
+		} else if (batchId) {
+			scopeTasks = await db.ai_tasks
+				.where("batch_id")
+				.equals(batchId)
+				.toArray();
+		} else {
+			return null;
+		}
+
+		const mergedPayload: Record<string, unknown> = {};
+
+		// For each dependency stage, find if it's completed in the right scope
+		for (const depKey of dependsOn) {
+			if (depKey === currentTask.stage_key) {
+				mergedPayload[depKey] = currentTask.output_data;
+				continue;
+			}
+
+			// Find tasks for this stage in this scope
+			const depTasks = scopeTasks.filter((t) => t.stage_key === depKey);
+
+			// If Isolated, filter by shared ancestry in hierarchy_path
+			let relevantDepTasks = depTasks;
+			if (grouping === "isolated") {
+				const currentHierarchy = currentTask.hierarchy_path || [];
+				const splitGroupId = (
+					currentTask as unknown as Record<string, unknown>
+				).split_group_id as string;
+				const branchPrefix = splitGroupId ? `${splitGroupId}#` : null;
+				const currentBranchId = branchPrefix
+					? currentHierarchy.find((id) => id.startsWith(branchPrefix))
+					: null;
+
+				relevantDepTasks = depTasks.filter((t) => {
+					const tHierarchy = t.hierarchy_path || [];
+					if (currentBranchId) {
+						// Must share the exact branch lineage ID
+						return tHierarchy.includes(currentBranchId);
+					} else {
+						// Fallback: share any ancestor (root fallback)
+						return tHierarchy.some((id) =>
+							currentHierarchy.includes(id),
+						);
+					}
+				});
+			}
+
+			if (relevantDepTasks.length === 0) return null; // Dependency not even started yet
+
+			const allDone = relevantDepTasks.every(
+				(t) => t.status === "completed" || t.status === "failed",
+			);
+			if (!allDone) return null;
+
+			// Aggregate outputs for this dependency stage
+			// If there's only one task (standard join), use its output directly
+			// If there are multiple (N:1 within a branch), use an array
+			if (relevantDepTasks.length === 1) {
+				mergedPayload[depKey] = relevantDepTasks[0].output_data;
+			} else {
+				mergedPayload[depKey] = relevantDepTasks.map(
+					(t) => t.output_data,
+				);
+			}
+		}
+
+		return mergedPayload;
+	});
 }
 
 async function updateBatchCounters(batchId: string, success: boolean) {

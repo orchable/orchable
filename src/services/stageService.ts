@@ -258,6 +258,7 @@ export async function syncStagesToPromptTemplates(
 			return_along_with: stage.return_along_with || [],
 			requires_approval: stage.requires_approval || false,
 			custom_component_id: stage.custom_component_id,
+			dependsOn: stage.dependsOn,
 		};
 
 		const record: PromptTemplateRecord = {
