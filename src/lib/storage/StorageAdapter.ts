@@ -106,6 +106,9 @@ export interface IStorageAdapter {
 
 	// AI Model Settings
 	listAiModelSettings(): Promise<import("../types").AIModelSetting[]>;
+	getAiModelSetting(
+		id: string,
+	): Promise<import("../types").AIModelSetting | null>;
 	upsertAiModelSetting(
 		setting: import("../types").AIModelSetting,
 	): Promise<void>;

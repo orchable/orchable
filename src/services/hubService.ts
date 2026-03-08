@@ -1,7 +1,9 @@
 import { supabase } from "@/lib/supabase";
-import type { OrchestratorConfig, AISettings } from "@/lib/types";
-import { storage } from "@/lib/storage";
+import { OrchestratorConfig, AISettings, AIModelSetting } from "@/lib/types";
+import { storage, getAssetStorageAdapter } from "@/lib/storage";
 import { PromptTemplate, CustomComponent } from "@/lib/storage/StorageAdapter";
+import { getStorageAdapterForType } from "@/lib/storage";
+import { UserTier } from "@/lib/storage";
 
 export type HubAssetType =
 	| "orchestration"
@@ -185,21 +187,33 @@ export const hubService = {
 			isPublic = true,
 		} = params;
 
-		// 1. Get source content for snapshotting
+		// 1. Get source content for snapshotting using tiered storage
+		const assetStorage = await getAssetStorageAdapter();
+		let sourceData:
+			| PromptTemplate
+			| CustomComponent
+			| OrchestratorConfig
+			| AIModelSetting
+			| null = null;
+
+		if (type === "template")
+			sourceData = await assetStorage.getTemplate(refId);
+		else if (type === "component")
+			sourceData = await assetStorage.getComponent(refId);
+		else if (type === "orchestration")
+			sourceData = await assetStorage.getConfig(refId);
+		else if (type === "ai_preset")
+			sourceData = await assetStorage.getAiModelSetting(refId);
+
+		if (!sourceData) throw new Error("Source asset not found");
+
+		// Determine table name for linking back later
 		let tableName = "";
 		if (type === "template") tableName = "prompt_templates";
 		else if (type === "component") tableName = "custom_components";
 		else if (type === "orchestration")
 			tableName = "lab_orchestrator_configs";
 		else if (type === "ai_preset") tableName = "ai_model_settings";
-
-		const { data: sourceData, error: fetchErr } = await supabase
-			.from(tableName)
-			.select("*")
-			.eq("id", refId)
-			.single();
-
-		if (fetchErr) throw fetchErr;
 
 		// 2. Prepare content bundle (Phase 2 logic)
 		let contentSnapshot: Record<string, unknown> = { ...sourceData };
@@ -283,8 +297,11 @@ export const hubService = {
 
 		if (error) throw error;
 
-		// 6. Link back to source table
-		if (tableName) {
+		// 6. Link back to source table (if it exists in cloud)
+		const {
+			data: { user: currentUser },
+		} = await supabase.auth.getUser();
+		if (currentUser && tableName) {
 			await supabase
 				.from(tableName)
 				.update({ hub_asset_id: data.id, is_public: isPublic })
@@ -299,7 +316,7 @@ export const hubService = {
 	 */
 	async importAsset(
 		hubAssetId: string,
-		options: { mode: "use" | "remix" } = { mode: "use" },
+		options: { mode: "use" | "remix"; tier?: UserTier } = { mode: "use" },
 	) {
 		// 1. Fetch Hub Asset snapshot
 		const { data: hubAsset, error: hubErr } = await supabase
@@ -336,7 +353,7 @@ export const hubService = {
 		importedAsset.is_public = false;
 
 		// Use storage adapter to route to either IndexedDB (Free/BYOK) or Supabase (Premium)
-		const adapter = storage.adapter;
+		const assetStorage = await getAssetStorageAdapter();
 
 		if (hubAsset.asset_type === "orchestration" && snapshot.bundle) {
 			const { templates, components } = snapshot.bundle as {
@@ -361,7 +378,7 @@ export const hubService = {
 					updated_at: new Date().toISOString(),
 				} as CustomComponent;
 
-				await adapter.upsertComponent(component);
+				await assetStorage.upsertComponent(component);
 				componentMap[oldId] = newId;
 			}
 
@@ -386,7 +403,7 @@ export const hubService = {
 					updated_at: new Date().toISOString(),
 				} as PromptTemplate;
 
-				await adapter.upsertTemplate(template);
+				await assetStorage.upsertTemplate(template);
 				templateMap[oldId] = newId;
 			}
 
@@ -411,13 +428,13 @@ export const hubService = {
 		let importedResult: unknown;
 
 		if (hubAsset.asset_type === "orchestration") {
-			importedResult = await adapter.saveConfig(
+			importedResult = await assetStorage.saveConfig(
 				importedAsset as Partial<OrchestratorConfig>,
 			);
 		} else if (hubAsset.asset_type === "template") {
 			const newId = crypto.randomUUID();
 			const template = { ...importedAsset, id: newId } as PromptTemplate;
-			await adapter.upsertTemplate(template);
+			await assetStorage.upsertTemplate(template);
 			importedResult = template;
 		} else if (hubAsset.asset_type === "component") {
 			const newId = crypto.randomUUID();
@@ -425,17 +442,31 @@ export const hubService = {
 				...importedAsset,
 				id: newId,
 			} as CustomComponent;
-			await adapter.upsertComponent(component);
+			await assetStorage.upsertComponent(component);
 			importedResult = component;
 		} else {
-			// For AI Preset or any other type not in adapter, fallback to direct Supabase
-			const { data, error: importErr } = await supabase
-				.from(targetTableName)
-				.insert(importedAsset)
-				.select()
-				.single();
-			if (importErr) throw importErr;
-			importedResult = data;
+			// For AI Preset or any other type not in basic adapter methods,
+			// use the storage adapter's underlying mechanism if possible
+			if (hubAsset.asset_type === "ai_preset") {
+				const setting = {
+					...importedAsset,
+					id: crypto.randomUUID(),
+				} as AIModelSetting;
+				await assetStorage.upsertAiModelSetting(setting);
+				importedResult = setting;
+			} else if (user) {
+				const { data, error: importErr } = await supabase
+					.from(targetTableName)
+					.insert(importedAsset)
+					.select()
+					.single();
+				if (importErr) throw importErr;
+				importedResult = data;
+			} else {
+				throw new Error(
+					"Cannot import unknown asset type without authentication",
+				);
+			}
 		}
 
 		// 5. Increment install count on Hub (Cloud only operation)

@@ -463,6 +463,18 @@ export class SupabaseAdapter implements IStorageAdapter {
 		return data as import("../types").AIModelSetting[];
 	}
 
+	async getAiModelSetting(
+		id: string,
+	): Promise<import("../types").AIModelSetting | null> {
+		const { data, error } = await supabase
+			.from("ai_model_settings")
+			.select("*")
+			.eq("id", id)
+			.single();
+		if (error) return null;
+		return data as import("../types").AIModelSetting;
+	}
+
 	async upsertAiModelSetting(
 		setting: import("../types").AIModelSetting,
 	): Promise<void> {

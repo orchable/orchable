@@ -422,6 +422,10 @@ export function AssetLibrary() {
     };
 
     const handleShareToHub = (type: HubAssetType, asset: { id: string; name: string; description?: string; tags?: string[] }) => {
+        if (!user) {
+            toast.error("Please login to share assets to the Hub");
+            return;
+        }
         setSharingAssetType(type);
         setSharingAssetId(asset.id);
         setSharingAssetInitialData({

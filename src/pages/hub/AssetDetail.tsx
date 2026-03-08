@@ -40,6 +40,8 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ReportDialog } from "@/components/hub/ReportDialog";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { useTier } from "@/hooks/useTier";
 
 const assetTypeConfig: Record<HubAssetType, { label: string; icon: React.ElementType; color: string; bg: string }> = {
     template: { label: "Prompt Template", icon: Library, color: "text-blue-500", bg: "bg-blue-500/10" },
@@ -58,6 +60,8 @@ export function AssetDetail() {
     const [remixCount, setRemixCount] = useState(0);
     const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
     const navigate = useNavigate();
+    const { user } = useAuth();
+    const { tier } = useTier();
 
     useEffect(() => {
         const fetchAsset = async () => {
@@ -91,7 +95,7 @@ export function AssetDetail() {
         if (!asset) return;
         setImporting(true);
         try {
-            await hubService.importAsset(asset.id);
+            await hubService.importAsset(asset.id, { mode: "use", tier });
             toast.success("Successfully imported to your library!");
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : "Failed to import asset";
@@ -103,6 +107,10 @@ export function AssetDetail() {
 
     const handleToggleStar = async () => {
         if (!asset) return;
+        if (!user) {
+            toast.error("Please login to star assets");
+            return;
+        }
         try {
             const starred = await hubService.toggleStar(asset.id);
             setIsStarred(starred);
