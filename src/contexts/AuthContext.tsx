@@ -105,6 +105,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await supabase.auth.signOut();
         setProfile(null);
         profileFetchedForUser.current = null;
+
+        // Clear IndexedDB to prevent data leaks between sessions
+        try {
+            const { db } = await import('@/lib/storage/IndexedDBAdapter');
+            await Promise.all([
+                db.task_batches.clear(),
+                db.ai_tasks.clear(),
+                db.user_api_keys.clear(),
+                db.orchestrator_configs.clear(),
+                db.metadata.clear(),
+                db.api_key_usage_log.clear(),
+                db.api_key_health.clear()
+            ]);
+            console.log('[AuthContext] Local database cleared on sign out.');
+        } catch (e) {
+            console.error('[AuthContext] Failed to clear local database on sign out:', e);
+        }
     };
 
     return (

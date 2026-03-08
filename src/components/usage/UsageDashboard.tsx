@@ -5,9 +5,77 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BarChart3, Info, Crown, Zap, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 export function UsageDashboard() {
+    const { user } = useAuth();
     const { usage, limits, tier, isPremium } = useTier();
+
+    if (!user) {
+        return (
+            <Card className="glass-card border-primary/20 bg-background/40 backdrop-blur-md overflow-hidden relative">
+                <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <BarChart3 className="w-16 h-16" />
+                </div>
+                <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                            <CardTitle className="text-xl flex items-center gap-2">
+                                <Zap className="w-5 h-5 text-zinc-500 fill-zinc-500" />
+                                Usage Dashboard
+                            </CardTitle>
+                            <CardDescription>
+                                You are currently using the <strong>Anonymous</strong> tier.
+                            </CardDescription>
+                        </div>
+                        <Badge variant="secondary" className="px-3 py-1 uppercase font-black tracking-tighter text-[10px]">
+                            Anonymous (Local Only)
+                        </Badge>
+                    </div>
+                </CardHeader>
+                <CardContent className="pt-4 space-y-6">
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-end">
+                            <div className="space-y-1">
+                                <p className="text-sm font-medium text-muted-foreground">Monthly Cloud Tasks</p>
+                                <h2 className="text-4xl font-black tracking-tighter">
+                                    0
+                                    <span className="text-xl font-normal text-muted-foreground ml-2">
+                                        / 0
+                                    </span>
+                                </h2>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-3 mt-4">
+                        <div className="p-3 rounded-xl bg-primary/5 border border-primary/10 flex items-start gap-3">
+                            <div className="p-2 rounded-lg bg-primary/10">
+                                <Zap className="w-4 h-4 text-primary" />
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-xs font-bold">Local Execution Active</p>
+                                <p className="text-[10px] text-muted-foreground">
+                                    Add your personal API Key below to run unlimited batches locally right in your browser.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/10 flex items-start gap-3">
+                            <div className="p-2 rounded-lg bg-amber-500/10">
+                                <Crown className="w-4 h-4 text-amber-500" />
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-xs font-bold">Want Free Cloud Tasks?</p>
+                                <p className="text-[10px] text-muted-foreground">
+                                    Create a free account to get 100 monthly tasks processed by our servers, without needing your own API key.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
 
     const count = usage?.count || 0;
     const limit = limits.tasks;

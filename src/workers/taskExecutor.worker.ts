@@ -1772,12 +1772,9 @@ async function updateBatchCounters(batchId: string, success: boolean) {
 
 // --- USAGE HELPERS (Worker context) ---
 async function checkUsage(): Promise<boolean> {
-	if (currentTier === "premium") return true;
-
-	const usage = await getUsage();
-	const limit = 200; // Decision 6
-	const grace = Math.floor(limit * 0.1);
-	return usage.count < limit + grace;
+	// Local execution (web-worker) is always unlimited because users provide their own personal API keys.
+	// We still track usage metadata for their personal dashboard, but we do not enforce arbitrary limits.
+	return true;
 }
 
 async function getUsage() {
