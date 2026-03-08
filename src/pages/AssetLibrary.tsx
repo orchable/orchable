@@ -65,7 +65,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTier } from '@/hooks/useTier';
 import { ComponentEditor } from '@/components/batch/ComponentEditor';
 import { db } from '@/lib/storage/IndexedDBAdapter';
-import { storage } from '@/lib/storage';
+import { storage, getAssetStorageAdapter } from '@/lib/storage';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { PromptEditorDialog } from '@/components/designer/PromptEditorDialog';
 import { Label } from "@/components/ui/label";
@@ -121,12 +121,14 @@ export function AssetLibrary() {
     const fetchAssets = async () => {
         setLoading(true);
         try {
-            await storage.waitForAdapter();
+            const assetStorage = await getAssetStorageAdapter();
             const [comps, aiList, docList, tplList] = await Promise.all([
                 getCustomComponents(),
                 supabase.from('ai_model_settings').select('*').order('name'),
-                supabase.from('document_assets').select('*').order('created_at', { ascending: false }),
-                storage.adapter.listTemplates()
+                tier === 'premium'
+                    ? supabase.from('document_assets').select('*').order('created_at', { ascending: false })
+                    : { data: await db.document_assets.orderBy('created_at').reverse().toArray(), error: null },
+                assetStorage.listTemplates()
             ]);
             setComponents(comps);
 
@@ -136,20 +138,12 @@ export function AssetLibrary() {
             }
 
             if (aiList.data) {
-                // If Free Tier, load local overrides from IndexedDB
-                if (tier === 'free') {
+                if (!user) {
+                    // Unauthenticated: load local from IndexedDB
                     const localSettings = await db.ai_model_settings.toArray();
-                    const mergedSettings = aiList.data.map(globalSetting => {
-                        const localOverride = localSettings.find(ls => ls.model_id === globalSetting.model_id);
-                        if (localOverride) {
-                            return { ...globalSetting, ...localOverride, id: globalSetting.id }; // Keep global ID but use local values
-                        }
-                        return globalSetting;
-                    });
-                    const additionalLocal = localSettings.filter(ls => !mergedSettings.some(m => m.id === ls.id || ls.id === (m.model_id + '_local')));
-                    setAiSettings([...mergedSettings, ...additionalLocal].sort((a, b) => a.name.localeCompare(b.name)));
+                    setAiSettings(localSettings.sort((a, b) => a.name.localeCompare(b.name)));
                 } else {
-                    // For Premium: Merge system defaults with user's overrides
+                    // Authenticated (Free or Premium): Merge system defaults with user's overrides from Supabase
                     const systemSettings = aiList.data.filter(s => s.user_id === null);
                     const userOverrides = aiList.data.filter(s => s.user_id === user?.id);
                     const mergedSettings = systemSettings.map(globalSetting => {
@@ -187,13 +181,8 @@ export function AssetLibrary() {
     const handleDeleteTemplate = async (id: string) => {
         if (!confirm('Are you sure you want to delete this template?')) return;
         try {
-            await storage.waitForAdapter();
-            if (storage.adapter.constructor.name === "SupabaseAdapter") {
-                const { error } = await supabase.from('prompt_templates').delete().eq('id', id);
-                if (error) throw error;
-            } else {
-                console.warn("Delete template not fully implemented for IndexedDB");
-            }
+            const assetStorage = await getAssetStorageAdapter();
+            await assetStorage.deleteTemplate(id);
             toast.success('Template deleted');
             fetchAssets();
         } catch (error) {
@@ -295,8 +284,8 @@ export function AssetLibrary() {
         if (!editingTemplate) return;
         setIsSavingPrompt(true);
         try {
-            await storage.waitForAdapter();
-            const existing = await storage.adapter.getTemplate(editingTemplate.id);
+            const assetStorage = await getAssetStorageAdapter();
+            const existing = await assetStorage.getTemplate(editingTemplate.id);
             const templateToSave = existing
                 ? {
                     ...existing,
@@ -310,7 +299,7 @@ export function AssetLibrary() {
                     version: 1,
                 };
 
-            await storage.adapter.upsertTemplate(templateToSave as unknown as PromptTemplateRecord);
+            await assetStorage.upsertTemplate(templateToSave as unknown as PromptTemplateRecord);
             toast.success(existing ? 'Prompt template updated' : 'New prompt template created');
             setIsPromptEditorOpen(false);
             fetchAssets();
@@ -374,67 +363,43 @@ export function AssetLibrary() {
         if (!editingAiSetting) return;
         setIsSavingAiSetting(true);
         try {
-            if (tier === 'free') {
+            const assetStorage = await getAssetStorageAdapter();
+
+            if (!user) {
+                // Unauthenticated: Save locally
                 const payload = { ...editingAiSetting };
-                const lookupId = editingAiSetting.id.includes('_local') ? editingAiSetting.id : editingAiSetting.id + '_local';
-                const existing = await db.ai_model_settings.where('id').equals(lookupId).first() || await db.ai_model_settings.where('model_id').equals(editingAiSetting.model_id).first();
-                if (existing) {
-                    await db.ai_model_settings.update(existing.id!, payload);
-                } else {
-                    payload.id = lookupId;
-                    await db.ai_model_settings.put(payload);
-                }
+                await db.ai_model_settings.put(payload);
                 toast.success('AI default settings saved locally');
                 setIsAiSettingEditorOpen(false);
                 fetchAssets();
                 return;
             }
 
-            if (!user) throw new Error("Must be logged in to save settings.");
-
+            // Authenticated (Free or Premium): Save to Supabase
+            // ... (rest of the logic remains similar but uses assetStorage if possible or keep direct supabase for complex merges)
+            // Actually, keep the specific merge logic for Supabase as I don't want to overcomplicate the adapter yet for specific table merges.
+            // Authenticated (Free or Premium): Save to Supabase
+            // We want model-specific overrides per user
             const { data: existingUserSetting } = await supabase
                 .from('ai_model_settings')
                 .select('id')
                 .eq('user_id', user.id)
-                .eq('id', editingAiSetting.id)
+                .eq('model_id', editingAiSetting.model_id)
                 .maybeSingle();
 
-            const payload = {
-                model_id: editingAiSetting.model_id,
-                name: editingAiSetting.name,
-                category: editingAiSetting.category,
-                tagline: editingAiSetting.tagline,
-                description: editingAiSetting.description,
-                supported_inputs: editingAiSetting.supported_inputs,
-                supported_outputs: editingAiSetting.supported_outputs,
-                input_token_limit: editingAiSetting.input_token_limit,
-                output_token_limit: editingAiSetting.output_token_limit,
-                capabilities: editingAiSetting.capabilities,
-                temperature: editingAiSetting.temperature,
-                top_k: editingAiSetting.top_k,
-                top_p: editingAiSetting.top_p,
-                max_output_tokens: editingAiSetting.max_output_tokens,
-                timeout_ms: editingAiSetting.timeout_ms,
-                retries: editingAiSetting.retries,
+            const payload: Partial<AIModelSetting> & { user_id: string | null } = {
+                ...editingAiSetting,
                 user_id: user.id
             };
 
-            let saveError;
             if (existingUserSetting) {
-                const { error } = await supabase
-                    .from('ai_model_settings')
-                    .update(payload)
-                    .eq('id', existingUserSetting.id);
-                saveError = error;
+                payload.id = existingUserSetting.id;
             } else {
-                const { error } = await supabase
-                    .from('ai_model_settings')
-                    .insert(payload);
-                saveError = error;
+                // Remove id to force a new record creation in Supabase for user-specific override
+                delete payload.id;
             }
 
-            if (saveError) throw saveError;
-
+            await assetStorage.upsertAiModelSetting(payload as AIModelSetting);
             toast.success('AI default settings updated');
             setIsAiSettingEditorOpen(false);
             fetchAssets();
@@ -840,26 +805,13 @@ export function AssetLibrary() {
                                                         <Switch
                                                             checked={setting.is_active}
                                                             onCheckedChange={async (checked) => {
-                                                                if (tier === 'free') {
-                                                                    const existing = await db.ai_model_settings.where('model_id').equals(setting.model_id).first();
-                                                                    if (existing) {
-                                                                        await db.ai_model_settings.update(existing.id!, { is_active: checked });
-                                                                    } else {
-                                                                        await db.ai_model_settings.put({ ...setting, is_active: checked, id: setting.model_id + '_local' });
-                                                                    }
-                                                                    setAiSettings(prev => prev.map(s => s.id === setting.id ? { ...s, is_active: checked } : s));
-                                                                    toast.success(checked ? 'Model enabled locally' : 'Model disabled locally');
-                                                                    return;
-                                                                }
-
-                                                                const { error } = await supabase
-                                                                    .from('ai_model_settings')
-                                                                    .update({ is_active: checked })
-                                                                    .eq('id', setting.id);
-                                                                if (!error) {
-                                                                    setAiSettings(prev => prev.map(s => s.id === setting.id ? { ...s, is_active: checked } : s));
+                                                                const assetStorage = await getAssetStorageAdapter();
+                                                                try {
+                                                                    const updated = { ...setting, is_active: checked };
+                                                                    await assetStorage.upsertAiModelSetting(updated);
+                                                                    setAiSettings(prev => prev.map(s => s.id === setting.id ? updated : s));
                                                                     toast.success(checked ? 'Model enabled' : 'Model disabled');
-                                                                } else {
+                                                                } catch (err) {
                                                                     toast.error('Failed to update status');
                                                                 }
                                                             }}

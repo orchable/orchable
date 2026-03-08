@@ -228,6 +228,7 @@ export interface AIModelSetting {
 	updated_at: string;
 	hub_asset_id?: string;
 	is_public?: boolean;
+	user_id?: string | null;
 }
 
 // Stage Input/Output Contract Types

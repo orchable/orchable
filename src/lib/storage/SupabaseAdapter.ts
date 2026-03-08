@@ -185,6 +185,14 @@ export class SupabaseAdapter implements IStorageAdapter {
 		}
 	}
 
+	async deleteTemplate(id: string): Promise<void> {
+		const { error } = await supabase
+			.from("prompt_templates")
+			.delete()
+			.eq("id", id);
+		if (error) throw error;
+	}
+
 	// Custom Components
 	async listComponents(): Promise<CustomComponent[]> {
 		const { data, error } = await supabase
@@ -211,6 +219,14 @@ export class SupabaseAdapter implements IStorageAdapter {
 			.from("custom_components")
 			.upsert(component);
 
+		if (error) throw error;
+	}
+
+	async deleteComponent(id: string): Promise<void> {
+		const { error } = await supabase
+			.from("custom_components")
+			.delete()
+			.eq("id", id);
 		if (error) throw error;
 	}
 
@@ -434,6 +450,33 @@ export class SupabaseAdapter implements IStorageAdapter {
 	): Promise<void> {
 		const { error } = await supabase.from("api_key_health").upsert(health);
 
+		if (error) throw error;
+	}
+
+	// AI Model Settings
+	async listAiModelSettings(): Promise<import("../types").AIModelSetting[]> {
+		const { data, error } = await supabase
+			.from("ai_model_settings")
+			.select("*")
+			.order("name");
+		if (error) throw error;
+		return data as import("../types").AIModelSetting[];
+	}
+
+	async upsertAiModelSetting(
+		setting: import("../types").AIModelSetting,
+	): Promise<void> {
+		const { error } = await supabase
+			.from("ai_model_settings")
+			.upsert(setting);
+		if (error) throw error;
+	}
+
+	async deleteAiModelSetting(id: string): Promise<void> {
+		const { error } = await supabase
+			.from("ai_model_settings")
+			.delete()
+			.eq("id", id);
 		if (error) throw error;
 	}
 }

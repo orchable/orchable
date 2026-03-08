@@ -14,6 +14,36 @@ export function getStorageAdapter(
 	return new IndexedDBAdapter();
 }
 
+/**
+ * Returns the storage adapter for non-execution assets (Templates, Components, AI Settings).
+ * Assets for all authenticated users (Free & Premium) are stored in Supabase for sync.
+ * Unauthenticated users always use local IndexedDB.
+ */
+export async function getAssetStorageAdapter(): Promise<IStorageAdapter> {
+	const { supabase } = await import("../supabase");
+	const {
+		data: { user },
+	} = await supabase.auth.getUser();
+
+	if (user) {
+		return getStorageAdapter("supabase-n8n");
+	}
+	return getStorageAdapter("web-worker");
+}
+
+/**
+ * Returns the correct storage adapter directly based on a stored type.
+ * Specifically used for Documents which can be local even if user is Authenticated (Free tier).
+ */
+export function getStorageAdapterForType(
+	type: "supabase" | "indexeddb",
+): IStorageAdapter {
+	if (type === "supabase") {
+		return new SupabaseAdapter();
+	}
+	return new IndexedDBAdapter();
+}
+
 let currentAdapter: IStorageAdapter = new IndexedDBAdapter();
 
 // Promise that resolves once refreshAdapter has completed at least once.

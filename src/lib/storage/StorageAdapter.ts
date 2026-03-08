@@ -96,11 +96,20 @@ export interface IStorageAdapter {
 	listTemplates(): Promise<PromptTemplate[]>;
 	getTemplate(id: string): Promise<PromptTemplate | null>;
 	upsertTemplate(template: PromptTemplate): Promise<void>;
+	deleteTemplate(id: string): Promise<void>;
 
 	// Custom Components
 	listComponents(): Promise<CustomComponent[]>;
 	getComponent(id: string): Promise<CustomComponent | null>;
 	upsertComponent(component: CustomComponent): Promise<void>;
+	deleteComponent(id: string): Promise<void>;
+
+	// AI Model Settings
+	listAiModelSettings(): Promise<import("../types").AIModelSetting[]>;
+	upsertAiModelSetting(
+		setting: import("../types").AIModelSetting,
+	): Promise<void>;
+	deleteAiModelSetting(id: string): Promise<void>;
 
 	// Configs
 	saveConfig(
@@ -128,4 +137,11 @@ export interface IStorageAdapter {
 	listKeys(): Promise<Record<string, unknown>[]>;
 	getApiKeyHealth(userApiKeyId: string): Promise<ApiKeyHealth | null>;
 	upsertApiKeyHealth(health: ApiKeyHealth): Promise<void>;
+
+	// AI Model Settings
+	listAiModelSettings(): Promise<import("../types").AIModelSetting[]>;
+	upsertAiModelSetting(
+		setting: import("../types").AIModelSetting,
+	): Promise<void>;
+	deleteAiModelSetting(id: string): Promise<void>;
 }

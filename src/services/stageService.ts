@@ -1,4 +1,4 @@
-import { storage } from "@/lib/storage";
+import { storage, getAssetStorageAdapter } from "@/lib/storage";
 import { supabase } from "@/lib/supabase";
 import type {
 	AISettings,
@@ -174,7 +174,8 @@ export async function syncStagesToPromptTemplates(
 
 		// First, check if there's a source template referenced
 		let templateContent = DEFAULT_PROMPT_TEMPLATE;
-		const existingSnapshot = await storage.adapter.getTemplate(templateId);
+		const assetStorage = await getAssetStorageAdapter();
+		const existingSnapshot = await assetStorage.getTemplate(templateId);
 
 		if (stage.prompt_template_id) {
 			// Fetch latest source template content from Supabase
@@ -188,7 +189,7 @@ export async function syncStagesToPromptTemplates(
 				templateContent = sourceTemplate.template;
 			} else {
 				// Fallback to local storage (crucial for Free Tier users who just saved it)
-				const localTemplate = await storage.adapter.getTemplate(
+				const localTemplate = await assetStorage.getTemplate(
 					stage.prompt_template_id,
 				);
 				if (localTemplate?.template) {
@@ -282,8 +283,9 @@ export async function syncStagesToPromptTemplates(
 	}
 
 	// 2. Perform Bulk Upsert
+	const assetStorage = await getAssetStorageAdapter();
 	for (const record of recordsToUpsert) {
-		await storage.adapter.upsertTemplate(record);
+		await assetStorage.upsertTemplate(record);
 	}
 
 	// PASS 2: Update next_stage_template_ids now that all templates exist
@@ -299,9 +301,9 @@ export async function syncStagesToPromptTemplates(
 			nextTemplateIds.length > 0 ? nextTemplateIds[0] : null;
 
 		if (nextTemplateIds.length > 0) {
-			const existing = await storage.adapter.getTemplate(templateId);
+			const existing = await assetStorage.getTemplate(templateId);
 			if (existing) {
-				await storage.adapter.upsertTemplate({
+				await assetStorage.upsertTemplate({
 					...existing,
 					next_stage_template_ids: nextTemplateIds,
 				});
@@ -316,7 +318,8 @@ export async function syncStagesToPromptTemplates(
  * Get all templates for an orchestrator
  */
 export async function getOrchestratorTemplates(orchestratorId: string) {
-	const allTemplates = await storage.adapter.listTemplates();
+	const assetStorage = await getAssetStorageAdapter();
+	const allTemplates = await assetStorage.listTemplates();
 	return allTemplates.filter((t) => t.organization_code === orchestratorId);
 }
 
@@ -324,7 +327,8 @@ export async function getOrchestratorTemplates(orchestratorId: string) {
  * Delete all templates for an orchestrator
  */
 export async function deleteOrchestratorTemplates(orchestratorId: string) {
-	const allTemplates = await storage.adapter.listTemplates();
+	const assetStorage = await getAssetStorageAdapter();
+	const allTemplates = await assetStorage.listTemplates();
 	const toDelete = allTemplates.filter(
 		(t) => t.organization_code === orchestratorId,
 	);
@@ -342,7 +346,8 @@ export async function deleteOrchestratorTemplates(orchestratorId: string) {
 export async function getTemplateById(
 	id: string,
 ): Promise<PromptTemplateRecord | null> {
-	const data = await storage.adapter.getTemplate(id);
+	const assetStorage = await getAssetStorageAdapter();
+	const data = await assetStorage.getTemplate(id);
 	return data as PromptTemplateRecord;
 }
 
@@ -350,7 +355,8 @@ export async function getTemplateById(
  * Get all custom components from the registry
  */
 export async function getCustomComponents(): Promise<CustomComponent[]> {
-	return storage.adapter.listComponents();
+	const assetStorage = await getAssetStorageAdapter();
+	return assetStorage.listComponents();
 }
 
 /**
@@ -359,7 +365,8 @@ export async function getCustomComponents(): Promise<CustomComponent[]> {
 export async function getCustomComponentById(
 	id: string,
 ): Promise<CustomComponent | null> {
-	return storage.adapter.getComponent(id);
+	const assetStorage = await getAssetStorageAdapter();
+	return assetStorage.getComponent(id);
 }
 
 /**
@@ -378,7 +385,8 @@ export async function createCustomComponent(
 		code: component.code || "",
 		...component,
 	} as CustomComponent;
-	await storage.adapter.upsertComponent(newComponent);
+	const assetStorage = await getAssetStorageAdapter();
+	await assetStorage.upsertComponent(newComponent);
 	return newComponent;
 }
 
@@ -389,9 +397,10 @@ export async function updateCustomComponent(
 	id: string,
 	updates: Partial<CustomComponent>,
 ): Promise<void> {
-	const existing = await storage.adapter.getComponent(id);
+	const assetStorage = await getAssetStorageAdapter();
+	const existing = await assetStorage.getComponent(id);
 	if (!existing) throw new Error("Component not found");
-	await storage.adapter.upsertComponent({
+	await assetStorage.upsertComponent({
 		...existing,
 		...updates,
 		updated_at: new Date().toISOString(),
@@ -402,7 +411,8 @@ export async function updateCustomComponent(
  * Delete a custom component
  */
 export async function deleteCustomComponent(id: string): Promise<void> {
-	// StorageAdapter doesn't have deleteComponent yet, sub-optimal
+	const assetStorage = await getAssetStorageAdapter();
+	await assetStorage.deleteComponent(id);
 }
 
 /**
@@ -412,9 +422,10 @@ export async function linkTemplateToComponent(
 	templateId: string,
 	componentId: string | null,
 ): Promise<void> {
-	const template = await storage.adapter.getTemplate(templateId);
+	const assetStorage = await getAssetStorageAdapter();
+	const template = await assetStorage.getTemplate(templateId);
 	if (!template) throw new Error("Template not found");
-	await storage.adapter.upsertTemplate({
+	await assetStorage.upsertTemplate({
 		...template,
 		custom_component_id: componentId || undefined,
 	});
@@ -427,9 +438,10 @@ export async function updateTemplateViewConfig(
 	id: string,
 	viewConfig: Record<string, unknown>,
 ) {
-	const template = await storage.adapter.getTemplate(id);
+	const assetStorage = await getAssetStorageAdapter();
+	const template = await assetStorage.getTemplate(id);
 	if (!template) throw new Error("Template not found");
-	await storage.adapter.upsertTemplate({
+	await assetStorage.upsertTemplate({
 		...template,
 		view_config: viewConfig,
 	});
@@ -439,10 +451,11 @@ export async function updateTemplateViewConfig(
  * Update the custom component code of a prompt template's view_config
  */
 export async function updateTemplateCustomComponent(id: string, code: string) {
-	const template = await storage.adapter.getTemplate(id);
+	const assetStorage = await getAssetStorageAdapter();
+	const template = await assetStorage.getTemplate(id);
 	if (!template) throw new Error("Template not found");
 	const currentViewConfig = template.view_config || {};
-	await storage.adapter.upsertTemplate({
+	await assetStorage.upsertTemplate({
 		...template,
 		view_config: {
 			...currentViewConfig,

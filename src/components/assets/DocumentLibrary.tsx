@@ -24,8 +24,8 @@ import {
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { DocumentAsset } from '@/lib/types';
-import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { getStorageAdapterForType } from '@/lib/storage';
 
 interface Props {
     documents: DocumentAsset[];
@@ -45,26 +45,30 @@ export const DocumentLibrary: React.FC<Props> = ({
         if (!confirm(`Are you sure you want to delete "${doc.name}"?`)) return;
 
         try {
-            // 1. Delete from DB
-            const { error } = await supabase
-                .from('document_assets')
-                .delete()
-                .eq('id', doc.id);
-
-            if (error) throw error;
-
-            // 2. Delete from Storage if not indexeddb
-            if (doc.storage_type === 'supabase') {
-                await supabase.storage
-                    .from('documents')
-                    .remove([doc.file_path]);
-            }
-
+            const documentStorage = getStorageAdapterForType(doc.storage_type as 'supabase' | 'indexeddb');
+            await documentStorage.deleteAsset(doc.id);
             toast.success('Document deleted');
             onRefresh();
         } catch (error) {
             console.error('Delete failed:', error);
             toast.error('Failed to delete document');
+        }
+    };
+
+    const handleDownload = async (doc: DocumentAsset) => {
+        try {
+            const documentStorage = getStorageAdapterForType(doc.storage_type as 'supabase' | 'indexeddb');
+            const content = await documentStorage.getAssetContent(doc);
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = doc.name;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Download failed:', error);
+            toast.error('Failed to download document');
         }
     };
 
@@ -112,7 +116,7 @@ export const DocumentLibrary: React.FC<Props> = ({
                                         <FileText className="w-4 h-4" />
                                         Preview
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem className="gap-2" onClick={() => window.open(doc.file_path)}>
+                                    <DropdownMenuItem className="gap-2" onClick={() => handleDownload(doc)}>
                                         <Download className="w-4 h-4" />
                                         Download
                                     </DropdownMenuItem>

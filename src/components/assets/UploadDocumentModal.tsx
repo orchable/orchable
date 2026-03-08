@@ -21,7 +21,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useTier } from '@/hooks/useTier';
 import { toast } from 'sonner';
-import { storage as storageAdapter } from '@/lib/storage';
+import { getStorageAdapterForType } from '@/lib/storage';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface Props {
@@ -57,45 +57,29 @@ export const UploadDocumentModal: React.FC<Props> = ({
     };
 
     const handleUpload = async () => {
-        if (!file || !user) return;
+        if (!file) return;
         setIsUploading(true);
 
         try {
-            const fileName = `${Date.now()}_${file.name}`;
-            const fileExt = file.name.split('.').pop()?.toLowerCase();
+            // Tiered storage routing
+            const storageType = tier === 'premium' ? 'supabase' : 'indexeddb';
+            const documentStorage = getStorageAdapterForType(storageType);
 
             // 1. Read content for parsing
             const content = await file.text();
             const parsed = parseDocumentContent(content, file.name);
 
-            // Implements: Scenario "System writes physical blob into Supabase Storage (Premium) or IndexedDB (Free/BYOK)"
-            const storageType = tier === 'premium' ? 'supabase' : 'indexeddb';
-            let finalPath = '';
+            // 2. Save physical blob via Adapter
+            const finalPath = await documentStorage.saveAsset(file.name, content, 'document');
 
-            if (storageType === 'supabase') {
-                const { data, error: uploadError } = await supabase.storage
-                    .from('documents')
-                    .upload(`${user.id}/${fileName}`, file);
-
-                if (uploadError) throw uploadError;
-                finalPath = supabase.storage.from('documents').getPublicUrl(data.path).data.publicUrl;
-            } else {
-                // Free/BYOK -> Store in IndexedDB
-                // saveAsset was for internal use, now we use createAsset which handles the record
-                const assetId = `${Date.now()}_${file.name}`;
-                // Save the actual content blob for local access
-                await storageAdapter.adapter.saveAsset(file.name, content, 'document');
-                finalPath = `local://documents/${assetId}`;
-            }
-
-            // 2. Create Asset record via Adapter
-            await storageAdapter.adapter.createAsset({
+            // 3. Create Asset record via Adapter
+            await documentStorage.createAsset({
                 name: file.name,
                 file_path: finalPath,
                 file_type: parsed.fileType,
                 size_bytes: file.size,
                 token_count_est: parsed.tokenCountEst,
-                user_id: user.id,
+                user_id: user?.id || 'anonymous',
                 storage_type: storageType
             });
 

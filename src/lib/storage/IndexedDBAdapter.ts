@@ -262,6 +262,10 @@ export class IndexedDBAdapter implements IStorageAdapter {
 		await db.prompt_templates.put(template);
 	}
 
+	async deleteTemplate(id: string): Promise<void> {
+		await db.prompt_templates.delete(id);
+	}
+
 	// Custom Components
 	async listComponents(): Promise<CustomComponent[]> {
 		return db.custom_components.toArray();
@@ -275,6 +279,10 @@ export class IndexedDBAdapter implements IStorageAdapter {
 		await db.custom_components.put(component);
 	}
 
+	async deleteComponent(id: string): Promise<void> {
+		await db.custom_components.delete(id);
+	}
+
 	// AI Model Settings
 	async listAiModelSettings(): Promise<AIModelSetting[]> {
 		return db.ai_model_settings.toArray();
@@ -282,6 +290,10 @@ export class IndexedDBAdapter implements IStorageAdapter {
 
 	async upsertAiModelSetting(setting: AIModelSetting): Promise<void> {
 		await db.ai_model_settings.put(setting);
+	}
+
+	async deleteAiModelSetting(id: string): Promise<void> {
+		await db.ai_model_settings.delete(id);
 	}
 
 	// Configs
