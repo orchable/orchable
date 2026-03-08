@@ -168,6 +168,16 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
             const { data: { user } } = await supabase.auth.getUser();
             const currentUserId = user?.id || 'anonymous';
 
+            // Pre-launch check: Anonymous users MUST have personal keys
+            const hasKeys = await keyPoolService.hasPersonalKeys(tier);
+            if (!user && !hasKeys) {
+                toast.error('Anonymous usage requires a personal Gemini API Key. Please add one in Settings or Create an account.', {
+                    duration: 6000,
+                });
+                setIsCreating(false);
+                return;
+            }
+
             toast.info(`Preparing ${inputItems.length} pipelines...`);
 
             // Use the new batchService to create batch and tasks
@@ -184,11 +194,8 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
             const execPath = await getExecutionPath(tier);
 
             if (execPath === 'web-worker') {
-                // BYOK path: check for personal keys in appropriate storage (IndexedDB for free, Supabase for premium)
-                const hasKeys = await keyPoolService.hasPersonalKeys(tier);
-
-                if (tier === 'free' && !hasKeys) {
-                    toast.error('Free Tier requires a personal Gemini API Key. Please add one in Settings.');
+                if (tier === 'free' && !hasKeys && user) {
+                    toast.error('Free Tier local execution requires a personal Gemini API Key. Please add one in Settings.');
                     setIsCreating(false);
                     return;
                 }

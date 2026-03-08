@@ -16,7 +16,7 @@ export const keyPoolService = {
 		const {
 			data: { user },
 		} = await supabase.auth.getUser();
-		if (!user) throw new Error("Authentication required to resolve keys.");
+		// Anonymous users can only resolve personal keys locally via IndexedDB in "free" tier mode
 
 		// 1. Fetch personal keys based on tier
 		let personalKeys: {
@@ -36,7 +36,7 @@ export const keyPoolService = {
 				key_name: k.key_name,
 				provider: k.provider,
 			}));
-		} else {
+		} else if (user) {
 			// Premium: Fetch from Supabase
 			const { data, error } = await supabase
 				.from("user_api_keys")

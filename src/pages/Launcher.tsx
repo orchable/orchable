@@ -238,6 +238,22 @@ export function LauncherPage() {
     setIsLaunching(true);
 
     try {
+      // Pre-launch check: Anonymous users MUST have personal keys
+      const hasKeys = await import('@/services/keyPoolService').then(m => m.keyPoolService.hasPersonalKeys(tier));
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+      if (!currentUser && !hasKeys) {
+        toast.error('Anonymous usage requires a personal Gemini API Key. Please add one in Settings or Create an account for free cloud execution.', {
+          duration: 6000,
+          action: {
+            label: 'Settings',
+            onClick: () => navigate('/settings')
+          }
+        });
+        setIsLaunching(false);
+        return;
+      }
+
       if (inputMode === 'json' && jsonData && jsonAnalysis) {
         // 1. Prepare common launch session info
         const launchId = crypto.randomUUID();

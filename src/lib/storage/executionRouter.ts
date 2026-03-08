@@ -4,6 +4,15 @@ import { keyPoolService } from "../../services/keyPoolService";
 export type ExecutionPath = "web-worker" | "supabase-n8n";
 
 export async function getExecutionPath(tier: UserTier): Promise<ExecutionPath> {
+	// Anonymous users must always use the local web-worker
+	const { supabase } = await import("../../lib/supabase");
+	const {
+		data: { user },
+	} = await supabase.auth.getUser();
+	if (!user) {
+		return "web-worker";
+	}
+
 	if (tier === "free") {
 		const hasKeys = await keyPoolService.hasPersonalKeys(tier);
 		if (hasKeys) {
