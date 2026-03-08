@@ -137,11 +137,4 @@ export interface IStorageAdapter {
 	listKeys(): Promise<Record<string, unknown>[]>;
 	getApiKeyHealth(userApiKeyId: string): Promise<ApiKeyHealth | null>;
 	upsertApiKeyHealth(health: ApiKeyHealth): Promise<void>;
-
-	// AI Model Settings
-	listAiModelSettings(): Promise<import("../types").AIModelSetting[]>;
-	upsertAiModelSetting(
-		setting: import("../types").AIModelSetting,
-	): Promise<void>;
-	deleteAiModelSetting(id: string): Promise<void>;
 }

@@ -284,11 +284,13 @@ export class IndexedDBAdapter implements IStorageAdapter {
 	}
 
 	// AI Model Settings
-	async listAiModelSettings(): Promise<AIModelSetting[]> {
+	async listAiModelSettings(): Promise<import("../types").AIModelSetting[]> {
 		return db.ai_model_settings.toArray();
 	}
 
-	async upsertAiModelSetting(setting: AIModelSetting): Promise<void> {
+	async upsertAiModelSetting(
+		setting: import("../types").AIModelSetting,
+	): Promise<void> {
 		await db.ai_model_settings.put(setting);
 	}
 

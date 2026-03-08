@@ -122,28 +122,28 @@ export function AssetLibrary() {
         setLoading(true);
         try {
             const assetStorage = await getAssetStorageAdapter();
-            const [comps, aiList, docList, tplList] = await Promise.all([
+
+            // Fetch Components and Templates which already use safe assetStorage routing
+            const [comps, tplList] = await Promise.all([
                 getCustomComponents(),
-                supabase.from('ai_model_settings').select('*').order('name'),
-                tier === 'premium'
-                    ? supabase.from('document_assets').select('*').order('created_at', { ascending: false })
-                    : { data: await db.document_assets.orderBy('created_at').reverse().toArray(), error: null },
                 assetStorage.listTemplates()
             ]);
-            setComponents(comps);
 
+            setComponents(comps);
             if (tplList) {
                 const sortedTemplates = tplList.sort((a, b) => a.name.localeCompare(b.name));
                 setTemplates(sortedTemplates as unknown as PromptTemplateRecord[]);
             }
 
-            if (aiList.data) {
-                if (!user) {
-                    // Unauthenticated: load local from IndexedDB
-                    const localSettings = await db.ai_model_settings.toArray();
-                    setAiSettings(localSettings.sort((a, b) => a.name.localeCompare(b.name)));
-                } else {
-                    // Authenticated (Free or Premium): Merge system defaults with user's overrides from Supabase
+            // Fetch AI Settings safely
+            if (!user) {
+                // Unauthenticated: 100% local IndexedDB
+                const localSettings = await db.ai_model_settings.toArray();
+                setAiSettings(localSettings.sort((a, b) => a.name.localeCompare(b.name)));
+            } else {
+                // Authenticated: Supabase
+                const aiList = await supabase.from('ai_model_settings').select('*').order('name');
+                if (aiList.data) {
                     const systemSettings = aiList.data.filter(s => s.user_id === null);
                     const userOverrides = aiList.data.filter(s => s.user_id === user?.id);
                     const mergedSettings = systemSettings.map(globalSetting => {
@@ -156,9 +156,19 @@ export function AssetLibrary() {
                     const mergedOverrideIds = mergedSettings.filter(m => m.user_id === user?.id).map(m => m.id);
                     const additionalCustom = userOverrides.filter(o => !mergedOverrideIds.includes(o.id));
                     setAiSettings([...mergedSettings, ...additionalCustom].sort((a, b) => a.name.localeCompare(b.name)));
+                } else if (aiList.error) {
+                    console.error('Failed to load AI Settings from Supabase:', aiList.error);
                 }
             }
-            if (docList.data) setDocuments(docList.data as DocumentAsset[]);
+
+            // Fetch Documents safely
+            if (tier === 'premium') {
+                const docList = await supabase.from('document_assets').select('*').order('created_at', { ascending: false });
+                if (docList.data) setDocuments(docList.data as DocumentAsset[]);
+            } else {
+                const localDocs = await db.document_assets.orderBy('created_at').reverse().toArray();
+                setDocuments(localDocs as DocumentAsset[]);
+            }
         } catch (error) {
             console.error('Failed to fetch assets:', error);
             toast.error('Failed to load resource list');
