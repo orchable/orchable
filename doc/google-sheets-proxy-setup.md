@@ -1,6 +1,6 @@
 # Google Sheets Generic Proxy Webhook Setup
 
-Because Google Sheets API requires OAuth authentication to push data programmatically (even for "Anyone with the link can edit" sheets), Orchable utilizes a generic Google Apps Script Web App as a proxy bridge. 
+Because Google Sheets API requires OAuth authentication to push data programmatically (even for "Anyone with the link can edit" sheets), Orchable utilizes a generic Google Apps Script Web App as a proxy bridge.
 
 You only need to deploy this Web App **once** for your entire Orchable instance.
 
@@ -73,7 +73,7 @@ function doPost(e) {
 VITE_GOOGLE_SHEETS_PROXY_URL=https://script.google.com/macros/s/.../exec
 ```
 
-3. Restart your dev server (`pnpm dev`).
+1. Restart your dev server (`pnpm dev`).
 
 ## Step 4: Using in Orchable
 

@@ -711,9 +711,35 @@ async function processTask(task: AiTask) {
 				let exportPayload: unknown = result;
 				let isRawString = false;
 
-				if (format === "tsv" || format === "csv") {
-					// Convert array to TSV/CSV string
-					const arrayData = Array.isArray(result) ? result : [result];
+				// For Google Sheets, we usually want tabular data.
+				// If format is 'json' but destination is 'google_sheets', we force 'tsv' for compatibility with the proxy script.
+				const effectiveFormat =
+					exportConfig.destination === "google_sheets" &&
+					format === "json"
+						? "tsv"
+						: format;
+
+				if (effectiveFormat === "tsv" || effectiveFormat === "csv") {
+					// Convert result to array, but be smart: if it's an object with a results array, use that.
+					let arrayData: unknown[] = [];
+					if (Array.isArray(result)) {
+						arrayData = result;
+					} else if (result && typeof result === "object") {
+						// Unwrap common data wrappers
+						const obj = result as Record<string, unknown>;
+						if (Array.isArray(obj.output_data)) {
+							arrayData = obj.output_data;
+						} else if (Array.isArray(obj.results)) {
+							arrayData = obj.results;
+						} else if (Array.isArray(obj.data)) {
+							arrayData = obj.data;
+						} else {
+							arrayData = [result];
+						}
+					} else {
+						arrayData = [result];
+					}
+
 					const keys = new Set<string>();
 					arrayData.forEach((r) => {
 						if (typeof r === "object" && r !== null) {
@@ -721,7 +747,7 @@ async function processTask(task: AiTask) {
 						}
 					});
 					const headers = Array.from(keys);
-					const sep = format === "tsv" ? "\t" : ",";
+					const sep = effectiveFormat === "tsv" ? "\t" : ",";
 
 					exportPayload = [
 						headers.join(sep),
@@ -738,7 +764,9 @@ async function processTask(task: AiTask) {
 										.replace(/\t/g, " ")
 										.replace(/\n/g, " ")
 										.replace(/"/g, '""');
-									return format === "tsv" ? v : `"${v}"`;
+									return effectiveFormat === "tsv"
+										? v
+										: `"${v}"`;
 								})
 								.join(sep),
 						),

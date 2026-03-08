@@ -572,6 +572,11 @@ export function ContractSection({
                                             <SelectItem value="tsv">TSV (For Google Sheets)</SelectItem>
                                         </SelectContent>
                                     </Select>
+                                    {exportConfig?.destination === 'google_sheets' && exportConfig?.settings?.format === 'json' && (
+                                        <p className="text-[10px] text-orange-500 mt-1">
+                                            Tip: Google Sheets proxy usually requires TSV or CSV format.
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         </div>
