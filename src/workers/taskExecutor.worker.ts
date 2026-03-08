@@ -1403,6 +1403,8 @@ async function handleNextStages(
 					output_mapping: sc.output_mapping || "result",
 					batch_grouping: sc.batch_grouping || null,
 					requires_approval: sc.requires_approval || false,
+					export_config: sc.export_config || undefined,
+					delimiters: sc.delimiters || undefined,
 				};
 			}),
 		);
@@ -1487,7 +1489,10 @@ async function handleNextStages(
 								merge_path: nextConfig.merge_path || null,
 								output_mapping:
 									nextConfig.output_mapping || "result",
+								export_config:
+									nextConfig.export_config || undefined,
 							},
+							delimiters: nextConfig.delimiters || undefined,
 							parent_stage_key: task.stage_key,
 							parent_task_id: task.id,
 						},
@@ -1555,7 +1560,10 @@ async function handleNextStages(
 									merge_path: nextConfig.merge_path || null,
 									output_mapping:
 										nextConfig.output_mapping || "result",
+									export_config:
+										nextConfig.export_config || undefined,
 								},
+								delimiters: nextConfig.delimiters || undefined,
 								parent_stage_key: task.stage_key,
 								parent_task_id: task.id,
 							},
@@ -1608,7 +1616,9 @@ async function handleNextStages(
 						split_path: nextConfig.split_path || null,
 						split_mode: nextConfig.split_mode || "per_item",
 						output_mapping: nextConfig.output_mapping || "result",
+						export_config: nextConfig.export_config || undefined,
 					},
+					delimiters: nextConfig.delimiters || undefined,
 					parent_stage_key: task.stage_key,
 					parent_task_id: task.id,
 				},
@@ -1801,7 +1811,10 @@ async function handleManyToOne(
 								"result",
 							merge_path:
 								(nextConfig.merge_path as string) || null,
+							export_config:
+								nextConfig.export_config || undefined,
 						},
+						delimiters: nextConfig.delimiters || undefined,
 						parent_stage_key: task.stage_key,
 						parent_task_id: task.id,
 						_merged_from_count: completedSiblings.length,

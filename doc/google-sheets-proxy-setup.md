@@ -69,11 +69,11 @@ function doPost(e) {
 1. Open your Orchable `.env` or `.env.local` file at the root of your project.
 2. Add the URL you copied as an environment variable:
 
-```env
-VITE_GOOGLE_SHEETS_PROXY_URL=https://script.google.com/macros/s/.../exec
-```
+   ```env
+   VITE_GOOGLE_SHEETS_PROXY_URL=https://script.google.com/macros/s/.../exec
+   ```
 
-1. Restart your dev server (`pnpm dev`).
+3. Restart your dev server (`pnpm dev`).
 
 ## Step 4: Using in Orchable
 
