@@ -350,13 +350,16 @@ export function LauncherPage() {
         const { getExecutionPath } = await import('@/lib/storage/executionRouter');
         const execPath = await getExecutionPath(tier);
 
+        const launchId = crypto.randomUUID();
+
         for (let i = 0; i < dataToProcess.length; i++) {
           const row = dataToProcess[i];
 
           await createExecutionMutation.mutateAsync({
             configId: selectedConfigId!,
             syllabusRow: row,
-            tier
+            tier,
+            launchId
           });
 
           if (execPath === 'web-worker') {

@@ -12,8 +12,9 @@ export const executionService = {
 		configId: string;
 		syllabusRow: SyllabusRow;
 		tier: UserTier;
+		launchId?: string;
 	}): Promise<Execution> {
-		const { configId, syllabusRow, tier } = data;
+		const { configId, syllabusRow, tier, launchId } = data;
 		const configs = await storage.adapter.listConfigs();
 		const config = configs?.find((c) => c.id === configId);
 		if (!config) throw new Error("Config not found");
@@ -23,6 +24,7 @@ export const executionService = {
 			inputItems: [syllabusRow as unknown as Record<string, unknown>],
 			batchName: syllabusRow.lessonTitle || "Untitled Execution",
 			tier,
+			launchId,
 		});
 
 		return batch as unknown as Execution;

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { executionService } from "@/services/executionService";
 import { usePolling } from "./usePolling";
 import { UserTier } from "@/lib/storage";
+import { SyllabusRow } from "@/lib/types";
 
 export function useExecutions() {
 	return useQuery({
@@ -36,15 +37,18 @@ export function useCreateExecution() {
 			configId,
 			syllabusRow,
 			tier,
+			launchId,
 		}: {
 			configId: string;
-			syllabusRow: any;
+			syllabusRow: SyllabusRow;
 			tier: UserTier;
+			launchId?: string;
 		}) => {
 			return executionService.createExecution({
 				configId,
 				syllabusRow,
 				tier,
+				launchId,
 			});
 		},
 		onSuccess: () => {
