@@ -2,7 +2,8 @@
 
 **HƯỚNG DẪN DÀNH CHO AI AGENT:**
 Bạn BẮT BUỘC phải đọc toàn bộ tài liệu này trước khi đề xuất bất kỳ thay đổi kiến trúc, thư viện, hoặc pattern code nào. 
-- Mọi phương án nằm trong cột `[Phương án bị loại bỏ]` là vùng cấm. 
+Bạn BẮT BUỘC phải đọc toàn bộ tài liệu này trước khi đề xuất bất kỳ thay đổi kiến trúc, thư viện, hoặc pattern code nào.
+- Mọi phương án nằm trong cột `[Phương án bị loại bỏ]` là vùng cấm.
 - Tuyệt đối không đề xuất lại những phương án này dưới bất kỳ hình thức nào.
 - Hãy tham khảo cột `[Giải pháp thay thế hiện tại]` để định hướng cách làm đúng.
 

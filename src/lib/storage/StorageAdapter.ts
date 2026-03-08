@@ -115,6 +115,7 @@ export interface IStorageAdapter {
 	saveConfig(
 		config: Partial<OrchestratorConfig>,
 	): Promise<OrchestratorConfig>;
+	upsertConfig(config: Partial<OrchestratorConfig>): Promise<void>;
 	listConfigs(): Promise<OrchestratorConfig[]>;
 	getConfig(id: string): Promise<OrchestratorConfig | null>;
 	updateConfig(

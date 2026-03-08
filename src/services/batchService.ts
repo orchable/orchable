@@ -28,12 +28,21 @@ export const batchService = {
 			extraMetadata,
 		} = options;
 
-		const { getTierSource } =
+		const { getTierSource, getExecutionPath } =
 			await import("../lib/storage/executionRouter");
 		const tierSource = await getTierSource(tier);
+		const path = await getExecutionPath(tier);
+		const executingLocally = path === "web-worker";
 
 		const launchId = existingLaunchId || crypto.randomUUID();
 		const adapter = storage.adapter;
+
+		let taskAdapter = adapter;
+		if (executingLocally) {
+			const { IndexedDBAdapter } =
+				await import("../lib/storage/IndexedDBAdapter");
+			taskAdapter = new IndexedDBAdapter();
+		}
 
 		// 1. Get sorted stages
 		const sortedStages = topologicalSortStages(
@@ -88,8 +97,33 @@ export const batchService = {
 			);
 		});
 
+		if (
+			executingLocally &&
+			adapter.constructor.name === "SupabaseAdapter"
+		) {
+			// Snapshot prompt templates to local DB so the web worker can access them
+			const { db } = await import("../lib/storage/IndexedDBAdapter");
+			const templateIds = new Set<string>();
+			config.steps.forEach((s) => {
+				if (s.prompt_template_id) templateIds.add(s.prompt_template_id);
+			});
+			for (const tId of templateIds) {
+				try {
+					const t = await adapter.getTemplate(tId);
+					if (t) {
+						await db.prompt_templates.put(t);
+					}
+				} catch (err) {
+					console.warn(
+						`[BatchService] Failed to snapshot template ${tId}:`,
+						err,
+					);
+				}
+			}
+		}
+
 		// 3. Create the batch
-		const batch = await adapter.createBatch({
+		const batch = await taskAdapter.createBatch({
 			name:
 				batchName || `${config.name} - Launch ${launchId.slice(0, 8)}`,
 			status: "processing",
@@ -168,11 +202,13 @@ export const batchService = {
 		}));
 
 		try {
-			const createdTasks = await adapter.createTasks(tasksToCreate);
+			const createdTasks = await taskAdapter.createTasks(tasksToCreate);
 
 			// 4. Set root_task_id to self for root tasks
 			for (const task of createdTasks) {
-				await adapter.updateTask(task.id, { root_task_id: task.id });
+				await taskAdapter.updateTask(task.id, {
+					root_task_id: task.id,
+				});
 			}
 
 			return { batch, launchId, tasks: createdTasks };

@@ -313,6 +313,29 @@ export class IndexedDBAdapter implements IStorageAdapter {
 		return newConfig;
 	}
 
+	async upsertConfig(config: Partial<OrchestratorConfig>): Promise<void> {
+		if (config.id) {
+			const existing = await db.orchestrator_configs.get(config.id);
+			if (existing) {
+				await db.orchestrator_configs.put({
+					...existing,
+					...config,
+					updated_at: new Date().toISOString(),
+				});
+				return;
+			}
+		}
+
+		const newConfig = {
+			id: config.id || crypto.randomUUID(),
+			created_at: new Date().toISOString(),
+			updated_at: new Date().toISOString(),
+			...config,
+		} as OrchestratorConfig;
+
+		await db.orchestrator_configs.put(newConfig);
+	}
+
 	async listConfigs(): Promise<OrchestratorConfig[]> {
 		return db.orchestrator_configs
 			.orderBy("created_at")
