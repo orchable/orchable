@@ -146,7 +146,8 @@ export function AssetLibrary() {
                         }
                         return globalSetting;
                     });
-                    setAiSettings(mergedSettings);
+                    const additionalLocal = localSettings.filter(ls => !mergedSettings.some(m => m.id === ls.id || ls.id === (m.model_id + '_local')));
+                    setAiSettings([...mergedSettings, ...additionalLocal].sort((a, b) => a.name.localeCompare(b.name)));
                 } else {
                     // For Premium: Merge system defaults with user's overrides
                     const systemSettings = aiList.data.filter(s => s.user_id === null);
@@ -158,7 +159,9 @@ export function AssetLibrary() {
                         }
                         return globalSetting;
                     });
-                    setAiSettings(mergedSettings);
+                    const mergedOverrideIds = mergedSettings.filter(m => m.user_id === user?.id).map(m => m.id);
+                    const additionalCustom = userOverrides.filter(o => !mergedOverrideIds.includes(o.id));
+                    setAiSettings([...mergedSettings, ...additionalCustom].sort((a, b) => a.name.localeCompare(b.name)));
                 }
             }
             if (docList.data) setDocuments(docList.data as DocumentAsset[]);
@@ -204,6 +207,11 @@ export function AssetLibrary() {
         setShowEditor(true);
     };
 
+    const handleDuplicateComponent = (comp: CustomComponent) => {
+        setEditingComponent({ ...comp, id: '', name: `${comp.name} Copy` });
+        setShowEditor(true);
+    };
+
     const handleNewComponent = () => {
         setEditingComponent(null);
         setShowEditor(true);
@@ -211,14 +219,15 @@ export function AssetLibrary() {
 
     const handleSaveComponent = async (code: string, mockData?: Record<string, unknown>) => {
         try {
-            if (editingComponent) {
+            if (editingComponent && editingComponent.id) {
                 await updateCustomComponent(editingComponent.id, {
                     code,
                     mock_data: mockData
                 });
                 toast.success('Component updated');
             } else {
-                const name = prompt('Enter new component name:', 'New Component');
+                const baseName = editingComponent ? editingComponent.name : 'New Component';
+                const name = prompt('Enter new component name:', baseName);
                 if (!name) return;
                 await createCustomComponent({
                     name,
@@ -245,22 +254,64 @@ export function AssetLibrary() {
         setIsPromptEditorOpen(true);
     };
 
+    const handleDuplicateTemplate = (template: PromptTemplateRecord) => {
+        const duplicatedTemplate = {
+            ...template,
+            id: crypto.randomUUID(),
+            name: `${template.name} Copy`,
+            version: 1,
+            hub_asset_id: undefined,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+        setEditingTemplate(duplicatedTemplate as unknown as PromptTemplateRecord);
+        setEditedPrompt(duplicatedTemplate.template || '');
+        const savedDelimiters = duplicatedTemplate.view_config?.delimiters as { start: string, end: string } | undefined;
+        setPromptDelimiters(savedDelimiters || { start: '%%', end: '%%' });
+        setIsPromptEditorOpen(true);
+    };
+
+    const handleNewTemplate = () => {
+        const newTemplate = {
+            id: crypto.randomUUID(),
+            name: 'New Prompt Template',
+            template: 'You are a helpful assistant.\n\nInput: %%input_data%%\n\nTask: ',
+            version: 1,
+            organization_code: '',
+            custom_component_id: null,
+            next_stage_template_ids: [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            view_config: { delimiters: { start: '%%', end: '%%' } }
+        } as unknown as PromptTemplateRecord;
+
+        setEditingTemplate(newTemplate);
+        setEditedPrompt(newTemplate.template || '');
+        setPromptDelimiters({ start: '%%', end: '%%' });
+        setIsPromptEditorOpen(true);
+    };
+
     const handleSavePrompt = async () => {
         if (!editingTemplate) return;
         setIsSavingPrompt(true);
         try {
             await storage.waitForAdapter();
             const existing = await storage.adapter.getTemplate(editingTemplate.id);
-            if (existing) {
-                await storage.adapter.upsertTemplate({
+            const templateToSave = existing
+                ? {
                     ...existing,
                     template: editedPrompt,
                     version: (existing.version || 1) + 1,
-                    // Note: `view_config` was on the DB layer but missing in adapter type. Merging as best effort.
-                    // Also updating `updated_at`.
-                } as unknown as PromptTemplateRecord);
-            }
-            toast.success('Prompt template updated');
+                }
+                : {
+                    ...editingTemplate,
+                    name: prompt('Enter template name:', 'New Template') || 'New Template',
+                    template: editedPrompt,
+                    version: 1,
+                };
+
+            await storage.adapter.upsertTemplate(templateToSave as unknown as PromptTemplateRecord);
+            toast.success(existing ? 'Prompt template updated' : 'New prompt template created');
             setIsPromptEditorOpen(false);
             fetchAssets();
         } catch (error) {
@@ -269,6 +320,49 @@ export function AssetLibrary() {
         } finally {
             setIsSavingPrompt(false);
         }
+    };
+
+    const handleNewAiSetting = () => {
+        const name = prompt('Enter name for the new AI preset:', 'My Custom Preset');
+        if (!name) return;
+
+        const newSetting: AIModelSetting = {
+            id: crypto.randomUUID(),
+            model_id: 'gemini-2.5-flash',
+            name: name,
+            category: 'Custom',
+            temperature: 0.7,
+            top_p: 0.95,
+            top_k: 40,
+            max_output_tokens: 8192,
+            timeout_ms: 30000,
+            retries: 3,
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+
+        setEditingAiSetting(newSetting);
+        setIsAiSettingEditorOpen(true);
+    };
+
+    const handleDuplicateAiSetting = (setting: AIModelSetting) => {
+        const name = prompt('Enter name for the duplicated AI preset:', `${setting.name} Copy`);
+        if (!name) return;
+
+        const duplicatedSetting: AIModelSetting = {
+            ...setting,
+            id: crypto.randomUUID(),
+            name: name,
+            category: 'Custom',
+            is_active: true,
+            hub_asset_id: undefined,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+
+        setEditingAiSetting(duplicatedSetting);
+        setIsAiSettingEditorOpen(true);
     };
 
     const handleEditAiSetting = (setting: AIModelSetting) => {
@@ -282,11 +376,12 @@ export function AssetLibrary() {
         try {
             if (tier === 'free') {
                 const payload = { ...editingAiSetting };
-                const existing = await db.ai_model_settings.where('model_id').equals(editingAiSetting.model_id).first();
+                const lookupId = editingAiSetting.id.includes('_local') ? editingAiSetting.id : editingAiSetting.id + '_local';
+                const existing = await db.ai_model_settings.where('id').equals(lookupId).first() || await db.ai_model_settings.where('model_id').equals(editingAiSetting.model_id).first();
                 if (existing) {
                     await db.ai_model_settings.update(existing.id!, payload);
                 } else {
-                    payload.id = editingAiSetting.model_id + '_local';
+                    payload.id = lookupId;
                     await db.ai_model_settings.put(payload);
                 }
                 toast.success('AI default settings saved locally');
@@ -301,7 +396,7 @@ export function AssetLibrary() {
                 .from('ai_model_settings')
                 .select('id')
                 .eq('user_id', user.id)
-                .eq('model_id', editingAiSetting.model_id)
+                .eq('id', editingAiSetting.id)
                 .maybeSingle();
 
             const payload = {
@@ -398,10 +493,22 @@ export function AssetLibrary() {
                             New Component
                         </Button>
                     )}
+                    {activeTab === 'templates' && (
+                        <Button className="gap-2" onClick={handleNewTemplate}>
+                            <Plus className="w-4 h-4" />
+                            New Template
+                        </Button>
+                    )}
                     {activeTab === 'documents' && (
                         <Button className="gap-2" onClick={() => setIsUploadModalOpen(true)}>
                             <Plus className="w-4 h-4" />
                             Upload Document
+                        </Button>
+                    )}
+                    {activeTab === 'ai_settings' && (
+                        <Button className="gap-2" onClick={handleNewAiSetting}>
+                            <Plus className="w-4 h-4" />
+                            New AI Preset
                         </Button>
                     )}
                 </div>
@@ -469,7 +576,7 @@ export function AssetLibrary() {
                                                             <Edit2 className="w-4 h-4" />
                                                             Edit
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuItem className="gap-2">
+                                                        <DropdownMenuItem className="gap-2" onClick={() => handleDuplicateComponent(comp)}>
                                                             <Copy className="w-4 h-4" />
                                                             Duplicate
                                                         </DropdownMenuItem>
@@ -610,6 +717,15 @@ export function AssetLibrary() {
                                                                 <Share2 className="w-4 h-4" />
                                                             </Button>
                                                         )}
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                                            onClick={() => handleDuplicateTemplate(template)}
+                                                            title="Duplicate Template"
+                                                        >
+                                                            <Copy className="w-4 h-4" />
+                                                        </Button>
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
@@ -826,6 +942,15 @@ export function AssetLibrary() {
                                                     >
                                                         <Share2 className="w-3.5 h-3.5" />
                                                         Share
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="gap-2 text-muted-foreground hover:text-primary"
+                                                        onClick={() => handleDuplicateAiSetting(setting)}
+                                                    >
+                                                        <Copy className="w-3.5 h-3.5" />
+                                                        Duplicate
                                                     </Button>
                                                     <Button
                                                         variant="secondary"
