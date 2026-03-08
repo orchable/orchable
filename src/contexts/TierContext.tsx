@@ -14,6 +14,7 @@ export function TierProvider({ children }: { children: React.ReactNode }) {
     const [tierState, setTierState] = useState<UserTier>('free');
     const [isSyncing, setIsSyncing] = useState(false);
     const [usage, setUsage] = useState<{ count: number; month: string } | null>(null);
+    const [hasKeys, setHasKeys] = useState(false);
     const hasHandledProfile = useRef(false);
 
     // Derive tier from profile role/tier
@@ -32,6 +33,7 @@ export function TierProvider({ children }: { children: React.ReactNode }) {
             try {
                 const { keyPoolService } = await import('@/services/keyPoolService');
                 const userHasKeys = await keyPoolService.hasPersonalKeys();
+                setHasKeys(userHasKeys);
                 const { freeTierService } = await import('@/services/freeTierService');
 
                 if (tier === 'free' && !userHasKeys) {
@@ -122,7 +124,7 @@ export function TierProvider({ children }: { children: React.ReactNode }) {
         isSyncing,
         usage,
         limits: {
-            tasks: usageService.getLimit(tier),
+            tasks: hasKeys ? Infinity : usageService.getLimit(tier),
             sync: true
         },
         refreshUsage
