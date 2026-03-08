@@ -3,14 +3,20 @@ import { useBatchProgress } from '@/hooks/useBatchProgress';
 import { BatchProgressCard } from '@/components/batch/BatchProgressCard';
 import { TaskHierarchyTree } from '@/components/batch/TaskHierarchyTree';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, RefreshCcw, LayoutDashboard, Activity, Download, RotateCcw, Trash2 } from 'lucide-react';
+import { ChevronLeft, RefreshCcw, LayoutDashboard, Activity, Download, RotateCcw, Trash2, ChevronDown } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useState } from 'react';
 import { getBatchTasks, TaskSummary } from '@/services/executionTrackingService';
 import { StageProgressSection } from '@/components/batch/StageProgressSection';
 import { taskActionService } from '@/services/taskActionService';
 import { toast } from 'sonner';
-import { exportToCsv } from '@/lib/csvExport';
+import { exportToCsv, exportToTsv, copyToTsvClipboard } from '@/lib/csvExport';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function BatchProgress() {
     const { batchId } = useParams<{ batchId: string }>();
@@ -45,7 +51,7 @@ export function BatchProgress() {
         }
     };
 
-    const handleExportAll = () => {
+    const getExportData = () => {
         const exportData: Record<string, unknown>[] = [];
         tasks.forEach(t => {
             if (t.status === 'completed' && t.output_data) {
@@ -59,10 +65,31 @@ export function BatchProgress() {
 
         if (exportData.length === 0) {
             toast.info('No completed tasks with data to export');
-            return;
+            return null;
         }
+        return exportData;
+    };
 
-        exportToCsv(exportData, `batch_${batchId}_all_completed.csv`);
+    const handleExportCsv = () => {
+        const data = getExportData();
+        if (data) exportToCsv(data, `batch_${batchId}_all_completed.csv`);
+    };
+
+    const handleExportTsv = () => {
+        const data = getExportData();
+        if (data) exportToTsv(data, `batch_${batchId}_all_completed.tsv`);
+    };
+
+    const handleCopyTsv = async () => {
+        const data = getExportData();
+        if (data) {
+            const success = await copyToTsvClipboard(data);
+            if (success) {
+                toast.success('Copied to clipboard (Ready for Google Sheets)');
+            } else {
+                toast.error('Failed to copy to clipboard');
+            }
+        }
     };
 
     const handleRetryAllFailed = async () => {
@@ -147,14 +174,29 @@ export function BatchProgress() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button
-                        variant="outline"
-                        className="rounded-xl border-primary/20 text-primary hover:bg-primary/5"
-                        onClick={handleExportAll}
-                    >
-                        <Download className="w-4 h-4 mr-2" />
-                        Export All
-                    </Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="outline"
+                                className="rounded-xl border-primary/20 text-primary hover:bg-primary/5"
+                            >
+                                <Download className="w-4 h-4 mr-2" />
+                                Export All
+                                <ChevronDown className="w-3 h-3 ml-2 opacity-50" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48 rounded-xl font-medium">
+                            <DropdownMenuItem onClick={handleCopyTsv}>
+                                Copy as TSV (Google Sheets)
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleExportTsv}>
+                                Download TSV File
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleExportCsv}>
+                                Download CSV File
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                     <Button
                         variant="outline"
                         className="rounded-xl border-amber-500/20 text-amber-500 hover:bg-amber-500/10"

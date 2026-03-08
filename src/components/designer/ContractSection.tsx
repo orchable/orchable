@@ -544,6 +544,7 @@ export function ContractSection({
                                         <SelectContent>
                                             <SelectItem value="json">JSON (Full Payload)</SelectItem>
                                             <SelectItem value="csv">CSV (Table only)</SelectItem>
+                                            <SelectItem value="tsv">TSV (For Google Sheets)</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
