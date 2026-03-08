@@ -139,33 +139,51 @@ export function ExecutionMonitor({ orchestratorExecutionId, onClose }: Execution
     const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
     const [autoRefresh, setAutoRefresh] = useState(true);
 
+
     const fetchProgress = useCallback(async () => {
         const data = await getExecutionProgress(orchestratorExecutionId);
         setProgress(data);
         setLoading(false);
     }, [orchestratorExecutionId]);
 
-    // Initial fetch and real-time subscription
+    // Initial fetch and conditionally subscribe
     useEffect(() => {
         fetchProgress();
 
-        // Subscribe to real-time updates
-        const unsubscribe = subscribeToExecutionUpdates(orchestratorExecutionId, () => {
-            if (autoRefresh) {
-                fetchProgress();
+        let unsubscribe = () => { };
+
+        // Only open Supabase WebSocket connections if we are likely using cloud tasks.
+        // For purely anonymous local execution, don't waste project Concurrent Connection Quotas.
+        const checkAdapterAndSubscribe = async () => {
+            const { storage } = await import('@/lib/storage');
+            if (storage.adapter.constructor.name !== "IndexedDBAdapter") {
+                unsubscribe = subscribeToExecutionUpdates(orchestratorExecutionId, () => {
+                    if (autoRefresh) fetchProgress();
+                });
             }
-        });
+        };
+
+        checkAdapterAndSubscribe();
 
         return () => {
             unsubscribe();
         };
     }, [orchestratorExecutionId, fetchProgress, autoRefresh]);
 
-    // Auto-refresh polling as fallback
+    // Auto-refresh polling as fallback (Faster poll for local IndexedDB to offset lack of WS)
     useEffect(() => {
         if (!autoRefresh) return;
 
-        const interval = setInterval(fetchProgress, 5000);
+        let pollRate = 5000;
+        const setPollRate = async () => {
+            const { storage } = await import('@/lib/storage');
+            if (storage.adapter.constructor.name === "IndexedDBAdapter") {
+                pollRate = 1500; // Fast local polling
+            }
+        };
+
+        setPollRate();
+        const interval = setInterval(fetchProgress, pollRate);
         return () => clearInterval(interval);
     }, [autoRefresh, fetchProgress]);
 
