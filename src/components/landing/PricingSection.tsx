@@ -17,7 +17,7 @@ export function PricingSection() {
             description: 'Start your journey. Built for creators.',
             features: [
                 'Local Execution (Browser)',
-                '100 Free Monthly Tasks (Cloud)',
+                'No Account Required',
                 'Unlimited Stages & Tasks (Local)',
                 'Visual Pipeline Designer',
                 'Basic Hub Community Access'
@@ -31,9 +31,9 @@ export function PricingSection() {
             description: 'Cloud sync for serious creators.',
             features: [
                 'Everything in Free',
+                '100 Free Monthly Tasks (Cloud)',
                 'Cloud-persistent history',
                 'Cross-device sync (Supabase)',
-                'Early access to Hub features',
                 'Priority task queueing'
             ],
             cta: 'Create Free Account',

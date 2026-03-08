@@ -58,7 +58,7 @@ export const usageService = {
 	getLimit(tier: string): number {
 		switch (tier) {
 			case "free":
-				return 200;
+				return 100;
 			case "premium":
 				return Infinity;
 			default:

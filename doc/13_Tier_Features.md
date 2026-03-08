@@ -5,7 +5,7 @@ Based on the [Orchable Lite 3-Tier Architecture Implementation Plan](../.gemini/
 ## 1. Core Tier Model
 
 | Tier | Authentication | Storage Engine | Execution Engine | Cost |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | **Anonymous** | None (Guest) | IndexedDB (Local only) | Web Worker → Direct Gemini API | Free |
 | **Free** | Supabase Auth | IndexedDB + Cloud Sync (Supabase) | Web Worker (Local) | Free |
 | **Premium** | Supabase Auth | Cloud-first (Supabase) | Cloud + 24/7 Background | Paid |
@@ -15,14 +15,14 @@ Based on the [Orchable Lite 3-Tier Architecture Implementation Plan](../.gemini/
 ## 2. Feature Unlock Matrix
 
 | Feature | Anonymous (Guest) | Free (Registered) | Premium (Subscriber) |
-|---|:---:|:---:|:---:|
+| --- | :---: | :---: | :---: |
 | **Visual Designer** | ✅ | ✅ | ✅ |
 | **Batch Execution (local web worker)** | ✅ | ✅ | ✅ |
 | **Custom TSX Sandbox** | ✅ | ✅ | ✅ |
 | **Export CSV/JSON** | ✅ | ✅ | ✅ |
 | **Cost Calculator** | ✅ | ✅ | ✅ |
-| **Cloud sync (Storage)** | ❌ | ✅ (Limited e.g. 500 tasks/mo) | ✅ Unlimited |
-| **Persistent History across devices** | ❌ (Cleared if cache deleted) | ✅ Limited | ✅ |
+| **Cloud sync (Storage)** | ❌ | ✅ (100 tasks/mo) | ✅ Unlimited |
+| **Persistent History across devices** | ❌ (Cleared if cache deleted) | ✅ (Cloud-persistent) | ✅ |
 | **Background Processing (Cloud)** | ❌ | ❌ | ✅ |
 | **Team Workspace & Collaboration** | ❌ | ❌ | ✅ |
 | **Auto API Key Rotation** | ❌ | ❌ | ✅ |
