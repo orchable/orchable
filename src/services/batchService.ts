@@ -139,6 +139,7 @@ export const batchService = {
 					split_path: firstStage.split_path || null,
 					split_mode: firstStage.split_mode || "per_item",
 					output_mapping: firstStage.output_mapping || "result",
+					export_config: firstStage.export_config,
 				},
 				next_stage_configs: nextStages.map((ns) => ({
 					template_id:
@@ -157,6 +158,7 @@ export const batchService = {
 					output_mapping: ns.output_mapping || "result",
 					batch_grouping: ns.batch_grouping || null,
 					delimiters: ns.contract?.input?.delimiters,
+					export_config: ns.export_config,
 				})),
 				delimiters: firstStage.contract?.input?.delimiters,
 				execution_delay_seconds: config.execution_delay_seconds || 0,

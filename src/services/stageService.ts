@@ -5,6 +5,7 @@ import type {
 	PreProcessConfig,
 	PostProcessConfig,
 	StageContract,
+	ExportConfig,
 } from "@/lib/types";
 import {
 	mapContractToInputSchema,
@@ -38,6 +39,7 @@ interface StageData {
 	requires_approval?: boolean;
 	return_along_with?: string[];
 	custom_component_id?: string;
+	export_config?: ExportConfig;
 }
 
 export interface CustomComponent {

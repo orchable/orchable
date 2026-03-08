@@ -680,6 +680,90 @@ async function processTask(task: AiTask) {
 			}
 		}
 
+		// --- STAGE EXPORT ---
+		const exportConfig = stageConfig.export_config;
+		if (exportConfig?.enabled) {
+			const format = exportConfig.settings?.format || "json";
+			let webhookUrl = exportConfig.settings?.webhook_url;
+
+			if (exportConfig.destination === "google_sheets") {
+				const proxyUrl = import.meta.env.VITE_GOOGLE_SHEETS_PROXY_URL;
+				if (proxyUrl) {
+					const sheetId = encodeURIComponent(
+						exportConfig.settings?.sheet_id || "",
+					);
+					const sheetName = encodeURIComponent(
+						exportConfig.settings?.worksheet_name || "",
+					);
+					webhookUrl = `${proxyUrl}?sheetUrl=${sheetId}&sheetName=${sheetName}`;
+				} else {
+					console.warn(
+						"[Worker] Missing VITE_GOOGLE_SHEETS_PROXY_URL in environment.",
+					);
+				}
+			}
+
+			if (
+				(exportConfig.destination === "webhook" ||
+					exportConfig.destination === "google_sheets") &&
+				webhookUrl
+			) {
+				let exportPayload: unknown = result;
+				let isRawString = false;
+
+				if (format === "tsv" || format === "csv") {
+					// Convert array to TSV/CSV string
+					const arrayData = Array.isArray(result) ? result : [result];
+					const keys = new Set<string>();
+					arrayData.forEach((r) => {
+						if (typeof r === "object" && r !== null) {
+							Object.keys(r).forEach((k) => keys.add(k));
+						}
+					});
+					const headers = Array.from(keys);
+					const sep = format === "tsv" ? "\t" : ",";
+
+					exportPayload = [
+						headers.join(sep),
+						...arrayData.map((r) =>
+							headers
+								.map((h) => {
+									const obj = r as Record<string, unknown>;
+									let v = obj[h];
+									if (v === null || v === undefined)
+										return "";
+									if (typeof v === "object")
+										v = JSON.stringify(v);
+									v = String(v)
+										.replace(/\t/g, " ")
+										.replace(/\n/g, " ")
+										.replace(/"/g, '""');
+									return format === "tsv" ? v : `"${v}"`;
+								})
+								.join(sep),
+						),
+					].join("\n");
+					isRawString = true;
+				}
+
+				try {
+					await executeWebhook(
+						{
+							webhook_url: webhookUrl,
+							webhook_method: "POST",
+						},
+						exportPayload,
+						isRawString,
+					);
+				} catch (e) {
+					console.warn(
+						`[Worker] Stage Export failed (Destination: ${exportConfig.destination}):`,
+						e,
+					);
+				}
+			}
+		}
+
 		// 5. Save output
 		await db.ai_tasks.update(task.id, {
 			status: "completed",
@@ -1203,18 +1287,27 @@ async function executeWebhook(
 		webhook_headers?: Record<string, string>;
 	},
 	payload: unknown,
+	isRawString = false,
 ) {
 	if (!config.webhook_url) return null;
+	const body = isRawString ? (payload as string) : JSON.stringify(payload);
+	const defaultContentType = isRawString ? "text/plain" : "application/json";
 	const response = await fetch(config.webhook_url, {
 		method: config.webhook_method || "POST",
 		headers: {
-			"Content-Type": "application/json",
+			"Content-Type": defaultContentType,
 			...(config.webhook_headers || {}),
 		},
-		body: JSON.stringify(payload),
+		body,
 	});
 	if (!response.ok) throw new Error(`Webhook failed: ${response.statusText}`);
-	return await response.json();
+
+	const text = await response.text();
+	try {
+		return JSON.parse(text);
+	} catch (e) {
+		return text; // Return raw text if not JSON
+	}
 }
 
 function applyMergeWithInput(

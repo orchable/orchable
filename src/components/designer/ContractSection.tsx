@@ -512,7 +512,7 @@ export function ContractSection({
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="webhook">Webhook (n8n/Custom)</SelectItem>
-                                            <SelectItem value="google_sheets" disabled>Google Sheets (Coming Soon)</SelectItem>
+                                            <SelectItem value="google_sheets">Google Sheets via Webhook</SelectItem>
                                             <SelectItem value="email" disabled>Email (Coming Soon)</SelectItem>
                                         </SelectContent>
                                     </Select>
@@ -528,6 +528,31 @@ export function ContractSection({
                                             className="h-8 text-xs font-mono"
                                             disabled={!exportConfig?.enabled}
                                         />
+                                    </div>
+                                )}
+
+                                {exportConfig?.destination === 'google_sheets' && (
+                                    <div className="space-y-3">
+                                        <div>
+                                            <Label className="text-xs mb-1.5 block">Google Sheet Link (Anyone can edit)</Label>
+                                            <Input
+                                                placeholder="https://docs.google.com/spreadsheets/d/..."
+                                                value={exportConfig?.settings?.sheet_id || ''}
+                                                onChange={(e) => handleExportSettingChange('sheet_id', e.target.value)}
+                                                className="h-8 text-xs font-mono"
+                                                disabled={!exportConfig?.enabled}
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs mb-1.5 block">Sheet Name (Tab Name)</Label>
+                                            <Input
+                                                placeholder="Sheet1"
+                                                value={exportConfig?.settings?.worksheet_name || ''}
+                                                onChange={(e) => handleExportSettingChange('worksheet_name', e.target.value)}
+                                                className="h-8 text-xs"
+                                                disabled={!exportConfig?.enabled}
+                                            />
+                                        </div>
                                     </div>
                                 )}
 
