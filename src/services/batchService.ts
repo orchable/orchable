@@ -192,8 +192,13 @@ export const batchService = {
 					output_mapping: ns.output_mapping || "result",
 					batch_grouping: ns.batch_grouping || null,
 					delimiters: ns.contract?.input?.delimiters,
+					dependsOn:
+						ns.dependsOn?.map(
+							(id) =>
+								config.steps.find((s) => s.id === id)
+									?.stage_key || id,
+						) || [],
 					export_config: ns.export_config,
-					dependsOn: ns.dependsOn || [],
 				})),
 				delimiters: firstStage.contract?.input?.delimiters,
 				execution_delay_seconds: config.execution_delay_seconds || 0,

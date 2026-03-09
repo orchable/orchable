@@ -259,7 +259,10 @@ export async function syncStagesToPromptTemplates(
 			return_along_with: stage.return_along_with || [],
 			requires_approval: stage.requires_approval || false,
 			custom_component_id: stage.custom_component_id,
-			dependsOn: stage.dependsOn,
+			dependsOn:
+				stage.dependsOn?.map(
+					(id) => stageMap.get(id)?.stage_key || id,
+				) || [],
 		};
 
 		const record: PromptTemplateRecord = {
