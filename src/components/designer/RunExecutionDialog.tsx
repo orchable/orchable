@@ -336,7 +336,7 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
                             </p>
                             <ul className="list-disc pl-4 space-y-1">
                                 <li>Execution will create a separate batch for each input item.</li>
-                                <li>You can monitor progress in real-time within this dialog.</li>
+                                <li>You will be redirected to the Monitor page to watch progress.</li>
                                 <li>Data is transient and will be cleared when you close or reload the designer.</li>
                             </ul>
                         </div>

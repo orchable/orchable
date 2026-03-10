@@ -59,6 +59,7 @@ interface DesignerState {
 	};
 	setInputData: (data: Partial<DesignerState["inputData"]>) => void;
 	clearInputData: () => void;
+	isDirty: () => boolean;
 }
 
 const INITIAL_START_NODE: Node = {
@@ -111,6 +112,44 @@ export const useDesignerStore = create<DesignerState>()(
 						execution_delay_seconds: 0,
 					},
 				});
+			},
+
+			isDirty: () => {
+				const {
+					nodes,
+					edges,
+					config,
+					orchestratorName,
+					orchestratorDescription,
+				} = get();
+
+				// Case 1: New orchestration with significant content
+				if (!config?.id) {
+					return nodes.length > 1 || edges.length > 0;
+				}
+
+				// Case 2: Compare with saved config
+				// Simple heuristic: check counts and basic metadata first
+				if (nodes.length !== config.steps.length + 1) return true; // +1 for start node
+				if (orchestratorName !== config.name) return true;
+				if (orchestratorDescription !== (config.description || ""))
+					return true;
+
+				// Deep comparison of steps (simplified for performance)
+				const currentSteps = nodes.filter((n) => n.type === "stepNode");
+				const savedSteps = config.steps;
+
+				// Check if any node position or data changed
+				for (const node of currentSteps) {
+					const saved = savedSteps.find((s) => s.id === node.id);
+					if (!saved) return true;
+					// Basic check: label or stage_key or task_type
+					if (node.data.label !== saved.label) return true;
+					if (node.data.stage_key !== saved.stage_key) return true;
+					if (node.data.task_type !== saved.task_type) return true;
+				}
+
+				return false;
 			},
 
 			setOrchestratorMetadata: (name: string, description: string) => {

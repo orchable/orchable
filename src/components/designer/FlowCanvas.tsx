@@ -225,10 +225,9 @@ export function FlowCanvas({ expandAll }: FlowCanvasProps) {
                     <Controls />
                     <MiniMap
                         nodeColor={(n) => {
-                            const name = n.data.name as string;
-                            if (name === 'A') return '#3b82f6';
-                            if (name === 'B') return '#22c55e';
-                            return '#94a3b8';
+                            const isConfigured = !!(n.data?.task_type || n.data?.webhookUrl);
+                            if (n.type === 'startNode') return '#10b981';
+                            return isConfigured ? '#3b82f6' : '#94a3b8';
                         }}
                         className="bg-card border shadow-sm"
                         maskColor="rgba(0, 0, 0, 0.1)"

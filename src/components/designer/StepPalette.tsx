@@ -1,12 +1,43 @@
+import { useState } from 'react';
 import { useDesignerStore } from '@/stores/designerStore';
-import { Plus, History, Settings2, FileText, CirclePlus } from 'lucide-react';
+import { Plus, History, Settings2, FileText } from 'lucide-react';
 import { useConfigs } from '@/hooks/useConfigs';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { OrchestratorConfig } from '@/lib/types';
 
 export function StepPalette() {
-    const { addStep, loadConfig, config: currentConfig } = useDesignerStore();
+    const { addStep, loadConfig, config: currentConfig, isDirty } = useDesignerStore();
     const { data: savedConfigs } = useConfigs();
+    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+    const [pendingConfig, setPendingConfig] = useState<OrchestratorConfig | null>(null);
+
+    const handleRecentClick = (config: OrchestratorConfig) => {
+        if (isDirty()) {
+            setPendingConfig(config);
+            setIsConfirmOpen(true);
+        } else {
+            loadConfig(config);
+        }
+    };
+
+    const confirmLoad = () => {
+        if (pendingConfig) {
+            loadConfig(pendingConfig);
+            setPendingConfig(null);
+        }
+        setIsConfirmOpen(false);
+    };
 
     // Sort by updated_at Desc and take top 5
     const recentConfigs = savedConfigs
@@ -74,7 +105,7 @@ export function StepPalette() {
                         {recentConfigs.map(config => (
                             <div
                                 key={config.id}
-                                onClick={() => loadConfig(config)}
+                                onClick={() => handleRecentClick(config)}
                                 className={`p-3 rounded-lg border cursor-pointer hover:shadow-md transition-all flex flex-col gap-2 group ${currentConfig?.id === config.id ? 'bg-primary/5 border-primary shadow-sm' : 'bg-card hover:border-primary/50'}`}
                             >
                                 <div className="flex items-center gap-3">
@@ -100,6 +131,23 @@ export function StepPalette() {
                     </div>
                 )}
             </div>
+
+            <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Load configuration?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Current orchestration has unsaved changes. All changes will be lost if you load a different configuration.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setPendingConfig(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmLoad} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                            Load Anyway
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

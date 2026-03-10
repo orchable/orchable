@@ -1,8 +1,5 @@
-# designer Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change improve-designer-ux. Update Purpose after archive.
-## Requirements
 ### Requirement: Orchestration Creation
 Users SHALL be able to clear the current designer canvas to start a new orchestration. The system MUST provide an explicit "New Orchestration" action. The system MUST warn the user before clearing the canvas if there are unsaved nodes or modifications. The system MUST also warn the user before loading a different configuration if the current canvas has unsaved changes.
 
@@ -23,22 +20,7 @@ Users SHALL be able to clear the current designer canvas to start a new orchestr
 - **THEN** the system shows a confirmation dialog warning about unsaved changes
 - **AND** upon confirmation, the selected configuration is loaded.
 
-### Requirement: Explicit Node Addition
-The system SHALL provide intuitive methods for adding new operational stages (nodes) to the orchestration canvas. This MUST include a direct button click action that places a default node onto the canvas.
-
-#### Scenario: User adds a generic node
-- **WHEN** the user clicks the "Add Node" button in the palette
-- **THEN** a new editable stage node is placed on the canvas below the last selected node or at the center.
-
-### Requirement: Duplicate Orchestration
-Users SHALL be able to duplicate an existing saved orchestration. The duplicate MUST be treated as a new, unsaved configuration. The system MUST provide a mechanism to automatically modify the `stage_key` of all duplicated stages using a user-provided suffix or prefix to maintain non-collision and readability.
-
-#### Scenario: User duplicates an orchestration
-- **WHEN** the user clicks "Duplicate" on a saved orchestration
-- **AND** the user provides a new name and a stage key suffix (e.g., `_v2`)
-- **THEN** the system generates a new canvas state with identical structure
-- **AND** all step nodes have the suffix appended to their `stage_key`
-- **AND** the configuration ID is cleared pending a save action.
+## ADDED Requirements
 
 ### Requirement: Dirty State Indicator
 The system SHALL visually indicate when the current canvas state differs from the last saved configuration. This indicator MUST be visible in the toolbar area.
@@ -72,4 +54,3 @@ The MiniMap SHALL accurately reflect the configured status of each node using di
 #### Scenario: MiniMap reflects node states
 - **WHEN** the designer canvas contains nodes in various states
 - **THEN** the MiniMap displays configured nodes in blue, unconfigured nodes in gray, and the start node in green.
-

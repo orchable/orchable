@@ -25,11 +25,13 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export function ConfigLibrary() {
-    const { loadConfig } = useDesignerStore();
+    const { loadConfig, isDirty } = useDesignerStore();
     const { data: savedConfigs } = useConfigs();
     const deleteConfig = useDeleteConfig();
     const [open, setOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [isLoadConfirmOpen, setIsLoadConfirmOpen] = useState(false);
+    const [pendingLoad, setPendingLoad] = useState<(() => void) | null>(null);
 
     const templates = [
         {
@@ -37,9 +39,9 @@ export function ConfigLibrary() {
             name: 'Linear Process',
             description: 'A simple sequence of steps (A → B → C)',
             steps: [
-                { id: 'step-a', name: 'A', label: 'Step A', webhookUrl: '', dependsOn: [], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
-                { id: 'step-b', name: 'B', label: 'Step B', webhookUrl: '', dependsOn: ['step-a'], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
-                { id: 'step-c', name: 'C', label: 'Step C', webhookUrl: '', dependsOn: ['step-b'], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
+                { id: 'step-a', name: 'A', label: 'Step A', stage_key: 'step_a', task_type: 'generic', dependsOn: [], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
+                { id: 'step-b', name: 'B', label: 'Step B', stage_key: 'step_b', task_type: 'generic', dependsOn: ['step-a'], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
+                { id: 'step-c', name: 'C', label: 'Step C', stage_key: 'step_c', task_type: 'generic', dependsOn: ['step-b'], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
             ]
         },
         {
@@ -47,10 +49,10 @@ export function ConfigLibrary() {
             name: 'Branching Logic',
             description: 'Execute parallel branches that converge (A → [B, C] → D)',
             steps: [
-                { id: 'step-a', name: 'A', label: 'Start', webhookUrl: '', dependsOn: [], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
-                { id: 'step-b', name: 'B', label: 'Branch 1', webhookUrl: '', dependsOn: ['step-a'], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
-                { id: 'step-c', name: 'C', label: 'Branch 2', webhookUrl: '', dependsOn: ['step-a'], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
-                { id: 'step-d', name: 'D', label: 'Converge', webhookUrl: '', dependsOn: ['step-b', 'step-c'], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
+                { id: 'step-a', name: 'A', label: 'Start', stage_key: 'start_branch', task_type: 'generic', dependsOn: [], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
+                { id: 'step-b', name: 'B', label: 'Branch 1', stage_key: 'branch_1', task_type: 'generic', dependsOn: ['step-a'], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
+                { id: 'step-c', name: 'C', label: 'Branch 2', stage_key: 'branch_2', task_type: 'generic', dependsOn: ['step-a'], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
+                { id: 'step-d', name: 'D', label: 'Converge', stage_key: 'converge', task_type: 'generic', dependsOn: ['step-b', 'step-c'], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
             ]
         },
         {
@@ -58,28 +60,46 @@ export function ConfigLibrary() {
             name: 'Parallel Execution',
             description: 'Run multiple independent tasks simultaneously (A, B, C)',
             steps: [
-                { id: 'step-a', name: 'A', label: 'Task A', webhookUrl: '', dependsOn: [], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
-                { id: 'step-b', name: 'B', label: 'Task B', webhookUrl: '', dependsOn: [], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
-                { id: 'step-c', name: 'C', label: 'Task C', webhookUrl: '', dependsOn: [], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
+                { id: 'step-a', name: 'A', label: 'Task A', stage_key: 'task_a', task_type: 'generic', dependsOn: [], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
+                { id: 'step-b', name: 'B', label: 'Task B', stage_key: 'task_b', task_type: 'generic', dependsOn: [], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
+                { id: 'step-c', name: 'C', label: 'Task C', stage_key: 'task_c', task_type: 'generic', dependsOn: [], timeout: 300000, retryConfig: { maxRetries: 3, retryDelay: 5000 } },
             ]
         }
     ];
 
     const handleLoadTemplate = (steps: StepConfig[]) => {
-        const timestamp = new Date().toISOString();
-        const baseConfig: Pick<OrchestratorConfig, "id" | "name" | "created_at" | "updated_at"> = {
-            id: `temp-${Date.now()}`,
-            name: "New Process",
-            created_at: timestamp,
-            updated_at: timestamp
+        const action = () => {
+            const timestamp = new Date().toISOString();
+            const baseConfig: Pick<OrchestratorConfig, "id" | "name" | "created_at" | "updated_at"> = {
+                id: `temp-${Date.now()}`,
+                name: "New Process",
+                created_at: timestamp,
+                updated_at: timestamp
+            };
+            loadConfig({ ...baseConfig, steps });
+            setOpen(false);
         };
-        loadConfig({ ...baseConfig, steps });
-        setOpen(false);
+
+        if (isDirty()) {
+            setPendingLoad(() => action);
+            setIsLoadConfirmOpen(true);
+        } else {
+            action();
+        }
     };
 
     const handleLoadConfig = (config: OrchestratorConfig) => {
-        loadConfig(config);
-        setOpen(false);
+        const action = () => {
+            loadConfig(config);
+            setOpen(false);
+        };
+
+        if (isDirty()) {
+            setPendingLoad(() => action);
+            setIsLoadConfirmOpen(true);
+        } else {
+            action();
+        }
     };
 
     const handleDelete = async (id: string, e: React.MouseEvent) => {
@@ -225,6 +245,30 @@ export function ConfigLibrary() {
                     </TabsContent>
                 </Tabs>
             </SheetContent>
+
+            <AlertDialog open={isLoadConfirmOpen} onOpenChange={setIsLoadConfirmOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Load pattern?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Your current work has unsaved changes. Loading a new pattern will overwrite the canvas.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setPendingLoad(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                pendingLoad?.();
+                                setPendingLoad(null);
+                                setIsLoadConfirmOpen(false);
+                            }}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            Load Anyway
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Sheet>
     );
 }

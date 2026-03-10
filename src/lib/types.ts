@@ -13,6 +13,7 @@ export interface OrchestratorConfig {
 	n8n_workflow_id?: string;
 	input_mapping?: JsonInputMapping;
 	execution_delay_seconds?: number;
+	tags?: string[];
 }
 
 export interface RegistryComponent {

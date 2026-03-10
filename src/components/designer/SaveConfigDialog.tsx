@@ -10,11 +10,20 @@ import {
 import { Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
-export function SaveConfigDialog() {
+interface SaveConfigDialogProps {
+    open?: boolean;
+    setOpen?: (open: boolean) => void;
+}
+
+export function SaveConfigDialog({ open: propOpen, setOpen: propSetOpen }: SaveConfigDialogProps) {
     const { nodes, edges, orchestratorName, orchestratorDescription, setOrchestratorMetadata } = useDesignerStore();
     const { save, isPending } = useSaveOrchestrator();
 
-    const [open, setOpen] = useState(false);
+    const [internalOpen, setInternalOpen] = useState(false);
+
+    // Support both controlled and uncontrolled
+    const open = propOpen !== undefined ? propOpen : internalOpen;
+    const setOpen = propSetOpen !== undefined ? propSetOpen : setInternalOpen;
 
     const handleSave = async () => {
         const success = await save();
@@ -25,12 +34,7 @@ export function SaveConfigDialog() {
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button size="sm">
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Config
-                </Button>
-            </DialogTrigger>
+
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Save Configuration</DialogTitle>
@@ -64,7 +68,6 @@ export function SaveConfigDialog() {
                 </div>
 
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
                     <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
                     <Button onClick={handleSave} disabled={isPending || !orchestratorName}>
                         {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}

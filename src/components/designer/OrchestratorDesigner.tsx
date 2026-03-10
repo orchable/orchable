@@ -35,7 +35,7 @@ import { useImportExport } from '@/hooks/useImportExport';
 import { toast } from 'sonner';
 
 export default function OrchestratorDesigner() {
-    const { nodes, selectedNode, reset, config, loadConfig, orchestratorName } = useDesignerStore();
+    const { nodes, selectedNode, reset, config, loadConfig, orchestratorName, isDirty } = useDesignerStore();
     const [searchParams, setSearchParams] = useSearchParams();
     const configId = searchParams.get('configId');
     const { data: savedConfigs } = useConfigs();
@@ -44,8 +44,22 @@ export default function OrchestratorDesigner() {
     const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
     const [isExpandedView, setIsExpandedView] = useState(false);
     const [isNewConfirmOpen, setIsNewConfirmOpen] = useState(false);
+    const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
 
     const { handleExport, handleImport, triggerImport, fileInputRef } = useImportExport();
+
+    const dirty = isDirty();
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                setIsSaveDialogOpen(true);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     useEffect(() => {
         if (configId && savedConfigs && !hasAttemptedLoad) {
@@ -96,36 +110,49 @@ export default function OrchestratorDesigner() {
                     onChange={handleImport}
                 />
 
-                <div className="absolute top-4 left-4 right-4 z-20 flex justify-between items-center pointer-events-none">
-                    {/* Left Group: Creation & Context */}
-                    <div className="flex gap-2 pointer-events-auto items-center">
-                        <Button
-                            variant="default"
-                            size="sm"
-                            onClick={handleNewOrchestration}
-                            className="shadow-md bg-primary hover:bg-primary/90"
-                        >
-                            <FilePlus className="w-4 h-4 mr-2" />
-                            New
-                        </Button>
-                        <ConfigLibrary />
-                        <Separator orientation="vertical" className="h-6 mx-1 bg-border/50" />
-                        <div className="flex flex-col justify-center">
-                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold leading-none mb-1">
+                <div className="absolute top-4 left-4 right-4 z-20 flex justify-between items-start pointer-events-none">
+                    {/* Left Group: Workspace & Identity */}
+                    <div className="flex flex-col gap-3 pointer-events-auto">
+                        <div className="flex gap-2 items-center">
+                            <Button
+                                variant="default"
+                                size="sm"
+                                onClick={handleNewOrchestration}
+                                className="shadow-md bg-primary hover:bg-primary/90"
+                            >
+                                <FilePlus className="w-4 h-4 mr-2" />
+                                New
+                            </Button>
+                            <ConfigLibrary />
+                        </div>
+
+                        <div className="flex flex-col bg-background/80 backdrop-blur-sm px-3 py-2 rounded-lg border shadow-sm border-primary/10 transition-all hover:bg-background/90 group">
+                            <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold leading-none mb-1.5">
                                 {config?.id ? "Editing Orchestration" : "New Orchestration"}
                             </span>
-                            <span className="text-sm font-semibold text-foreground leading-none truncate max-w-[200px]">
+                            <span className="text-sm font-bold text-foreground leading-none truncate max-w-[350px] flex items-center gap-1.5">
                                 {orchestratorName || "Untitled Orchestration"}
+                                {dirty && <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" title="Unsaved changes" />}
                             </span>
                         </div>
                     </div>
 
                     {/* Right Group: Actions */}
-                    <div className="flex gap-2 pointer-events-auto">
-                        <SaveConfigDialog />
-                        <RunExecutionDialog disabled={!config?.id} />
+                    <div className="flex gap-2 pointer-events-auto items-center">
 
-                        <Separator orientation="vertical" className="h-9 bg-border" />
+                        <div className="flex items-center gap-1 bg-background/50 p-1 rounded-lg border shadow-sm">
+                            <RunExecutionDialog disabled={!config?.id} />
+                            <Separator orientation="vertical" className="h-6 mx-1 bg-border/50" />
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setIsSaveDialogOpen(true)}
+                                className="bg-card shadow-sm border hover:border-primary/50"
+                            >
+                                <Save className="w-4 h-4 mr-2 text-primary" />
+                                Save Config
+                            </Button>
+                        </div>
 
                         <Button
                             variant={isExpandedView ? "secondary" : "outline"}
@@ -136,8 +163,6 @@ export default function OrchestratorDesigner() {
                             {isExpandedView ? <Minimize2 className="w-4 h-4 mr-2" /> : <Maximize2 className="w-4 h-4 mr-2" />}
                             {isExpandedView ? "Collapse" : "Expand All"}
                         </Button>
-
-                        <Separator orientation="vertical" className="h-9 bg-border" />
 
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -167,6 +192,7 @@ export default function OrchestratorDesigner() {
                         </DropdownMenu>
                     </div>
 
+
                     {/* Modals & Dialogs */}
                     <AlertDialog open={isNewConfirmOpen} onOpenChange={setIsNewConfirmOpen}>
                         <AlertDialogContent>
@@ -185,6 +211,11 @@ export default function OrchestratorDesigner() {
                         </AlertDialogContent>
                     </AlertDialog>
 
+                    <SaveConfigDialog
+                        open={isSaveDialogOpen}
+                        setOpen={setIsSaveDialogOpen}
+                    />
+
                     <DuplicateOrchDialog
                         open={isDuplicateDialogOpen}
                         onOpenChange={setIsDuplicateDialogOpen}
@@ -199,7 +230,7 @@ export default function OrchestratorDesigner() {
                             initialData={{
                                 title: config.name,
                                 description: config.description,
-                                tags: (config as any).tags || []
+                                tags: config.tags || []
                             }}
                         />
                     )}
