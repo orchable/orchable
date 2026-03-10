@@ -37,6 +37,7 @@ interface DesignerState {
 		subOrchNode: Node,
 		parentSteps: StepConfig[],
 	) => void;
+	duplicateOrchestrationToCanvas: (newName: string, suffix: string) => void;
 	reset: () => void;
 	orchestratorName: string;
 	orchestratorDescription: string;
@@ -143,6 +144,19 @@ export const useDesignerStore = create<DesignerState>()(
 
 			addStep: (stepName: string) => {
 				const id = `step_${Date.now()}`;
+				const nodes = get().nodes;
+				const stepCount = nodes.filter(
+					(n) => n.type === "stepNode",
+				).length;
+
+				const name =
+					stepName.trim() ||
+					String.fromCharCode(65 + (stepCount % 26));
+
+				// If stepName was empty, label is "Stage A", otherwise it uses the name provided
+				const label = stepName.trim() ? stepName : `Stage ${name}`;
+				const stage_key = `stage_${name.toLowerCase().replace(/[^a-z0-9]/g, "_")}`;
+
 				// Deep clone the default config to prevent reference issues
 				const baseConfig = JSON.parse(
 					JSON.stringify(DEFAULT_STAGE_CONFIG),
@@ -159,14 +173,15 @@ export const useDesignerStore = create<DesignerState>()(
 					data: {
 						...baseConfig,
 						stepId: id,
-						name: stepName, // A, B, C, etc.
-						label: `Core Question ${stepName}`,
-						stage_key: `core_question_${stepName.toLowerCase()}`,
+						name: name,
+						label: label,
+						stage_key: stage_key,
 					},
 				};
 
 				set({
 					nodes: [...get().nodes, newNode],
+					selectedNode: newNode,
 				});
 			},
 
@@ -428,6 +443,62 @@ export const useDesignerStore = create<DesignerState>()(
 						edges: newEdges,
 						selectedNode: null,
 					};
+				});
+			},
+			duplicateOrchestrationToCanvas: (
+				newName: string,
+				suffix: string,
+			) => {
+				const state = get();
+				const now = Date.now();
+
+				// 1. Map old IDs to new IDs to rebuild edges correctly
+				const idMap: Record<string, string> = {};
+				state.nodes.forEach((node) => {
+					if (node.id === "start") {
+						idMap[node.id] = "start";
+					} else {
+						idMap[node.id] =
+							`step_${now}_${Math.random().toString(36).substring(2, 9)}`;
+					}
+				});
+
+				// 2. Clone and update nodes
+				const clonedNodes: Node[] = state.nodes.map((node) => {
+					const newId = idMap[node.id];
+					const clonedData = JSON.parse(JSON.stringify(node.data));
+
+					if (node.type === "stepNode") {
+						// Update stage_key if it exists
+						if (clonedData.stage_key) {
+							clonedData.stage_key = `${clonedData.stage_key}${suffix}`;
+						}
+						clonedData.stepId = newId;
+					}
+
+					return {
+						...node,
+						id: newId,
+						data: clonedData,
+						selected: false,
+					};
+				});
+
+				// 3. Clone and update edges
+				const clonedEdges: Edge[] = state.edges.map((edge) => ({
+					...edge,
+					id: `e_${idMap[edge.source]}-${idMap[edge.target]}`,
+					source: idMap[edge.source],
+					target: idMap[edge.target],
+				}));
+
+				// 4. Reset state with new cloned data and clear config ID
+				set({
+					nodes: clonedNodes,
+					edges: clonedEdges,
+					selectedNode: null,
+					config: null, // Clear active config to make it a "New" unsaved orchestration
+					orchestratorName: newName,
 				});
 			},
 		}),

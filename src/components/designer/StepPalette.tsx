@@ -1,6 +1,7 @@
 import { useDesignerStore } from '@/stores/designerStore';
-import { Plus, History, Settings2, FileText } from 'lucide-react';
+import { Plus, History, Settings2, FileText, CirclePlus } from 'lucide-react';
 import { useConfigs } from '@/hooks/useConfigs';
+import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 
 export function StepPalette() {
@@ -16,26 +17,43 @@ export function StepPalette() {
         <div className="h-full border-r bg-muted/30 flex flex-col">
             {/* Top section: Add Step */}
             <div className="p-4 border-b">
-                <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                    <Plus className="w-4 h-4" />
-                    Add Node
-                </h3>
-                <div className="flex flex-col gap-2">
-                    <input
-                        type="text"
-                        placeholder="Node Name (e.g. A, qgen)"
-                        className="flex h-9 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                const target = e.target as HTMLInputElement;
-                                if (target.value.trim()) {
-                                    addStep(target.value.trim());
-                                    target.value = '';
+                <div className="flex flex-col gap-3">
+                    <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => addStep('')}
+                        className="w-full shadow-sm bg-primary/90 hover:bg-primary"
+                    >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add New Stage
+                    </Button>
+
+                    <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t border-border/50" />
+                        </div>
+                        <div className="relative flex justify-center text-[10px] uppercase">
+                            <span className="bg-background px-2 text-muted-foreground font-semibold">Or Quick Add</span>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <input
+                            type="text"
+                            placeholder="Stage Name (e.g. Extraction)"
+                            className="flex h-9 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    const target = e.target as HTMLInputElement;
+                                    if (target.value.trim()) {
+                                        addStep(target.value.trim());
+                                        target.value = '';
+                                    }
                                 }
-                            }
-                        }}
-                    />
-                    <p className="text-[10px] text-muted-foreground mt-1">Press Enter to add to canvas</p>
+                            }}
+                        />
+                        <p className="text-[10px] text-muted-foreground">Press Enter to add to canvas</p>
+                    </div>
                 </div>
             </div>
 
