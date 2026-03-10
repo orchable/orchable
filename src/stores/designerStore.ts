@@ -13,7 +13,7 @@ import {
 	type OnEdgesChange,
 	type OnConnect,
 } from "@xyflow/react";
-import type { OrchestratorConfig } from "@/lib/types";
+import type { OrchestratorConfig, StepConfig } from "@/lib/types";
 import { DEFAULT_STAGE_CONFIG } from "@/lib/constants/defaultStepConfig";
 
 interface DesignerState {
@@ -32,6 +32,11 @@ interface DesignerState {
 	updateStepData: (id: string, data: Record<string, unknown>) => void;
 	setSelectedNode: (node: Node | null) => void;
 	loadConfig: (config: OrchestratorConfig) => void;
+	replaceNodesWithSubOrch: (
+		selectedIds: Set<string>,
+		subOrchNode: Node,
+		parentSteps: StepConfig[],
+	) => void;
 	reset: () => void;
 	orchestratorName: string;
 	orchestratorDescription: string;
@@ -328,7 +333,7 @@ export const useDesignerStore = create<DesignerState>()(
 					inputData: config.input_mapping
 						? {
 								...get().inputData,
-								...(config.input_mapping as Record<
+								...(config.input_mapping as unknown as Record<
 									string,
 									unknown
 								>),
@@ -354,6 +359,75 @@ export const useDesignerStore = create<DesignerState>()(
 					orchestratorName: "",
 					orchestratorDescription: "",
 					viewport: { x: 0, y: 0, zoom: 1 },
+				});
+			},
+			replaceNodesWithSubOrch: (
+				selectedIds: Set<string>,
+				subOrchNode: Node,
+				parentSteps: StepConfig[],
+			) => {
+				set((state) => {
+					// 1. Filter out removed nodes
+					const remainingNodes = state.nodes.filter(
+						(n) => !selectedIds.has(n.id),
+					);
+
+					// 2. Update remaining nodes' data (for new dependsOn)
+					const updatedNodes = remainingNodes.map((n) => {
+						const matchingStep = parentSteps.find(
+							(s) => s.id === n.id,
+						);
+						if (matchingStep) {
+							return {
+								...n,
+								data: { ...matchingStep, stepId: n.id },
+							};
+						}
+						return n;
+					});
+
+					// 3. Rebuild edges based on parentSteps' dependsOn
+					const finalNodes = [...updatedNodes, subOrchNode];
+					const newEdges: Edge[] = [];
+
+					// We can iterate through all steps in parentSteps + subOrchNode.data
+					const allNewSteps = [
+						...parentSteps,
+						subOrchNode.data as unknown as StepConfig,
+					];
+
+					allNewSteps.forEach((step) => {
+						const targetId = step.id;
+						(step.dependsOn || []).forEach((sourceId) => {
+							newEdges.push({
+								id: `e_${sourceId}-${targetId}`,
+								source: sourceId,
+								target: targetId,
+								animated: true,
+							});
+						});
+					});
+
+					// Handle start node edges: any node with 0 dependsOn (that isn't start itself) should connect from start
+					allNewSteps.forEach((step) => {
+						if (
+							(!step.dependsOn || step.dependsOn.length === 0) &&
+							step.id !== "start"
+						) {
+							newEdges.push({
+								id: `e_start-${step.id}`,
+								source: "start",
+								target: step.id,
+								animated: true,
+							});
+						}
+					});
+
+					return {
+						nodes: finalNodes,
+						edges: newEdges,
+						selectedNode: null,
+					};
 				});
 			},
 		}),

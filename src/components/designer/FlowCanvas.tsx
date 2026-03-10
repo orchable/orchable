@@ -13,8 +13,12 @@ import '@xyflow/react/dist/style.css';
 import { useDesignerStore } from '@/stores/designerStore';
 import { StartNode } from './StartNode';
 import { StepNode } from './StepNode';
-import { resolveInlineMerge } from '@/services/stageService';
+import { resolveInlineMerge, isConnectedSubgraph } from '@/services/stageService';
 import type { OrchestratorConfig } from '@/lib/types';
+import { Button } from '@/components/ui/button';
+import { PlusSquare } from 'lucide-react';
+import { toast } from 'sonner';
+import { ExtractSubOrchDialog } from './ExtractSubOrchDialog';
 
 interface FlowCanvasProps {
     expandAll?: boolean;
@@ -143,6 +147,29 @@ export function FlowCanvas({ expandAll }: FlowCanvasProps) {
         });
     }, [removeStep]);
 
+    // Handle Extraction Dialog
+    const [isExtractDialogOpen, setIsExtractDialogOpen] = useState(false);
+    const selectedStepNodeIds = useMemo(() =>
+        nodes.filter(n => n.selected && n.type === 'stepNode').map(n => n.id)
+        , [nodes]);
+
+    const handleOpenExtractDialog = () => {
+        if (selectedStepNodeIds.length < 2) return;
+
+        // Pre-validate connectivity
+        const isConnected = isConnectedSubgraph(
+            new Set(selectedStepNodeIds),
+            edges.map(e => ({ source: e.source, target: e.target }))
+        );
+
+        if (!isConnected) {
+            toast.error("Extraction requires a connected set of stages (a continuous flow).");
+            return;
+        }
+
+        setIsExtractDialogOpen(true);
+    };
+
     return (
         <div className="w-full h-full bg-slate-50 dark:bg-slate-900 flex flex-col">
             {isResolving && (
@@ -151,6 +178,27 @@ export function FlowCanvas({ expandAll }: FlowCanvasProps) {
                     <span className="text-sm font-medium">Resolving nested orchestrations...</span>
                 </div>
             )}
+
+            {/* Selection Toolbar */}
+            {selectedStepNodeIds.length >= 2 && !expandAll && (
+                <div className="absolute top-4 left-4 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <Button
+                        onClick={handleOpenExtractDialog}
+                        size="sm"
+                        className="bg-primary shadow-lg border-2 border-primary-foreground/10 hover:shadow-primary/20"
+                    >
+                        <PlusSquare className="w-4 h-4 mr-2" />
+                        Extract Sub-Orchestration ({selectedStepNodeIds.length})
+                    </Button>
+                </div>
+            )}
+
+            <ExtractSubOrchDialog
+                open={isExtractDialogOpen}
+                onOpenChange={setIsExtractDialogOpen}
+                selectedNodeIds={selectedStepNodeIds}
+            />
+
             <div className="flex-1 min-h-0">
                 <ReactFlow
                     key={expandAll ? 'expanded-canvas' : (config?.id || 'default-canvas')}

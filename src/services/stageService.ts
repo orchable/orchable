@@ -644,17 +644,144 @@ export async function resolveInlineMerge(
 }
 
 /**
- * Validate that there are no duplicate stage keys in the resolved pipeline
+ * Check if the selected nodes form a connected subgraph
  */
-export function validateStageKeyUniqueness(steps: StepConfig[]): string[] {
-	const keys = new Set<string>();
-	const duplicates: string[] = [];
-	for (const step of steps) {
-		const key = step.stage_key || step.id;
-		if (keys.has(key)) {
-			duplicates.push(key);
+export function isConnectedSubgraph(
+	selectedIds: Set<string>,
+	edges: { source: string; target: string }[],
+): boolean {
+	if (selectedIds.size <= 1) return true;
+
+	// Build adjacency list for selection
+	const adj = new Map<string, string[]>();
+	for (const id of selectedIds) adj.set(id, []);
+
+	for (const e of edges) {
+		if (selectedIds.has(e.source) && selectedIds.has(e.target)) {
+			adj.get(e.source)!.push(e.target);
+			adj.get(e.target)!.push(e.source); // undirected for connectivity
 		}
-		keys.add(key);
 	}
-	return duplicates;
+
+	// BFS from first node
+	const firstNode = Array.from(selectedIds)[0];
+	const visited = new Set<string>();
+	const queue = [firstNode];
+
+	while (queue.length > 0) {
+		const curr = queue.shift()!;
+		if (!curr || visited.has(curr)) continue;
+		visited.add(curr);
+		for (const neighbor of adj.get(curr) || []) {
+			if (!visited.has(neighbor)) queue.push(neighbor);
+		}
+	}
+
+	return visited.size === selectedIds.size;
+}
+
+/**
+ * Perform a "Extract Sub-Orchestration" refactor.
+ * Given a selection of nodes, creates a new Orchestration config and
+ * returns mappings for the designer to update its canvas.
+ */
+export function extractSubOrchestration(
+	selectedNodeIds: string[],
+	allSteps: StepConfig[],
+	allEdges: { source: string; target: string }[],
+	newOrchConfig: {
+		id: string;
+		name: string;
+		description?: string;
+		stage_key: string;
+	},
+): {
+	subOrch: OrchestratorConfig;
+	parentSteps: StepConfig[];
+	subOrchNode: StepConfig;
+} {
+	const selectedIds = new Set(selectedNodeIds);
+	const selectedSteps = allSteps.filter((s) => selectedIds.has(s.id));
+
+	// 1. Partition edges
+	const internalEdges = allEdges.filter(
+		(e) => selectedIds.has(e.source) && selectedIds.has(e.target),
+	);
+	const incomingEdges = allEdges.filter(
+		(e) => !selectedIds.has(e.source) && selectedIds.has(e.target),
+	);
+	// const outgoingEdges = allEdges.filter(e => selectedIds.has(e.source) && !selectedIds.has(e.target));
+
+	// 2. Build subOrch (Orch B)
+	const subOrchSteps: StepConfig[] = selectedSteps.map((s) => {
+		const originalDependsOn = s.dependsOn || [];
+		// Only keep internal dependencies
+		const internalDependsOn = originalDependsOn.filter((d) =>
+			selectedIds.has(d),
+		);
+		return {
+			...s,
+			dependsOn: internalDependsOn,
+		};
+	});
+
+	const subOrch: OrchestratorConfig = {
+		id: newOrchConfig.id,
+		name: newOrchConfig.name,
+		description: newOrchConfig.description || "",
+		steps: subOrchSteps,
+	};
+
+	// 3. Create sub-orch replacement node for Parent
+	const subOrchNodeId = `step_${Date.now()}`;
+	const subOrchNode: StepConfig = {
+		id: subOrchNodeId,
+		name: newOrchConfig.name,
+		label: newOrchConfig.name,
+		stage_key: newOrchConfig.stage_key,
+		task_type: "sub_orchestration",
+		sub_orchestration_id: subOrch.id,
+		dependsOn: Array.from(
+			new Set(incomingEdges.map((e) => e.source)),
+		).filter((id) => id !== "start"),
+		position: {
+			// Basic heuristic: average center of selected nodes
+			x:
+				selectedSteps.reduce(
+					(acc, s) => acc + (s.position?.x || 0),
+					0,
+				) / selectedSteps.length,
+			y:
+				selectedSteps.reduce(
+					(acc, s) => acc + (s.position?.y || 0),
+					0,
+				) / selectedSteps.length,
+		},
+	};
+
+	// 4. Transform Parent Steps
+	const parentSteps: StepConfig[] = allSteps
+		.filter((s) => !selectedIds.has(s.id)) // Remove old steps
+		.map((s) => {
+			const deps = s.dependsOn || [];
+			// If this step depended on any of the extracted stages, it now depends on the sub-orch node
+			const hasExtractedDep = deps.some((d) => selectedIds.has(d));
+			if (hasExtractedDep) {
+				const filteredDeps = deps.filter((d) => !selectedIds.has(d));
+				return {
+					...s,
+					dependsOn: Array.from(
+						new Set([...filteredDeps, subOrchNodeId]),
+					),
+				};
+			}
+			return s;
+		});
+
+	// The subOrchNode is not yet inside parentSteps, it will be added by the caller/store action
+	return {
+		subOrch,
+		parentSteps,
+		subOrchNode,
+	};
 }
