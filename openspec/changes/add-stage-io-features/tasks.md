@@ -20,7 +20,7 @@
 
 - [x] 4.1 Update `batchService.ts` to pre-fetch Document content from `document_assets` into `global_context` at launch (snapshotting).
 - [x] 4.2 Introduce `triggerExport` logic inside `taskExecutor.worker.ts`'s `handleManyToOne` function (Last Sibling check).
-- [ ] 4.3 Add prompt injection formatting logic for resolving `%%document.X%%` or `[GLOBAL_CONTEXT]` markers.
+- [x] 4.3 Add prompt injection formatting logic for resolving `%%GLOBAL_CONTEXT%%` marker (via `enrichmentData`).
 - [ ] 4.4 Build Gemini Cache creation middleware (for Premium Users only) inside `executionRouter.ts`.
 
 ## 5. Security & Validation
