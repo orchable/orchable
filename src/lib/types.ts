@@ -15,6 +15,13 @@ export interface OrchestratorConfig {
 	execution_delay_seconds?: number;
 }
 
+export interface RegistryComponent {
+	id: string;
+	name: string;
+	description?: string | null;
+	is_active?: boolean;
+}
+
 export interface JsonInputMapping {
 	fieldSelection: { shared: string[]; perTask: string[] };
 	fieldMapping: Record<string, string>;
@@ -71,6 +78,10 @@ export interface StepConfig {
 
 	// Custom Visual Component (Optional)
 	custom_component_id?: string;
+
+	// 🪜 Nested Orchestration (Optional)
+	sub_orchestration_id?: string;
+	sub_orchestration_output_path?: string;
 
 	// 🔨 Stage IO: Export Configuration
 	export_config?: ExportConfig;

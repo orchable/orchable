@@ -37,16 +37,13 @@ export const batchService = {
 		const launchId = existingLaunchId || crypto.randomUUID();
 		const adapter = storage.adapter;
 
-		let taskAdapter = adapter;
-		if (executingLocally) {
-			const { IndexedDBAdapter } =
-				await import("../lib/storage/IndexedDBAdapter");
-			taskAdapter = new IndexedDBAdapter();
-		}
+		// 1. Resolve nested orchestrations via Inline Merge
+		const { resolveInlineMerge } = await import("./stageService");
+		const { steps: resolvedSteps } = await resolveInlineMerge(config);
 
-		// 1. Get sorted stages
+		// 2. Get sorted stages
 		const sortedStages = topologicalSortStages(
-			config.steps as unknown as Parameters<
+			resolvedSteps as unknown as Parameters<
 				typeof topologicalSortStages
 			>[0],
 			[],
@@ -57,10 +54,10 @@ export const batchService = {
 			throw new Error("Orchestrator has no stages configured");
 		}
 
-		// 2. Snapshot Auxiliary Documents into global_context
+		// 3. Snapshot Auxiliary Documents into global_context
 		const globalContext: Record<string, string> = {};
 		const allAuxIds = new Set<string>();
-		config.steps.forEach((s) => {
+		resolvedSteps.forEach((s) => {
 			if (s.auxiliary_inputs) {
 				s.auxiliary_inputs.forEach((id) => allAuxIds.add(id));
 			}
@@ -87,8 +84,8 @@ export const batchService = {
 		}
 
 		// Identify next stages for the first stage
-		const nextStages = config.steps.filter((s) =>
-			s.dependsOn?.includes(firstStage.id),
+		const nextStages = resolvedSteps.filter((s) =>
+			s.dependsOn?.includes(firstStage.stage_key || firstStage.id),
 		);
 		const nextStageTemplateIds = nextStages.map((ns) => {
 			return (
@@ -97,27 +94,32 @@ export const batchService = {
 			);
 		});
 
-		if (
-			executingLocally &&
-			adapter.constructor.name === "SupabaseAdapter"
-		) {
+		let taskAdapter = adapter;
+		if (executingLocally) {
+			const { IndexedDBAdapter } =
+				await import("../lib/storage/IndexedDBAdapter");
+			taskAdapter = new IndexedDBAdapter();
+
 			// Snapshot prompt templates to local DB so the web worker can access them
-			const { db } = await import("../lib/storage/IndexedDBAdapter");
-			const templateIds = new Set<string>();
-			config.steps.forEach((s) => {
-				if (s.prompt_template_id) templateIds.add(s.prompt_template_id);
-			});
-			for (const tId of templateIds) {
-				try {
-					const t = await adapter.getTemplate(tId);
-					if (t) {
-						await db.prompt_templates.put(t);
+			if (adapter.constructor.name === "SupabaseAdapter") {
+				const { db } = await import("../lib/storage/IndexedDBAdapter");
+				const templateIds = new Set<string>();
+				resolvedSteps.forEach((s) => {
+					if (s.prompt_template_id)
+						templateIds.add(s.prompt_template_id);
+				});
+				for (const tId of templateIds) {
+					try {
+						const t = await adapter.getTemplate(tId);
+						if (t) {
+							await db.prompt_templates.put(t);
+						}
+					} catch (err) {
+						console.warn(
+							`[BatchService] Failed to snapshot template ${tId}:`,
+							err,
+						);
 					}
-				} catch (err) {
-					console.warn(
-						`[BatchService] Failed to snapshot template ${tId}:`,
-						err,
-					);
 				}
 			}
 		}
@@ -194,9 +196,11 @@ export const batchService = {
 					delimiters: ns.contract?.input?.delimiters,
 					dependsOn:
 						ns.dependsOn?.map(
-							(id) =>
-								config.steps.find((s) => s.id === id)
-									?.stage_key || id,
+							(ident) =>
+								resolvedSteps.find(
+									(s) =>
+										s.id === ident || s.stage_key === ident,
+								)?.stage_key || ident,
 						) || [],
 					export_config: ns.export_config,
 				})),

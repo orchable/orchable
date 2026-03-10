@@ -10,16 +10,10 @@ import {
 	Execution as TaskBatch,
 	OrchestratorConfig,
 	DocumentAsset,
+	RegistryComponent,
 } from "../types";
 import { TaskSummary as AiTask } from "../../services/executionTrackingService";
 import { AIModelSetting } from "../types";
-
-export interface RegistryComponent {
-	id: string;
-	name: string;
-	description?: string | null;
-	is_active?: boolean;
-}
 
 export interface MetadataValue {
 	count: number;

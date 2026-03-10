@@ -6,12 +6,17 @@ import type {
 	PostProcessConfig,
 	StageContract,
 	ExportConfig,
+	OrchestratorConfig,
+	StepConfig,
 } from "@/lib/types";
+import { configService } from "@/services/configService";
 import {
 	mapContractToInputSchema,
 	mapContractToOutputSchema,
 } from "@/lib/schemaUtils";
 import { DEFAULT_PROMPT_TEMPLATE } from "@/lib/constants/defaultStepConfig";
+
+const MAX_NESTING_DEPTH = 5;
 
 // Types for prompt template sync
 interface StageData {
@@ -39,6 +44,8 @@ interface StageData {
 	requires_approval?: boolean;
 	return_along_with?: string[];
 	custom_component_id?: string;
+	sub_orchestration_id?: string;
+	sub_orchestration_output_path?: string;
 	export_config?: ExportConfig;
 }
 
@@ -91,6 +98,7 @@ export function topologicalSortStages(
 	edges: Array<{ source: string; target: string }>,
 ): StageData[] {
 	const stageMap = new Map(stages.map((s) => [s.id, s]));
+	const idByKey = new Map(stages.map((s) => [s.stage_key || s.id, s.id]));
 	const inDegree = new Map<string, number>();
 	const adjList = new Map<string, string[]>();
 
@@ -100,13 +108,28 @@ export function topologicalSortStages(
 		adjList.set(s.id, []);
 	});
 
-	// Build graph (ignore 'start' node)
+	// Build graph from explicit edges (if any)
 	edges.forEach((edge) => {
 		if (edge.source === "start") return;
 		if (!stageMap.has(edge.source) || !stageMap.has(edge.target)) return;
 
 		adjList.get(edge.source)?.push(edge.target);
 		inDegree.set(edge.target, (inDegree.get(edge.target) || 0) + 1);
+	});
+
+	// Also build from dependsOn for robustness (especially after inline merge)
+	stages.forEach((stage) => {
+		stage.dependsOn?.forEach((dep) => {
+			const sourceId = idByKey.get(dep);
+			if (sourceId && sourceId !== stage.id) {
+				// Check if this edge already exists to avoid double-counting inDegree
+				const currentAdj = adjList.get(sourceId) || [];
+				if (!currentAdj.includes(stage.id)) {
+					adjList.get(sourceId)?.push(stage.id);
+					inDegree.set(stage.id, (inDegree.get(stage.id) || 0) + 1);
+				}
+			}
+		});
 	});
 
 	// Kahn's algorithm
@@ -156,8 +179,18 @@ export async function syncStagesToPromptTemplates(
 	stages: StageData[],
 	edges: Array<{ source: string; target: string }>,
 ): Promise<Map<string, string>> {
-	const stageMap = new Map(stages.map((s) => [s.id, s]));
-	const sortedStages = topologicalSortStages(stages, edges);
+	// 1. Resolve nested orchestrations via Inline Merge
+	const config: OrchestratorConfig = {
+		id: orchestratorId,
+		name: orchestratorName,
+		steps: stages as unknown as StepConfig[],
+	} as OrchestratorConfig;
+
+	const { steps: resolvedSteps } = await resolveInlineMerge(config);
+	const resolvedStages = resolvedSteps as unknown as StageData[];
+
+	const stageMap = new Map(resolvedStages.map((s) => [s.id, s]));
+	const sortedStages = topologicalSortStages(resolvedStages, edges);
 
 	// Map: stageId -> generated prompt_template_id
 	const templateIdMap = new Map<string, string>();
@@ -466,4 +499,162 @@ export async function updateTemplateCustomComponent(id: string, code: string) {
 			customComponent: code,
 		},
 	});
+}
+
+/**
+ * Detect circular dependencies in nested orchestrations
+ */
+export async function detectCircularDependency(
+	configId: string,
+	path: Set<string> = new Set(),
+): Promise<boolean> {
+	if (path.has(configId)) return true;
+	path.add(configId);
+
+	try {
+		const config = await configService.getConfig(configId);
+		for (const step of config.steps) {
+			if (
+				step.task_type === "sub_orchestration" &&
+				step.sub_orchestration_id
+			) {
+				if (
+					await detectCircularDependency(
+						step.sub_orchestration_id,
+						new Set(path),
+					)
+				) {
+					return true;
+				}
+			}
+		}
+	} catch (e) {
+		console.error("Lỗi khi kiểm tra dependency cho config:", configId, e);
+	}
+
+	return false;
+}
+
+/**
+ * Resolve a nested orchestration by flattening (inline merge) its stages
+ */
+export async function resolveInlineMerge(
+	config: OrchestratorConfig,
+	depth = 0,
+): Promise<{ steps: StepConfig[]; edges: any[] }> {
+	if (depth > MAX_NESTING_DEPTH) {
+		console.warn("Độ sâu lồng nhau vượt quá giới hạn", MAX_NESTING_DEPTH);
+		return { steps: config.steps, edges: [] };
+	}
+
+	// Deep clone steps to avoid mutating the original config object
+	const steps = JSON.parse(JSON.stringify(config.steps)) as StepConfig[];
+	const resolvedSteps: StepConfig[] = [];
+
+	for (const step of steps) {
+		if (
+			step.task_type === "sub_orchestration" &&
+			step.sub_orchestration_id
+		) {
+			try {
+				const subConfig = await configService.getConfig(
+					step.sub_orchestration_id,
+				);
+				const { steps: subSteps } = await resolveInlineMerge(
+					subConfig,
+					depth + 1,
+				);
+
+				if (subSteps.length === 0) continue;
+
+				// Prefix sub-stage keys to avoid collision: sub_{parentStageKey}__{childStageKey}
+				const prefix = `sub_${step.stage_key || step.id}__`;
+				const mappedSubSteps = subSteps.map((ss) => ({
+					...ss,
+					id: `${prefix}${ss.id}`,
+					stage_key: ss.stage_key
+						? `${prefix}${ss.stage_key}`
+						: undefined,
+					dependsOn: (ss.dependsOn || []).map((d) => `${prefix}${d}`),
+				}));
+
+				// The first stages of sub-orch (those with no internal dependencies)
+				// should depend on the parent stage's dependencies.
+				const internalIds = new Set(subSteps.map((s) => s.id));
+				const internalKeys = new Set(
+					subSteps.map((s) => s.stage_key).filter(Boolean),
+				);
+
+				const firstStages = mappedSubSteps.filter((ss) => {
+					// Check if original dependsOn contained any internal Ids or Keys
+					const originalStep = subSteps.find(
+						(os) => `${prefix}${os.id}` === ss.id,
+					);
+					if (!originalStep) return true;
+					return !originalStep.dependsOn?.some(
+						(d) => internalIds.has(d) || internalKeys.has(d),
+					);
+				});
+
+				for (const fs of firstStages) {
+					fs.dependsOn = [...(step.dependsOn || [])];
+				}
+
+				// Find "last" stages of the sub-orch to bridge back to the parent pipeline
+				const dependentIdsOrKeys = new Set(
+					mappedSubSteps.flatMap((ss) => ss.dependsOn || []),
+				);
+				const lastStages = mappedSubSteps.filter(
+					(ss) =>
+						!dependentIdsOrKeys.has(ss.id) &&
+						(!ss.stage_key ||
+							!dependentIdsOrKeys.has(ss.stage_key)),
+				);
+				const lastStageIdentifiers = lastStages.map(
+					(ss) => ss.stage_key || ss.id,
+				);
+
+				// Update subsequent stages in parent orch that depended on this sub-orch stage
+				for (const otherStep of steps) {
+					if (
+						otherStep.dependsOn?.includes(step.stage_key || step.id)
+					) {
+						otherStep.dependsOn = otherStep.dependsOn.filter(
+							(d) => d !== (step.stage_key || step.id),
+						);
+						otherStep.dependsOn.push(...lastStageIdentifiers);
+					}
+				}
+
+				resolvedSteps.push(...mappedSubSteps);
+			} catch (e) {
+				console.error(
+					"Lỗi khi resolve sub-orchestration:",
+					step.sub_orchestration_id,
+					e,
+				);
+				resolvedSteps.push(step);
+			}
+		} else {
+			resolvedSteps.push(step);
+		}
+	}
+
+	return { steps: resolvedSteps, edges: [] };
+}
+
+/**
+ * Validate that there are no duplicate stage keys in the resolved pipeline
+ */
+export function validateStageKeyUniqueness(steps: StepConfig[]): string[] {
+	const keys = new Set<string>();
+	const duplicates: string[] = [];
+	for (const step of steps) {
+		const key = step.stage_key || step.id;
+		if (keys.has(key)) {
+			duplicates.push(key);
+		}
+		keys.add(key);
+	}
+	return duplicates;
 }

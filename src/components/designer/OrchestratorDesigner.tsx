@@ -12,7 +12,7 @@ import { OrchestratorImportExport } from './OrchestratorImportExport';
 import { useDesignerStore } from '@/stores/designerStore';
 import { useConfigs } from '@/hooks/useConfigs';
 import { Button } from '@/components/ui/button';
-import { RotateCcw, Globe } from 'lucide-react';
+import { RotateCcw, Globe, Maximize2, Minimize2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { ShareToHubDialog } from '@/components/hub/ShareToHubDialog';
 
@@ -23,6 +23,7 @@ export default function OrchestratorDesigner() {
     const { data: savedConfigs } = useConfigs();
     const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false);
     const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+    const [isExpandedView, setIsExpandedView] = useState(false);
 
     useEffect(() => {
         if (configId && savedConfigs && !hasAttemptedLoad) {
@@ -70,6 +71,16 @@ export default function OrchestratorDesigner() {
                     </Button>
                     <SaveConfigDialog />
                     <RunExecutionDialog disabled={!config?.id} />
+                    <Separator orientation="vertical" className="h-9 bg-border" />
+                    <Button
+                        variant={isExpandedView ? "secondary" : "outline"}
+                        size="sm"
+                        onClick={() => setIsExpandedView(!isExpandedView)}
+                        className={isExpandedView ? "border-primary text-primary" : "bg-card hover:border-primary/50"}
+                    >
+                        {isExpandedView ? <Minimize2 className="w-4 h-4 mr-2" /> : <Maximize2 className="w-4 h-4 mr-2" />}
+                        {isExpandedView ? "Collapse All" : "Expand All"}
+                    </Button>
 
                     {config?.id && (
                         <ShareToHubDialog
@@ -85,7 +96,7 @@ export default function OrchestratorDesigner() {
                         />
                     )}
                 </div>
-                <FlowCanvas />
+                <FlowCanvas expandAll={isExpandedView} />
             </div>
 
             {/* Right Sidebar: Config Panel (Conditional) */}

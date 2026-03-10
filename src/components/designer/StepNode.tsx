@@ -10,6 +10,8 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import type { Cardinality, StageContract, JsonSchemaProperty } from '@/lib/types';
 import { summarizeInputFields, summarizeOutputSchema, extractInputFields } from '@/lib/schemaUtils';
+import { Layers } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface StepNodeProps {
     data: {
@@ -22,6 +24,7 @@ interface StepNodeProps {
         cardinality?: Cardinality; // New: 1:1, 1:N, N:1
         prompt_template?: string;  // Prompt template content for input extraction
         contract?: StageContract;  // Input/Output contract
+        sub_orchestration_id?: string;
     };
     selected: boolean;
 }
@@ -71,6 +74,15 @@ export function StepNode({ data, selected }: StepNodeProps) {
     // Check if configured: either webhook (legacy) or task_type (new)
     const isConfigured = !!(data.webhookUrl || data.task_type);
     const cardinality = data.cardinality || '1:1';
+    const navigate = useNavigate();
+    const isSubOrch = data.task_type === 'sub_orchestration';
+
+    const handleDoubleClick = (e: React.MouseEvent) => {
+        if (isSubOrch && data.sub_orchestration_id) {
+            e.stopPropagation();
+            navigate(`/designer/${data.sub_orchestration_id}`);
+        }
+    };
 
     // Compute IN/OUT summary
     const ioSummary = useMemo(() => {
@@ -108,8 +120,13 @@ export function StepNode({ data, selected }: StepNodeProps) {
                         // Not Configured & Not Selected
                         !isConfigured && !selected && "border-border group-hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5",
                         // Selected (Primary Blue Override)
-                        selected && "border-primary shadow-lg shadow-primary/10"
-                    )}>
+                        // Selected (Primary Blue Override)
+                        selected && "border-primary shadow-lg shadow-primary/10",
+                        // Sub-orch specific style
+                        isSubOrch && "border-dashed"
+                    )}
+                        onDoubleClick={handleDoubleClick}
+                    >
                         <div className="flex items-center gap-3">
                             <StepBadge name={data.name} />
                             <div className="flex-1 min-w-0">
@@ -146,6 +163,16 @@ export function StepNode({ data, selected }: StepNodeProps) {
                             >
                                 {cardinality}
                             </Badge>
+                        )}
+
+                        {/* Sub-orchestration Indicator */}
+                        {isSubOrch && (
+                            <div
+                                className="absolute -top-2 -left-2 bg-primary text-primary-foreground rounded-full p-1 shadow-md border border-background"
+                                title="Nested Orchestration"
+                            >
+                                <Layers className="w-3 h-3" />
+                            </div>
                         )}
 
                         {/* Connection Handles - Visual only */}

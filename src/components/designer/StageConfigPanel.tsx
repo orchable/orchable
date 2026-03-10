@@ -17,6 +17,7 @@ import { Slider } from '@/components/ui/slider';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { extractInputFields, generateOutputFormatSection, createDefaultContract, injectOutputFormatIntoPrompt, mapContractToInputSchema, mapContractToOutputSchema, ensureGeminiSchema } from '@/lib/schemaUtils';
+import { detectCircularDependency, validateStageKeyUniqueness } from '@/services/stageService';
 import { OutputSchemaEditor } from '@/components/designer/OutputSchemaEditor';
 import { IconPicker } from '@/components/common/IconPicker';
 import { cn } from '@/lib/utils';
@@ -72,7 +73,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { PrePostProcessSection } from './PrePostProcessSection';
 import { ContractSection } from './ContractSection';
-import type { AIModel, Cardinality, PreProcessConfig, PostProcessConfig, StageContract, AIModelSetting, StepConfig, AISettings, DocumentAsset, ExportConfig } from '@/lib/types';
+import type { AIModel, Cardinality, PreProcessConfig, PostProcessConfig, StageContract, AIModelSetting, StepConfig, AISettings, DocumentAsset, ExportConfig, OrchestratorConfig, RegistryComponent } from '@/lib/types';
 import { PromptEditorDialog } from './PromptEditorDialog';
 import { ICONS } from '@/lib/icons';
 
@@ -135,6 +136,8 @@ const stageConfigSchema = z.object({
     thinkingLevel: z.string().optional(),
     thinkingBudget: z.number().optional(),
     auxiliary_inputs: z.array(z.string()).optional(),
+    sub_orchestration_id: z.string().optional(),
+    sub_orchestration_output_path: z.string().optional(),
     export_config: z.object({
         enabled: z.boolean(),
         destination: z.enum(['google_sheets', 'webhook', 'email']),
@@ -146,6 +149,14 @@ const stageConfigSchema = z.object({
             format: z.enum(['json', 'csv', 'tsv']).optional()
         })
     }).optional()
+}).superRefine((data, ctx) => {
+    if (data.task_type === 'sub_orchestration' && !data.sub_orchestration_id) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "A sub-orchestration must be selected.",
+            path: ["sub_orchestration_id"]
+        });
+    }
 });
 
 type StageFormData = z.infer<typeof stageConfigSchema>;
@@ -213,6 +224,11 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
     const navigate = useNavigate();
     const stage = nodes.find(n => n.id === stageId);
     const [activeTab, setActiveTab] = useState('basic');
+    const designerConfig = useDesignerStore(state => state.config);
+
+    // Validation state
+    const [validationError, setValidationError] = useState<string | null>(null);
+    const [isValidating, setIsValidating] = useState(false);
 
     // Prompt templates state
     const [templates, setTemplates] = useState<PromptTemplate[]>([]);
@@ -234,6 +250,10 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
     // AI Models state (dynamic from db)
     const [aiModels, setAiModels] = useState<AIModelSetting[]>([]);
     const [loadingAiModels, setLoadingAiModels] = useState(false);
+
+    // Sub-orchestrations list
+    const [orchestrations, setOrchestrations] = useState<OrchestratorConfig[]>([]);
+    const [loadingOrch, setLoadingOrch] = useState(false);
 
     // 🔨 Stage IO: Available Documents state
     const [availableDocuments, setAvailableDocuments] = useState<DocumentAsset[]>([]);
@@ -271,6 +291,8 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
             thinkingLevel: '',
             thinkingBudget: 0,
             auxiliary_inputs: [],
+            sub_orchestration_id: '',
+            sub_orchestration_output_path: 'result',
             export_config: {
                 enabled: false,
                 destination: 'webhook',
@@ -411,14 +433,72 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
         }
     }, []);
 
-    const watchedVariables = form.watch(['model_id', 'temperature', 'topP', 'topK', 'maxOutputTokens', 'generate_content_api', 'thinkingLevel', 'thinkingBudget']);
+    const fetchOrchestrations = useCallback(async () => {
+        setLoadingOrch(true);
+        try {
+            const list = await storage.adapter.listConfigs();
+            // Filter out the current one to prevent simple self-recursion (though detectCircularDependency handles it properly)
+            const filtered = list.filter(c => c.id !== nodes.find(n => n.id === stageId)?.data?.orchestrator_id);
+            setOrchestrations(filtered);
+        } catch (err) {
+            console.error('Failed to fetch orchestrations:', err);
+        } finally {
+            setLoadingOrch(false);
+        }
+    }, [nodes, stageId]);
+
+    const watchedVariables = form.watch(['model_id', 'temperature', 'topP', 'topK', 'maxOutputTokens', 'generate_content_api', 'thinkingLevel', 'thinkingBudget', 'task_type', 'sub_orchestration_id', 'stage_key']);
+    const taskType = watchedVariables[8];
+    const subOrchId = watchedVariables[9];
+    const stageKey = watchedVariables[10];
+    const designerId = designerConfig?.id;
+    const designerName = designerConfig?.name;
+
+    // Real-time validation
+    useEffect(() => {
+        const validateDesign = async () => {
+            const { task_type, sub_orchestration_id, stage_key } = form.getValues();
+            setValidationError(null);
+
+            // 1. Check for circular dependency
+            if (taskType === 'sub_orchestration' && subOrchId) {
+                setIsValidating(true);
+                try {
+                    // If we have a current config ID, check for circularity
+                    if (designerId) {
+                        const isCircular = await detectCircularDependency(subOrchId, new Set([designerId]));
+                        if (isCircular) {
+                            setValidationError(`Circular Dependency Detected: The selected orchestration eventually calls the current orchestration (${designerName}).`);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Validation error:', err);
+                } finally {
+                    setIsValidating(false);
+                }
+            }
+
+            // 2. Check for stage key collision in current flow
+            const currentKeys = nodes
+                .filter(n => n.id !== stageId)
+                .map(n => n.data?.stage_key || n.id);
+
+            if (stage_key && currentKeys.includes(stage_key)) {
+                setValidationError(`Stage Key Collision: The key "${stage_key}" is already used by another stage in this orchestration.`);
+            }
+        };
+
+        const timer = setTimeout(validateDesign, 500);
+        return () => clearTimeout(timer);
+    }, [taskType, subOrchId, stageKey, designerId, designerName, nodes, stageId, form]);
 
     useEffect(() => {
         fetchTemplates();
         fetchComponents();
         fetchAiModels();
         fetchDocuments();
-    }, [fetchTemplates, fetchComponents, fetchAiModels, fetchDocuments]);
+        fetchOrchestrations();
+    }, [fetchTemplates, fetchComponents, fetchAiModels, fetchDocuments, fetchOrchestrations]);
 
     // Prompt Editor State
     const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -626,6 +706,8 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                 thinkingLevel: (gc.thinkingLevel as string) || (ai as unknown as Record<string, string>).thinkingLevel || '',
                 thinkingBudget: (gc.thinkingBudget as number) ?? (ai as unknown as Record<string, number>).thinkingBudget ?? 0,
                 auxiliary_inputs: data.auxiliary_inputs || [],
+                sub_orchestration_id: data.sub_orchestration_id || '',
+                sub_orchestration_output_path: data.sub_orchestration_output_path || 'result',
                 export_config: data.export_config || {
                     enabled: false,
                     destination: 'webhook',
@@ -960,7 +1042,9 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
             contract: contract,
             requires_approval: data.requires_approval,
             custom_component_id: (data.custom_component_id === '_default' || !data.custom_component_id) ? null : data.custom_component_id,
-            return_along_with: data.return_along_with ? data.return_along_with.split(',').map(s => s.trim()).filter(Boolean) : []
+            return_along_with: data.return_along_with ? data.return_along_with.split(',').map(s => s.trim()).filter(Boolean) : [],
+            sub_orchestration_id: data.sub_orchestration_id,
+            sub_orchestration_output_path: data.sub_orchestration_output_path
         });
 
         // Also persist stage_config to Supabase prompt_templates table
@@ -996,6 +1080,8 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                     },
                     return_along_with: data.return_along_with ? data.return_along_with.split(',').map(s => s.trim()).filter(Boolean) : [],
                     auxiliary_inputs: data.auxiliary_inputs || [],
+                    sub_orchestration_id: data.sub_orchestration_id,
+                    sub_orchestration_output_path: data.sub_orchestration_output_path,
                     export_config: data.export_config as ExportConfig
                 };
 
@@ -1072,9 +1158,13 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                                 return <span className="truncate px-0.5">{name.slice(0, 3).toUpperCase()}</span>;
                             })()}
                         </span>
-                        Stage Configuration
                     </CardTitle>
                     <div className="flex items-center gap-1">
+                        {validationError && (
+                            <Badge variant="destructive" className="animate-pulse mr-2">
+                                Validation Error
+                            </Badge>
+                        )}
                         <Badge variant="outline" className="font-mono text-xs mr-1">
                             {form.watch('cardinality')}
                         </Badge>
@@ -1125,7 +1215,14 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
             </CardHeader>
             <CardContent>
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                        {validationError && (
+                            <Alert variant="destructive" className="mb-6">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertTitle>Design Error</AlertTitle>
+                                <AlertDescription>{validationError}</AlertDescription>
+                            </Alert>
+                        )}
                         <Tabs value={activeTab} onValueChange={setActiveTab}>
                             <TabsList className="grid w-full grid-cols-3 h-auto p-1 gap-1">
                                 <TabsTrigger value="basic" className="text-xs">
@@ -1209,14 +1306,74 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>Task Type</FormLabel>
-                                            <FormControl>
-                                                <Input {...field} placeholder="e.g. qgen_1_core" className="font-mono text-sm" />
-                                            </FormControl>
-                                            <FormDescription>Routing key for n8n workflow</FormDescription>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select task type" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="generic">Generic AI Task</SelectItem>
+                                                    <SelectItem value="reasoning">Reasoning / Thinking</SelectItem>
+                                                    <SelectItem value="sub_orchestration">Nested Orchestration (Sub-orch)</SelectItem>
+                                                    <SelectItem value="system">System Task</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <FormDescription>Determines the execution strategy</FormDescription>
                                             <FormMessage />
                                         </FormItem>
                                     )}
                                 />
+
+                                {form.watch('task_type') === 'sub_orchestration' && (
+                                    <div className="space-y-4 p-4 rounded-lg border bg-amber-50/30 border-amber-200/50 dark:bg-amber-950/10 dark:border-amber-900/30">
+                                        <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-400">
+                                            <Braces className="w-4 h-4" />
+                                            Sub-Orchestration Settings
+                                        </div>
+
+                                        <FormField
+                                            control={form.control}
+                                            name="sub_orchestration_id"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Select Orchestration</FormLabel>
+                                                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                                        <FormControl>
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder="Select an orchestration..." />
+                                                            </SelectTrigger>
+                                                        </FormControl>
+                                                        <SelectContent>
+                                                            {orchestrations.map(orch => (
+                                                                <SelectItem key={orch.id} value={orch.id}>
+                                                                    {orch.name}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <FormDescription>Choose existing orchestration to nest</FormDescription>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+
+                                        <FormField
+                                            control={form.control}
+                                            name="sub_orchestration_output_path"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Sub-orch Output Path</FormLabel>
+                                                    <FormControl>
+                                                        <Input {...field} placeholder="e.g. result or final_answer" className="font-mono text-sm" />
+                                                    </FormControl>
+                                                    <FormDescription>JSON path in sub-orch state to export back to parent</FormDescription>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
+                                )}
 
                                 <FormField
                                     control={form.control}
