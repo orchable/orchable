@@ -2,6 +2,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { configService } from "@/services/configService";
 import { OrchestratorConfig, StepConfig } from "@/lib/types";
 import { useTier } from "@/hooks/useTier";
+import { useDesignerStore } from "@/stores/designerStore";
+import { toast } from "sonner";
+import { syncStagesToPromptTemplates } from "@/services/stageService";
 
 export function useConfigs() {
 	const { tier } = useTier();
@@ -56,9 +59,7 @@ export function useDeleteConfig() {
 	});
 }
 
-import { useDesignerStore } from "@/stores/designerStore";
-import { toast } from "sonner";
-import { syncStagesToPromptTemplates } from "@/services/stageService";
+// (imports moved to top of file)
 
 export function useSaveOrchestrator() {
 	const {
@@ -102,13 +103,16 @@ export function useSaveOrchestrator() {
 				prompt_template_id: data.prompt_template_id || "",
 				cardinality: data.cardinality || "1:1",
 
-				// 1:N Split config (these were missing!)
+				// 1:N Split config
 				split_path: data.split_path || "",
 				split_mode: data.split_mode || "per_item",
+				batch_size: data.batch_size,
+				batch_grouping: data.batch_grouping || "global",
+				merge_path: data.merge_path || "output_data",
 				output_mapping: data.output_mapping || "result",
 				return_along_with: data.return_along_with || [],
 
-				// AI Settings (new)
+				// AI Settings
 				ai_settings: data.ai_settings || {
 					model_id: "gemini-2.0-flash",
 					generationConfig: {
@@ -129,18 +133,25 @@ export function useSaveOrchestrator() {
 				// Layout
 				position: node.position,
 
-				// Dependencies (computed from edges)
+				// Dependencies
 				dependsOn: edges
 					.filter((e) => e.target === node.id)
 					.map((e) => e.source)
 					.filter((sourceId) => sourceId !== "start"),
 
+				// Component & Sub-orchestration
+				custom_component_id: data.custom_component_id,
+				sub_orchestration_id: data.sub_orchestration_id,
+				sub_orchestration_output_path:
+					data.sub_orchestration_output_path,
+
 				// Pre/Post Process Hooks
 				pre_process: data.pre_process,
 				post_process: data.post_process,
 
-				// Input/Output Contract
+				// Input/Output Contract & Export
 				contract: data.contract,
+				export_config: data.export_config,
 
 				// Approval flow
 				requires_approval: data.requires_approval || false,
@@ -176,10 +187,8 @@ export function useSaveOrchestrator() {
 					id: currentConfig.id,
 					updates: payload,
 				});
-				toast.success("Configuration updated!");
 			} else {
 				savedConfig = await saveConfig.mutateAsync(payload);
-				toast.success("New configuration saved!");
 				loadConfig(savedConfig);
 			}
 
@@ -220,7 +229,9 @@ export function useSaveOrchestrator() {
 					"Synced templates:",
 					Object.fromEntries(templateIdMap),
 				);
-				toast.success(`Synced ${templateIdMap.size} stage templates!`);
+				toast.success(
+					`${currentConfig?.id ? "Updated" : "Saved"} configuration (${templateIdMap.size} stages synced)`,
+				);
 			} catch (syncError: unknown) {
 				console.error("Failed to sync stage templates:", syncError);
 				const errorMsg =
@@ -250,6 +261,6 @@ export function useSaveOrchestrator() {
 
 	return {
 		save,
-		isPending: saveConfig.isPending,
+		isPending: saveConfig.isPending || updateConfig.isPending,
 	};
 }
