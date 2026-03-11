@@ -175,8 +175,8 @@ function generateSql(bundle: Bundle, dirPath: string) {
       content = fs.readFileSync(pPath, 'utf8').replace(/'/g, "''");
     }
     console.log(`\n-- Prompt for ${s.stage_key}`);
-    console.log(`INSERT INTO public.prompt_templates (id, name, stage_key, content, ai_settings)`);
-    console.log(`VALUES ('${crypto.randomUUID()}', '${s.label}', '${s.stage_key}', '${content}', '${JSON.stringify(s.ai_settings)}'::jsonb);`);
+    console.log(`INSERT INTO public.prompt_templates (id, name, template, default_ai_settings, is_active, stage_key)`);
+    console.log(`VALUES ('${crypto.randomUUID()}', '${s.label}', '${content}', '${JSON.stringify(s.ai_settings)}'::jsonb, TRUE, '${s.stage_key}');`);
   });
   
   console.log(`${COLORS.CYAN}--- SQL OUTPUT END ---${COLORS.RESET}`);

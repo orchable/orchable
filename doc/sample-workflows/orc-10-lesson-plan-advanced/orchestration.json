@@ -1,0 +1,80 @@
+{
+  "_version": "1.0.0",
+  "orchestratorName": "ORC-10: Advanced Lesson Plan Generator",
+  "orchestratorDescription": "Tái tạo tài liệu giáo án chi tiết theo chuẩn định dạng 5E từ Khung Chương trình",
+  "steps": [
+    {
+      "id": "step_A",
+      "name": "Process 1",
+      "label": "Xác định Dự án Cuối",
+      "stage_key": "p1_final_product",
+      "task_type": "generation",
+      "cardinality": "1:1",
+      "dependsOn": [],
+      "ai_settings": {
+        "model_id": "gemini-1.5-pro-002",
+        "generationConfig": {
+          "temperature": 0.5,
+          "maxOutputTokens": 2048
+        }
+      }
+    },
+    {
+      "id": "step_B",
+      "name": "Process 2",
+      "label": "Sản phẩm Từng bài",
+      "stage_key": "p2_lesson_products",
+      "task_type": "generation",
+      "cardinality": "1:1",
+      "dependsOn": [
+        "step_A"
+      ],
+      "ai_settings": {
+        "model_id": "gemini-1.5-pro-002",
+        "generationConfig": {
+          "temperature": 0.5,
+          "maxOutputTokens": 4096
+        }
+      }
+    },
+    {
+      "id": "step_C",
+      "name": "Process 3",
+      "label": "Tóm tắt Học phần",
+      "stage_key": "p3_module_summary",
+      "task_type": "generation",
+      "cardinality": "1:1",
+      "dependsOn": [
+        "step_A",
+        "step_B"
+      ],
+      "ai_settings": {
+        "model_id": "gemini-1.5-pro-002",
+        "generationConfig": {
+          "temperature": 0.5,
+          "maxOutputTokens": 8192
+        }
+      }
+    },
+    {
+      "id": "step_D",
+      "name": "Process 4",
+      "label": "Giáo án Chi tiết (5E)",
+      "stage_key": "p4_detailed_lesson",
+      "task_type": "generation",
+      "cardinality": "1:1",
+      "dependsOn": [
+        "step_A",
+        "step_B",
+        "step_C"
+      ],
+      "ai_settings": {
+        "model_id": "gemini-1.5-pro-002",
+        "generationConfig": {
+          "temperature": 0.5,
+          "maxOutputTokens": 8192
+        }
+      }
+    }
+  ]
+}

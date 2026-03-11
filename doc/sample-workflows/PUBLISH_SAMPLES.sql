@@ -339,3 +339,281 @@ $P$, '{"model_id": "gemini-flash-latest"}', TRUE, v_user_id, 'c0900000-0000-0000
 
     RAISE NOTICE 'Sample workflows published successfully for user %', v_user_id;
 END $$;
+-- Config: ORC-10: Advanced Lesson Plan Generator
+INSERT INTO public.lab_orchestrator_configs (id, name, description, steps, is_public, created_at, updated_at)
+VALUES ('bd5ac273-94a8-485e-9a6e-a3947ce80458', 'ORC-10: Advanced Lesson Plan Generator', 'Tái tạo tài liệu giáo án chi tiết theo chuẩn định dạng 5E từ Khung Chương trình', '[{"id":"step_A","name":"Process 1","label":"Xác định Dự án Cuối","stage_key":"p1_final_product","task_type":"generation","cardinality":"1:1","dependsOn":[],"prompt_template_id":"2af809e5-6815-4d56-b8b8-173a94bd006c","ai_settings":{"model_id":"gemini-1.5-pro-002","generationConfig":{"temperature":0.5,"maxOutputTokens":2048}}},{"id":"step_B","name":"Process 2","label":"Sản phẩm Từng bài","stage_key":"p2_lesson_products","task_type":"generation","cardinality":"1:1","dependsOn":["step_A"],"prompt_template_id":"2af809e5-6815-4d56-b8b8-173a94bd006d","ai_settings":{"model_id":"gemini-1.5-pro-002","generationConfig":{"temperature":0.5,"maxOutputTokens":4096}}},{"id":"step_C","name":"Process 3","label":"Tóm tắt Học phần","stage_key":"p3_module_summary","task_type":"generation","cardinality":"1:1","dependsOn":["step_A","step_B"],"prompt_template_id":"2af809e5-6815-4d56-b8b8-173a94bd006e","ai_settings":{"model_id":"gemini-1.5-pro-002","generationConfig":{"temperature":0.5,"maxOutputTokens":8192}}},{"id":"step_D","name":"Process 4","label":"Giáo án Chi tiết (5E)","stage_key":"p4_detailed_lesson","task_type":"generation","cardinality":"1:1","dependsOn":["step_A","step_B","step_C"],"prompt_template_id":"2af809e5-6815-4d56-b8b8-173a94bd006f","ai_settings":{"model_id":"gemini-1.5-pro-002","generationConfig":{"temperature":0.5,"maxOutputTokens":8192}}}]'::jsonb, TRUE, NOW(), NOW());
+
+-- Prompt for p1_final_product
+INSERT INTO public.prompt_templates (id, name, template, default_ai_settings, is_active, stage_key)
+VALUES ('2af809e5-6815-4d56-b8b8-173a94bd006c', 'Xác định Dự án Cuối', 'Bạn là chuyên gia thiết kế chương trình IoT/STEM cho học sinh 15–18 tuổi.
+
+## MISSION
+Xác định và mô tả chi tiết Sản phẩm Cuối Học phần — một dự án lớn, tích hợp mà học sinh hoàn thành để kết thúc học phần, dựa trên bảng khung chương trình được cung cấp.
+
+## INPUT DATA
+<curriculum_table>
+%%input_data%%
+</curriculum_table>
+
+## INSTRUCTIONS
+Nhiệm vụ của bạn: Phân tích toàn bộ bảng khung chương trình trên và xác định Sản phẩm Cuối Học phần (một dự án tích hợp). 
+
+**Lưu ý khi thực hiện:**
+- Sản phẩm cuối phải tích hợp kiến thức từ ÍT NHẤT 70% số bài trong học phần.
+- Ưu tiên tính thực tế: dự án giải quyết một vấn đề có trong đời sống thực.
+- Tham khảo các "Sản phẩm bài học" để đảm bảo sản phẩm cuối là sự tích hợp tự nhiên của các sản phẩm nhỏ.
+- Nếu input đã chỉ rõ tên dự án (ví dụ: "Trạm Thời Tiết"), giữ nguyên và bổ sung chi tiết.
+
+## VALIDATION
+- [ ] Dự án cuối có tên cụ thể chưa?
+- [ ] Có liệt kê phần cứng/phần mềm rõ ràng chưa?
+- [ ] Luồng hoạt động có logic từ đầu đến cuối chưa?
+- [ ] Kiến thức tích hợp có map được về các bài cụ thể chưa?
+
+## OUTPUT FORMAT
+Hãy output tiếng Việt (giữ nguyên thuật ngữ kỹ thuật tiếng Anh), định dạng Markdown, theo ĐÚNG cấu trúc sau (dài khoảng 400-600 từ):
+
+---
+
+## Tổng hợp Sản phẩm / Dự án Cuối Học phần
+
+### 1. Tên dự án cuối
+[Tên dự án ngắn gọn, hấp dẫn]
+
+### 2. Mô tả tổng quan
+[2–4 câu mô tả dự án, nêu rõ: dự án tạo ra cái gì, hoạt động như thế nào, phục vụ mục đích thực tế gì]
+
+### 3. Các thành phần của hệ thống
+[Liệt kê từng thành phần phần cứng và phần mềm, vai trò của từng thành phần]
+
+### 4. Luồng hoạt động (Data Flow)
+[Mô tả từng bước: dữ liệu/tín hiệu đi từ đâu → qua gì → đến đâu → hiển thị/hành động gì]
+
+### 5. Kiến thức học phần được tích hợp
+[Map từng bài học (tên bài + số bài) sang kiến thức/kỹ năng cụ thể được dùng trong dự án]
+
+### 6. Sản phẩm đầu ra mong đợi (Demo Day)
+[Mô tả cụ thể cảnh demo: HS làm gì → hệ thống phản hồi thế nào → người quan sát thấy gì]
+
+### 7. Outcome tổng thể học phần
+[Liệt kê 6–10 kỹ năng học sinh có thể làm được sau khi hoàn thành dự án]
+', '{"model_id":"gemini-1.5-pro-002","generationConfig":{"temperature":0.5,"maxOutputTokens":2048}}'::jsonb, TRUE, 'p1_final_product');
+
+-- Prompt for p2_lesson_products
+INSERT INTO public.prompt_templates (id, name, template, default_ai_settings, is_active, stage_key)
+VALUES ('1706a890-e44b-4884-bffb-c2da7cdf3bbf', 'Sản phẩm Từng bài', 'Bạn là chuyên gia thiết kế chương trình IoT/STEM cho học sinh 15–18 tuổi.
+
+## MISSION
+Xác định Sản phẩm cụ thể của TỪNG bài học sao cho các sản phẩm nhỏ tích lũy dần và hội tụ về sản phẩm cuối học phần.
+
+## INPUT DATA
+Khung chương trình:
+<curriculum_table>
+%%input_data%%
+</curriculum_table>
+
+Sản phẩm cuối học phần (đã xác định):
+<final_product>
+{{p1_final_product}}
+</final_product>
+
+## INSTRUCTIONS
+Nhiệm vụ: Với mỗi bài học trong khung chương trình, xác định **Sản phẩm cụ thể** — thứ học sinh tạo ra được, chạy được, quan sát được vào cuối buổi học đó.
+
+**Nguyên tắc thiết kế sản phẩm từng bài:**
+1. **Tích lũy:** Sản phẩm bài N phải kế thừa / mở rộng từ sản phẩm bài N-1.
+2. **Hội tụ:** Đến bài cuối dự án, tất cả sản phẩm nhỏ hội tụ vào sản phẩm cuối.
+3. **Quan sát được:** Học sinh phải nhìn thấy hoặc đo được kết quả (đèn sáng, serial monitor, dashboard...).
+4. **Vừa sức:** Sản phẩm phải hoàn thành được trong thời lượng buổi học.
+5. **Cụ thể:** Nêu rõ INPUT nào → PROCESSING gì → OUTPUT gì.
+
+## VALIDATION
+- [ ] Tất cả các bài đều có sản phẩm chưa?
+- [ ] Chuỗi sản phẩm có tính tích lũy chưa?
+- [ ] Sản phẩm bài cuối có phải là sản phẩm cuối học phần không?
+- [ ] Mỗi sản phẩm có quan sát được không?
+
+## OUTPUT FORMAT
+Hãy output tiếng Việt (giữ nguyên thuật ngữ kỹ thuật tiếng Anh), định dạng Markdown, theo ĐÚNG cấu trúc sau CHO TỪNG BÀI:
+
+---
+
+### Bài [X]: [Tên bài]
+
+**Sản phẩm:** [Tên sản phẩm ngắn gọn]
+
+**Mô tả hoạt động:**
+[2–3 câu: mô tả hệ thống làm gì, quan sát được gì, thể hiện kiến thức gì của bài]
+
+**Kế thừa từ bài trước:** [Thành phần/code nào được giữ lại từ bài trước — hoặc "Bài đầu tiên" nếu là bài 1]
+
+**Đóng góp cho sản phẩm cuối:** [Thành phần/kỹ năng này sẽ được dùng ở đâu trong dự án cuối]
+
+---
+[Lặp lại cho tất cả các bài trong học phần]
+', '{"model_id":"gemini-1.5-pro-002","generationConfig":{"temperature":0.5,"maxOutputTokens":4096}}'::jsonb, TRUE, 'p2_lesson_products');
+
+-- Prompt for p3_module_summary
+INSERT INTO public.prompt_templates (id, name, template, default_ai_settings, is_active, stage_key)
+VALUES ('5a46fe9c-b38f-4d85-b978-046a1a41521e', 'Tóm tắt Học phần', 'Bạn là chuyên gia thiết kế chương trình IoT/STEM cho học sinh 15–18 tuổi.
+
+## MISSION
+Tạo Tóm tắt Học phần cho từng bài bao gồm Mục tiêu, Chi tiết Nội dung, Sản phẩm cụ thể và Outcome.
+
+## INPUT DATA
+Khung chương trình và Learning Objectives:
+<learning_objectives_json>
+%%input_data%%
+</learning_objectives_json>
+
+Sản phẩm cuối học phần:
+<final_product>
+{{p1_final_product}}
+</final_product>
+
+Sản phẩm từng bài:
+<lesson_products>
+{{p2_lesson_products}}
+</lesson_products>
+
+## INSTRUCTIONS
+Nhiệm vụ: Với MỖI BÀI HỌC, viết phần TÓM TẮT theo đúng 4 mục của định dạng mẫu.
+
+**Hướng dẫn điền từng mục:**
+- **Mục tiêu chính:** Dịch CIO/SIO thành câu tiếng Việt (bắt đầu bằng động từ hành động).
+- **Chi tiết hóa nội dung:** Mỗi SIO → 1 chủ đề con với giải thích + code mẫu.
+- **Sản phẩm/Kết quả cụ thể:** Lấy từ Sản phẩm từng bài, chia nhỏ thành kết quả quan sát được.
+- **Outcome:** Viết lại mục tiêu chính dưới dạng "HS có thể làm được...".
+- **Lưu ý:** Xử lý kỹ bài ôn tập, dự án. Chèn code block đúng ngôn ngữ.
+
+## VALIDATION
+- [ ] Tất cả bài đều có đủ 4 mục chưa?
+- [ ] Chi tiết hóa có code mẫu ở những bài lập trình chưa?
+- [ ] Mục tiêu chính và Outcome có tương ứng với nhau không?
+- [ ] Sản phẩm/Kết quả có cụ thể không?
+
+## OUTPUT FORMAT
+Hãy output tiếng Việt, định dạng Markdown, theo ĐÚNG cấu trúc sau CHO TỪNG BÀI:
+
+---
+
+### **Buổi [X.Y]: [Tên bài học]**
+
+* Mục tiêu chính:
+  * [Mục tiêu 1 — bắt đầu bằng động từ hành động: Hiểu / Biết / Lập trình...]
+  * [...] 
+
+* Chi tiết hóa nội dung:
+  * [Chủ đề con 1]:
+    * [Giải thích khái niệm]
+    * [Code mẫu nếu cần — code block]
+    * [Lưu ý kỹ thuật]
+  * [...]
+
+* Sản phẩm/Kết quả cụ thể:
+  * [Kết quả quan sát được 1]
+  * [...]
+
+* Outcome (Học sinh có thể làm được):
+  * [Kỹ năng 1 — bắt đầu bằng động từ: Giải thích / Khởi tạo / Viết...]
+  * [...]
+
+---
+[Lặp lại cho tất cả các bài]
+', '{"model_id":"gemini-1.5-pro-002","generationConfig":{"temperature":0.5,"maxOutputTokens":8192}}'::jsonb, TRUE, 'p3_module_summary');
+
+-- Prompt for p4_detailed_lesson
+INSERT INTO public.prompt_templates (id, name, template, default_ai_settings, is_active, stage_key)
+VALUES ('269410e8-a7fa-412e-bf79-a8b9a9050e16', 'Giáo án Chi tiết (5E)', 'Bạn là chuyên gia thiết kế giáo án IoT/STEM cho học sinh 15–18 tuổi.
+
+## MISSION
+Tạo giáo án chi tiết đầy đủ cho tất cả các bài học dựa trên Tóm tắt Học phần, theo mô hình 5E.
+
+## INPUT DATA
+Thông tin học phần:
+<curriculum_table>
+%%input_data%%
+</curriculum_table>
+
+Tóm tắt học phần (cho tất cả các bài):
+<module_summary>
+{{p3_module_summary}}
+</module_summary>
+
+Sản phẩm từng bài:
+<lesson_products>
+{{p2_lesson_products}}
+</lesson_products>
+
+Sản phẩm cuối học phần:
+<final_product>
+{{p1_final_product}}
+</final_product>
+
+## INSTRUCTIONS
+Nhiệm vụ: Viết giáo án chi tiết đầy đủ cho CÁC BUỔI HỌC theo đúng cấu trúc mô hình 5E.
+
+**HƯỚNG DẪN CHI TIẾT CHO TỪNG GIAI ĐOẠN 5E:**
+- **Engage (~10%):** Dùng câu hỏi từ vấn đề thực tế, GV demo ngắn, đặt mục tiêu.
+- **Explore (~40%):** Chia thành 2-3 hoạt động nhỏ, HS tự khám phá trước, GV hỗ trợ.
+- **Explain (~20%):** GV giải thích SAU KHI HS đã khám phá, tập trung vào bản chất.
+- **Elaborate (~20%):** Yêu cầu nâng cao, mở rộng trong phạm vi bài.
+- **Evaluate (~10%):** Kiểm tra tại chỗ, hỏi nhanh có đáp án, giới thiệu bài tiếp theo.
+
+## VALIDATION
+- [ ] Tài liệu có phần đọc kỹ thuật và code mẫu không?
+- [ ] Tiến trình 5E có chia phút rõ ràng không?
+- [ ] Explore có để HS tự khám phá trước không?
+- [ ] Evaluate có kiểm tra tại chỗ không?
+
+## OUTPUT FORMAT
+Hãy output format Markdown cho từng bài học theo ĐÚNG cấu trúc sau (Lặp lại cho tất cả các bài):
+
+---
+
+## **Giáo án Buổi học [X.Y]: [Tên bài]**
+
+* Học phần: [Tên học phần]
+* Dự án: [Mô tả ngắn liên quan đến dự án cuối]
+* Mục tiêu buổi học:
+  * [Các mục tiêu]
+* Chuẩn bị:
+  * GV: [...]
+  * HS: [...]
+* Tài liệu đọc/hướng dẫn: "[Tên tài liệu]"
+
+---
+
+Tài liệu đọc/hướng dẫn: "[Tên tài liệu]"
+
+1. [Phần giới thiệu ngữ cảnh / Vấn đề thực tế]
+2. [Khái niệm/Lý thuyết chính]
+3. [Hướng dẫn kỹ thuật từng bước - nhắc lại code mẫu, lưu ý]
+Thực Hành: [Các bước thực hành]
+
+---
+
+Tiến trình bài học (Mô hình 5E)
+*(Phân bổ thời gian: Engage 10%, Explore 40%, Explain 20%, Elaborate 20%, Evaluate 10%)*
+
+1\. Engage (Gắn kết — [X] phút)
+* Hoạt động: [...]
+* Tóm tắt mục tiêu.
+
+2\. Explore (Khám phá — [X] phút)
+* Hoạt động 1: [...]
+* Hoạt động 2: [...]
+
+3\. Explain (Giải thích — [X] phút)
+* Hoạt động: Giải thích khái niệm, thảo luận.
+
+4\. Elaborate (Mở rộng/Áp dụng — [X] phút)
+* Hoạt động: Thử thách mở rộng.
+
+5\. Evaluate (Đánh giá — [X] phút)
+* Hoạt động: Kiểm tra tại chỗ, Câu hỏi nhanh.
+* Kết thúc buổi học: Tóm tắt, giới thiệu buổi tiếp theo.
+
+---
+', '{"model_id":"gemini-1.5-pro-002","generationConfig":{"temperature":0.5,"maxOutputTokens":8192}}'::jsonb, TRUE, 'p4_detailed_lesson');
+

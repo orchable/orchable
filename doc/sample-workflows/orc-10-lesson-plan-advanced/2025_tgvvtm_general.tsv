@@ -1,0 +1,71 @@
+ Học phần	Công cụ học tập	Bài	Thời lượng	Tiêu đề	Chủ đề bài học	Vấn đề	Mục tiêu bài học & Kiến thức cần đạt	Sản phẩm bài học	Ảnh minh hoạ sản phẩm
+HỌC PHẦN 9: Python cơ bản & Điều khiển Thiết bị ngoại vi	Raspberry Pi Pico W, Thonny IDE, MicroPython	1	90 phút	LÀM QUEN VỚI PYTHON	Tương tác cơ bản với máy tính bằng ngôn ngữ lập trình.	Làm sao để ra lệnh cho máy tính thực hiện các phép tính tự động?	"Viết và chạy chương trình đầu tiên:
+- Thonny IDE, REPL, print().
+Nhận dữ liệu từ người dùng:
+- Hàm input(), lưu vào Biến (Variable).
+Thực hiện tính toán và xử lý kiểu dữ liệu:
+- Toán tử +,-,*,/, hàm int() để chuyển đổi Kiểu dữ liệu (Data Type) từ chuỗi sang số."	"Máy tính bỏ túi V.1:
+Chương trình yêu cầu người dùng nhập 2 số, sau đó tính toán và in ra tổng, hiệu, tích, thương của chúng."	
+HỌC PHẦN 9: Python cơ bản & Điều khiển Thiết bị ngoại vi	Raspberry Pi Pico W, Thonny IDE, MicroPython	2	90 phút	CẤU TRÚC ĐIỀU KHIỂN	Lập trình luồng điều khiển: Giúp chương trình ra quyết định và lặp lại.	Làm sao để chương trình thông minh hơn, có thể tự ra quyết định và lặp lại công việc một cách hiệu quả?	"Giúp chương trình ra quyết định:
+- Cấu trúc điều kiện if, elif, else, Toán tử so sánh >, <, ==.
+Lặp lại công việc với số lần biết trước:<br>- Vòng lặp for kết hợp với range().
+Lặp lại cho đến khi một điều kiện được thỏa mãn:
+- Vòng lặp while, lệnh break."	"Trò chơi Đoán số & Máy in Bảng cửu chương
+1) Game đoán số với gợi ý “lớn hơn/nhỏ hơn”.
+2) Máy in bảng cửu chương của một số bất kỳ do người dùng nhập."	
+HỌC PHẦN 9: Python cơ bản & Điều khiển Thiết bị ngoại vi	Raspberry Pi Pico W, Thonny IDE, MicroPython	3	90 phút	CHUỖI VÀ DANH SÁCH	Làm việc với dữ liệu văn bản và các tập hợp dữ liệu.	Làm thế nào để quản lý một nhóm dữ liệu (ví dụ: danh sách học sinh) thay vì chỉ lưu từng giá trị đơn lẻ trong mỗi biến?	"Tạo và lưu trữ một nhóm dữ liệu:
+- Kiểu dữ liệu list (danh sách), cách khởi tạo [].
+Thao tác với danh sách:
+- Thêm phần tử bằng list.append().
+Truy cập và hiển thị từng mục trong danh sách:
+- Dùng vòng lặp for để duyệt qua từng phần tử trong list."	"Sổ liên lạc V.1:
+Chương trình cho phép người dùng lặp đi lặp lại việc “Thêm tên mới” vào một danh sách, và có thể “Hiển thị toàn bộ danh sách” bất cứ lúc nào."	
+HỌC PHẦN 9: Python cơ bản & Điều khiển Thiết bị ngoại vi	Raspberry Pi Pico W, Thonny IDE, MicroPython	4	90 phút	ÔN TẬP 1	Củng cố kiến thức và kỹ năng lập trình Python cơ bản.	Làm sao để đảm bảo mọi người đều nắm vững kiến thức nền tảng về Python trước khi chuyển sang phần cứng phức tạp?	"Củng cố kiến thức đã học:
+- Ôn tập toàn bộ kiến thức từ Bài 1-3: Biến, print, input, if/else, for, while, list.
+Rèn luyện kỹ năng gỡ lỗi và tự phát triển tính năng:
+- Áp dụng kiến thức đã học để giải quyết vấn đề hoặc thêm chức năng mới.
+Kiểm tra, đánh giá mức độ hiểu bài:
+- Trả lời các câu hỏi Quiz bao quát các khái niệm đã học."	"Hoàn thiện các dự án Mini & Quiz:
+Hoàn thành các sản phẩm Bài 1-3, có thể nâng cấp. Làm 15 câu hỏi Quiz."	
+HỌC PHẦN 9: Python cơ bản & Điều khiển Thiết bị ngoại vi	Raspberry Pi Pico W, Thonny IDE, MicroPython	5	90 phút	LÀM QUEN VỚI RASPBERRY PI PICO W	Giao tiếp phần cứng đầu tiên: Ra lệnh cho vi điều khiển.	Làm sao để dùng code Python điều khiển một thiết bị vật lý ở thế giới bên ngoài?	"Điều khiển một chân GPIO ở chế độ đầu ra:
+- Import module machine. Sử dụng machine.Pin với tham số Pin.OUT.
+Điều khiển trạng thái bật/tắt của đèn:
+- Gọi phương thức Pin.on() và Pin.off().
+Tạo độ trễ và vòng lặp vô hạn:
+- Import module utime. Dùng utime.sleep() và vòng lặp while True:."	"Trái tim Pico:
+Chương trình làm đèn LED có sẵn trên bo mạch Pico nhấp nháy liên tục, mô phỏng nhịp đập của trái tim."	
+HỌC PHẦN 9: Python cơ bản & Điều khiển Thiết bị ngoại vi	Raspberry Pi Pico W, Thonny IDE, MicroPython	6	90 phút	ĐIỀU KHIỂN THIẾT BỊ - P1	Tương tác hai chiều: Đọc tín hiệu đầu vào để điều khiển đầu ra.	Làm sao để một chương trình có thể đọc được trạng thái của một công tắc vật lý và hành động dựa trên trạng thái đó?	"Đọc tín hiệu ổn định từ nút nhấn:
+- Cấu hình Pin.IN với Pin.PULL_UP để tránh tín hiệu “trôi nổi”.
+Liên tục kiểm tra trạng thái nút nhấn:
+- Gọi phương thức Pin.value() trong vòng lặp while True:
+Điều khiển đèn LED dựa trên trạng thái nút nhấn:
+- Sử dụng if/else để phân tích giá trị từ Pin.value() và điều khiển đèn."	"Công tắc đèn thông minh V.1:
+Một mạch gồm LED và nút nhấn. Khi người dùng nhấn giữ nút, đèn sáng. Thả nút ra, đèn tắt."	
+HỌC PHẦN 9: Python cơ bản & Điều khiển Thiết bị ngoại vi	Raspberry Pi Pico W, Thonny IDE, MicroPython	7	90 phút	ĐIỀU KHIỂN THIẾT BỊ - P2	Điều khiển tương tự (Analog-like) bằng tín hiệu số.	Làm thế nào để điều khiển thiết bị ở nhiều mức khác nhau (sáng mờ, quay chậm), thay vì chỉ Bật/Tắt?	"Hiểu và sử dụng PWM:
+- Khái niệm PWM (Điều chế độ rộng xung). Sử dụng lớp machine.PWM.
+Điều khiển độ sáng của đèn LED:
+- Sử dụng phương thức PWM.duty_u16() để đặt độ sáng.
+Tạo hiệu ứng mượt mà:
+- Dùng vòng lặp for và range() để thay đổi giá trị duty_u16 một cách tuần tự."	"Đèn ngủ hiệu ứng Hơi thở:
+Một đèn LED tự động sáng lên từ từ rồi lại mờ đi từ từ, lặp đi lặp lại."	
+HỌC PHẦN 9: Python cơ bản & Điều khiển Thiết bị ngoại vi	Raspberry Pi Pico W, Thonny IDE, MicroPython	8	90 phút	CHIẾU SÁNG TỰ ĐỘNG & ĐO KHOẢNG CÁCH	Đọc tín hiệu Analog và các giao thức cảm biến phức tạp hơn.	Làm sao để thiết bị ‘cảm nhận’ được các yếu tố môi trường phức tạp hơn như độ sáng và khoảng cách?	"Đọc giá trị từ cảm biến analog (LDR):
+- Lắp Mạch chia áp. Dùng machine.ADC và ADC.read_u16().
+Sử dụng cảm biến siêu âm (HC-SR04):
+- Hiểu nguyên lý Trigger/Echo. Sử dụng hàm có sẵn để nhận về khoảng cách (cm).
+Ra quyết định dựa trên dữ liệu cảm biến:
+- Dùng if/else để bật/tắt đèn hoặc còi báo."	"Đèn tự động & Cảnh báo khoảng cách:
+1) Đèn tự động bật khi trời tối (dùng LDR).
+2) Còi báo kêu khi vật cản ở quá gần (dùng HC-SR04)."	
+HỌC PHẦN 9: Python cơ bản & Điều khiển Thiết bị ngoại vi	Raspberry Pi Pico W, Thonny IDE, MicroPython	9	90 phút	ÔN TẬP 2	Củng cố kiến thức và kỹ năng điều khiển phần cứng với MicroPython.	Làm sao để đảm bảo mọi người đều có thể điều khiển các loại cảm biến và linh kiện khác nhau trước khi làm dự án cuối kỳ?	"Củng cố kiến thức điều khiển phần cứng:
+- Ôn tập Pin.IN, Pin.OUT, PWM, ADC, cách dùng cảm biến.
+Rèn luyện kỹ năng tích hợp hệ thống:
+- Kết hợp logic từ nhiều cảm biến để tạo ra một hệ thống thông minh hơn.
+Kiểm tra, đánh giá mức độ hiểu bài:
+- Trả lời Quiz về các lớp machine và các khái niệm điện tử liên quan."	"Hoàn thiện hệ thống tự động & Quiz:
+Hoàn thành các sản phẩm Bài 5-8, có thể tích hợp. Làm 15 câu hỏi Quiz."	
+HỌC PHẦN 9: Python cơ bản & Điều khiển Thiết bị ngoại vi	Raspberry Pi Pico W, Thonny IDE, MicroPython	10	90 phút	DỰ ÁN CUỐI HỌC PHẦN - Ý TƯỞNG VÀ THỰC HIỆN	Tích hợp kiến thức và kỹ năng.	Làm sao để tích hợp nhiều chức năng (đo nhiều cảm biến, điều khiển nhiều đầu ra) vào một hệ thống duy nhất một cách hài hòa?	Vận dụng toàn bộ kiến thức đã học trong học phần để lên ý tưởng, thiết kế, lập trình, lắp ráp và trình bày một sản phẩm hoàn chỉnh, giải quyết một vấn đề thực tế nhỏ.	"Trạm Thời Tiết và Cảnh Báo An Toàn Mini:
+Thiết bị đo nhiệt độ, độ ẩm, ánh sáng và khoảng cách. Hiển thị trạng thái bằng LED đa năng và cảnh báo bằng còi."	
+HỌC PHẦN 9: Python cơ bản & Điều khiển Thiết bị ngoại vi	Raspberry Pi Pico W, Thonny IDE, MicroPython	11	90 phút	DỰ ÁN CUỐI HỌC PHẦN - HOÀN THIỆN	Tích hợp kiến thức và kỹ năng.	Làm sao để tích hợp nhiều chức năng (đo nhiều cảm biến, điều khiển nhiều đầu ra) vào một hệ thống duy nhất một cách hài hòa?	Vận dụng toàn bộ kiến thức đã học trong học phần để lên ý tưởng, thiết kế, lập trình, lắp ráp và trình bày một sản phẩm hoàn chỉnh, giải quyết một vấn đề thực tế nhỏ.	"Trạm Thời Tiết và Cảnh Báo An Toàn Mini:
+Thiết bị đo nhiệt độ, độ ẩm, ánh sáng và khoảng cách. Hiển thị trạng thái bằng LED đa năng và cảnh báo bằng còi."	
+HỌC PHẦN 9: Python cơ bản & Điều khiển Thiết bị ngoại vi	Raspberry Pi Pico W, Thonny IDE, MicroPython	12	90 phút	DỰ ÁN CUỐI HỌC PHẦN - TRÌNH BÀY	Tích hợp kiến thức và kỹ năng.	Làm sao để tích hợp nhiều chức năng (đo nhiều cảm biến, điều khiển nhiều đầu ra) vào một hệ thống duy nhất một cách hài hòa?	Vận dụng toàn bộ kiến thức đã học trong học phần để lên ý tưởng, thiết kế, lập trình, lắp ráp và trình bày một sản phẩm hoàn chỉnh, giải quyết một vấn đề thực tế nhỏ.	"Trạm Thời Tiết và Cảnh Báo An Toàn Mini:
+Thiết bị đo nhiệt độ, độ ẩm, ánh sáng và khoảng cách. Hiển thị trạng thái bằng LED đa năng và cảnh báo bằng còi."	
