@@ -1,0 +1,60 @@
+{
+  "_version": "1.0.0",
+  "orchestratorName": "ORC-01: Auto Quiz Generator",
+  "orchestratorDescription": "End-to-end pipeline to convert syllabus concepts into multiple choice quizzes.",
+  "steps": [
+    {
+      "id": "step_A",
+      "name": "A",
+      "label": "Concept Extractor",
+      "stage_key": "extractor",
+      "task_type": "extraction",
+      "cardinality": "1:1",
+      "dependsOn": [],
+      "ai_settings": {
+        "model_id": "gemini-1.5-flash-002",
+        "generationConfig": {
+          "temperature": 0.1,
+          "maxOutputTokens": 2048
+        }
+      },
+      "position": { "x": 100, "y": 100 }
+    },
+    {
+      "id": "step_B",
+      "name": "B",
+      "label": "Quiz Writer",
+      "stage_key": "writer",
+      "task_type": "generation",
+      "cardinality": "1:N",
+      "split_path": "concepts",
+      "split_mode": "per_item",
+      "dependsOn": ["step_A"],
+      "ai_settings": {
+        "model_id": "gemini-1.5-pro-002",
+        "generationConfig": {
+          "temperature": 0.7,
+          "maxOutputTokens": 4096
+        }
+      },
+      "position": { "x": 100, "y": 300 }
+    },
+    {
+      "id": "step_C",
+      "name": "C",
+      "label": "Answer Key Optimizer",
+      "stage_key": "optimizer",
+      "task_type": "optimization",
+      "cardinality": "1:1",
+      "dependsOn": ["step_B"],
+      "ai_settings": {
+        "model_id": "gemini-1.5-flash-002",
+        "generationConfig": {
+          "temperature": 0.2,
+          "maxOutputTokens": 1024
+        }
+      },
+      "position": { "x": 100, "y": 500 }
+    }
+  ]
+}

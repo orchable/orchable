@@ -353,10 +353,9 @@ export const useDesignerStore = create<DesignerState>()(
 				// Reconstruct edges
 				const edges: Edge[] = [];
 				config.steps.forEach((step) => {
-					// Config doesn't strictly store "start -> first step" connection,
-					// but we can infer or leave it disconnected.
-					// For now, let's just load the steps and dependencies.
-					step.dependsOn.forEach((depId) => {
+					// Create edges based on dependencies
+					const dependsOn = step.dependsOn || []; // Ensure dependsOn exists
+					dependsOn.forEach((depId) => {
 						edges.push({
 							id: `e_${depId}-${step.id}`,
 							source: depId,
@@ -367,7 +366,7 @@ export const useDesignerStore = create<DesignerState>()(
 					// If a step has NO dependencies, we could optionally connect it to 'start'
 					// to make the graph look connected, but strictly speaking 'dependsOn' is empty.
 					// Let's connect roots to start for visual flow.
-					if (step.dependsOn.length === 0) {
+					if (dependsOn.length === 0) { // Use the checked dependsOn
 						edges.push({
 							id: `e_start-${step.id}`,
 							source: "start",

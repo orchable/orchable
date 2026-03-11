@@ -193,8 +193,8 @@ $P$, '{"model_id": "gemini-flash-latest", "temperature": 0.3}', TRUE, v_user_id,
     -- Orchestration
     INSERT INTO public.lab_orchestrator_configs (id, name, description, steps, created_by, is_public)
     VALUES ('00200000-0000-0000-0000-000000000002', 'ORC-02: Smart Lesson Plan Builder', 'Multi-stage education pipeline: Analysis -> Design -> Validation', 
-    '[{"id":"step_A","name":"A","label":"Pedagogical Mapper","stage_key":"mapper","task_type":"pedagogical_mapping","prompt_template_id":"p0200000-0000-0000-0000-00000000000a","cardinality":"1:1","ai_settings":{"model_id":"gemini-pro-latest"}},{"id":"step_B","name":"B","label":"Activity Designer","stage_key":"designer","task_type":"activity_design","prompt_template_id":"p0200000-0000-0000-0000-00000000000b","cardinality":"1:N","split_path":"output_data","split_mode":"per_item","dependsOn":["step_A"]},{"id":"step_C","name":"C","label":"Coherence Validator","stage_key":"validator","task_type":"lesson_qc","prompt_template_id":"p0200000-0000-0000-0000-00000000000c","cardinality":"N:1","dependsOn":["step_B"]}]'::jsonb, 
-    v_user_id, FALSE) ON CONFLICT (id) DO UPDATE SET steps = EXCLUDED.steps;
+    '[{"id":"step_A","name":"A","label":"Pedagogical Mapper","stage_key":"mapper","task_type":"pedagogical_mapping","prompt_template_id":"p0200000-0000-0000-0000-00000000000a","cardinality":"1:1","dependsOn":[],"ai_settings":{"model_id":"gemini-1.5-pro-latest","generationConfig":{"temperature":0.7,"maxOutputTokens":4096}}},{"id":"step_B","name":"B","label":"Activity Designer","stage_key":"designer","task_type":"activity_design","prompt_template_id":"p0200000-0000-0000-0000-00000000000b","cardinality":"1:N","split_path":"output_data","split_mode":"per_item","dependsOn":["step_A"],"ai_settings":{"model_id":"gemini-1.5-flash-latest","generationConfig":{"temperature":1.0,"maxOutputTokens":8192}}},{"id":"step_C","name":"C","label":"Coherence Validator","stage_key":"validator","task_type":"lesson_qc","prompt_template_id":"p0200000-0000-0000-0000-00000000000c","cardinality":"N:1","dependsOn":["step_B"],"ai_settings":{"model_id":"gemini-1.5-flash-latest","generationConfig":{"temperature":0.3,"maxOutputTokens":4096}}}]'::jsonb, 
+    v_user_id, TRUE) ON CONFLICT (id) DO UPDATE SET steps = EXCLUDED.steps, is_public = EXCLUDED.is_public;
 
 
     -- ==========================================
@@ -266,11 +266,11 @@ $P$, '{"model_id": "gemini-flash-latest"}', TRUE, v_user_id, NULL, 'distiller'),
 You are the **Social Media Manager Specialist**. Your goal is to adapt a core message into multiple platform-specific posts. (V1: LinkedIn, V2: X, V3: Threads, V4: FB/IG)
 $P$, '{"model_id": "gemini-flash-latest"}', TRUE, v_user_id, 'c0500000-0000-0000-0000-000000000005', 'adapter')
     ON CONFLICT (id) DO UPDATE SET template = EXCLUDED.template;
-
+    -- ORC-05
     INSERT INTO public.lab_orchestrator_configs (id, name, description, steps, created_by, is_public)
-    VALUES ('00500000-0000-0000-0000-000000000005', 'ORC-05: Social Media Pack Generator', 'Distill -> Adapt (1:N)', 
-    '[{"id":"step_A","name":"A","label":"Message Distiller","stage_key":"distiller","task_type":"marketing_analysis","prompt_template_id":"p0500000-0000-0000-0000-00000000000a","cardinality":"1:1","ai_settings":{"model_id":"gemini-flash-latest"}},{"id":"step_B","name":"B","label":"Platform Adapter","stage_key":"adapter","task_type":"content_adaptation","prompt_template_id":"p0500000-0000-0000-0000-00000000000b","cardinality":"1:N","split_path":"output_data","split_mode":"per_item","dependsOn":["step_A"]}]'::jsonb, 
-    v_user_id, FALSE) ON CONFLICT (id) DO UPDATE SET steps = EXCLUDED.steps;
+    VALUES ('00500000-0000-0000-0000-000000000005', 'ORC-05: Social Media Pack Generator', 'Multi-stage marketing pipeline', 
+    '[{"id":"step_A","name":"A","label":"Message Distiller","stage_key":"distiller","task_type":"marketing_analysis","prompt_template_id":"p0500000-0000-0000-0000-00000000000a","cardinality":"1:1","dependsOn":[],"ai_settings":{"model_id":"gemini-1.5-flash-latest","generationConfig":{"temperature":0.5,"maxOutputTokens":2048}}},{"id":"step_B","name":"B","label":"Platform Adapter","stage_key":"adapter","task_type":"content_adaptation","prompt_template_id":"p0500000-0000-0000-0000-00000000000b","cardinality":"1:N","split_path":"output_data","split_mode":"per_item","dependsOn":["step_A"],"ai_settings":{"model_id":"gemini-1.5-flash-latest","generationConfig":{"temperature":1.1,"maxOutputTokens":4096}}}]'::jsonb, 
+    v_user_id, TRUE) ON CONFLICT (id) DO UPDATE SET steps = EXCLUDED.steps, is_public = EXCLUDED.is_public;
 
 
     -- ==========================================
@@ -331,11 +331,11 @@ $P$, '{"model_id": "gemini-pro-latest"}', TRUE, v_user_id, NULL, 'architect'),
 You are the **Chief Quality Officer**. Your goal is to compare original vs refactored.
 $P$, '{"model_id": "gemini-flash-latest"}', TRUE, v_user_id, 'c0900000-0000-0000-0000-000000000009', 'validator')
     ON CONFLICT (id) DO UPDATE SET template = EXCLUDED.template;
-
+    -- ORC-09
     INSERT INTO public.lab_orchestrator_configs (id, name, description, steps, created_by, is_public)
-    VALUES ('00900000-0000-0000-0000-000000000009', 'ORC-09: Code Review & Refactor Advisor', 'Thinking Audit -> Pro Refactor -> QA Validation', 
-    '[{"id":"step_A","name":"A","label":"Deep Static Auditor","stage_key":"auditor","task_type":"security_audit","prompt_template_id":"p0900000-0000-0000-0000-00000000000a","cardinality":"1:1","ai_settings":{"model_id":"gemini-2.5-flash"}},{"id":"step_B","name":"B","label":"Refactor Architect","stage_key":"architect","task_type":"code_refactor","prompt_template_id":"p0900000-0000-0000-0000-00000000000b","cardinality":"1:1","dependsOn":["step_A"]},{"id":"step_C","name":"C","label":"Quality Validator","stage_key":"validator","task_type":"qa_validation","prompt_template_id":"p0900000-0000-0000-0000-00000000000c","cardinality":"1:1","dependsOn":["step_B"]}]'::jsonb, 
-    v_user_id, FALSE) ON CONFLICT (id) DO UPDATE SET steps = EXCLUDED.steps;
+    VALUES ('00900000-0000-0000-0000-000000000009', 'ORC-09: Code Review Advisor', 'Advanced static audit and refactor advisor', 
+    '[{"id":"step_A","name":"A","label":"Deep Static Auditor","stage_key":"auditor","task_type":"security_audit","prompt_template_id":"p0900000-0000-0000-0000-00000000000a","cardinality":"1:1","dependsOn":[],"ai_settings":{"model_id":"gemini-2.0-flash-thinking-exp","generationConfig":{"temperature":0.3,"maxOutputTokens":16000}}},{"id":"step_B","name":"B","label":"Refactor Architect","stage_key":"architect","task_type":"code_refactor","prompt_template_id":"p0900000-0000-0000-0000-00000000000b","cardinality":"1:1","dependsOn":["step_A"],"ai_settings":{"model_id":"gemini-1.5-pro-latest","generationConfig":{"temperature":0.7,"maxOutputTokens":8192}}},{"id":"step_C","name":"C","label":"Quality Validator","stage_key":"validator","task_type":"qa_validation","prompt_template_id":"p0900000-0000-0000-0000-00000000000c","cardinality":"1:1","dependsOn":["step_B"],"ai_settings":{"model_id":"gemini-1.5-flash-latest","generationConfig":{"temperature":0.2,"maxOutputTokens":4096}}}]'::jsonb, 
+    v_user_id, TRUE) ON CONFLICT (id) DO UPDATE SET steps = EXCLUDED.steps, is_public = EXCLUDED.is_public;
 
     RAISE NOTICE 'Sample workflows published successfully for user %', v_user_id;
 END $$;

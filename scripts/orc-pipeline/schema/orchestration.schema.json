@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Orchestration Config",
+  "description": "Schema for Orchable orchestration configurations",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": [
+      "id",
+      "name",
+      "label",
+      "stage_key",
+      "task_type",
+      "cardinality",
+      "dependsOn",
+      "ai_settings"
+    ],
+    "properties": {
+      "id": {
+        "type": "string",
+        "pattern": "^step_[A-Z0-9_]+$"
+      },
+      "name": {
+        "type": "string"
+      },
+      "label": {
+        "type": "string"
+      },
+      "stage_key": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*$"
+      },
+      "task_type": {
+        "type": "string"
+      },
+      "cardinality": {
+        "type": "string",
+        "enum": ["1:1", "1:N", "N:1"]
+      },
+      "dependsOn": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "ai_settings": {
+        "type": "object",
+        "required": ["model_id", "generationConfig"],
+        "properties": {
+          "model_id": { "type": "string" },
+          "generationConfig": {
+            "type": "object",
+            "required": ["temperature", "maxOutputTokens"],
+            "properties": {
+              "temperature": { "type": "number", "minimum": 0, "maximum": 2 },
+              "maxOutputTokens": { "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      },
+      "split_path": { "type": "string" },
+      "split_mode": { "type": "string", "enum": ["per_item", "custom"] },
+      "prompt_template_id": { "type": "string" },
+      "contract": { "type": "object" },
+      "position": {
+        "type": "object",
+        "properties": {
+          "x": { "type": "number" },
+          "y": { "type": "number" }
+        }
+      }
+    },
+    "if": {
+      "properties": { "cardinality": { "const": "1:N" } }
+    },
+    "then": {
+      "required": ["split_path"]
+    }
+  }
+}
