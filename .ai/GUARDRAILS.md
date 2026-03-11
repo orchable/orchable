@@ -12,6 +12,7 @@
 8. **Bypass StorageAdapter** — never query IndexedDB or Supabase directly from components; use services that go through `storage.adapter`
 9. **Modify `prompt_templates` table directly** — always use `stageService.syncStagesToPromptTemplates` for orchestrator templates
 10. **Add new npm dependencies** without considering bundle size impact on Web Worker
+11. **Edit platform rule files directly** (`.cursor/`, `.windsurfrules`, `.agents/rules/project-context.md`, `.github/copilot-instructions.md`) — they are auto-generated. Edit the source files and run `npm run sync:context`.
 
 ## ✅ Always
 
@@ -45,3 +46,43 @@ Before submitting any significant change:
 - [ ] New `StepConfig` fields are optional (backward compat)
 - [ ] Worker changes tested with actual task execution
 - [ ] No circular imports introduced
+
+## 📦 Worker Development Guidelines
+
+`taskExecutor.worker.ts` is the execution heart of the system:
+
+### Do not block the poll loop
+
+```typescript
+// ✅ Non-blocking: process one task, return quickly
+async function processTask(task) { ... }
+
+// ❌ Blocking: never sleep inside the loop
+while (!allTasksDone) {
+  await sleep(1000); // blocks entire worker
+}
+```
+
+### Use transactions for atomic operations
+
+```typescript
+// ✅ Prevents duplicate task creation
+await db.transaction('rw', db.ai_tasks, db.task_batches, async () => {
+  // atomic check + create
+});
+```
+
+### Key management
+
+- Never log API keys
+- Always use `keyManager.getBestKey()` — it handles rotation, health tracking, rate limiting
+- Report success/failure back to `KeyManager` after each call
+
+## 🗃️ On Archiving an OpenSpec Change
+
+After running `openspec archive <change-id> --yes`:
+
+1. **Check `doc/`** — scan `doc/00_Index.md` and relevant doc files for content that may be
+   stale due to the archived change. Update them or flag with `<!-- STALE: reason -->`.
+2. **Re-sync platform files** — run `npm run sync:context` to regenerate all AI rule files.
+3. **Commit both** together so the platform files always match the spec state.

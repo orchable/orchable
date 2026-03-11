@@ -13,7 +13,8 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"docs:dev": "cd apps/docs && npx next dev",
-		"docs:build": "cd apps/docs && npx next build"
+		"docs:build": "cd apps/docs && npx next build",
+		"sync:context": "npx tsx scripts/sync-ai-context.ts"
 	},
 	"dependencies": {
 		"@hookform/resolvers": "^3.10.0",
