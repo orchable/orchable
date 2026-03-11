@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useDesignerStore } from '@/stores/designerStore';
 import { supabase } from '@/lib/supabase';
-import { storage } from '@/lib/storage';
+import { storage, getAssetStorageAdapter } from '@/lib/storage';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,7 @@ import { Slider } from '@/components/ui/slider';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { extractInputFields, generateOutputFormatSection, createDefaultContract, injectOutputFormatIntoPrompt, mapContractToInputSchema, mapContractToOutputSchema, ensureGeminiSchema } from '@/lib/schemaUtils';
-import { detectCircularDependency, validateStageKeyUniqueness } from '@/services/stageService';
+import { detectCircularDependency } from '@/services/stageService';
 import { OutputSchemaEditor } from '@/components/designer/OutputSchemaEditor';
 import { IconPicker } from '@/components/common/IconPicker';
 import { cn } from '@/lib/utils';
@@ -73,8 +73,9 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { PrePostProcessSection } from './PrePostProcessSection';
 import { ContractSection } from './ContractSection';
-import type { AIModel, Cardinality, PreProcessConfig, PostProcessConfig, StageContract, AIModelSetting, StepConfig, AISettings, DocumentAsset, ExportConfig, OrchestratorConfig, RegistryComponent } from '@/lib/types';
+import type { AIModel, Cardinality, PreProcessConfig, PostProcessConfig, StageContract, AIModelSetting, StepConfig, AISettings, DocumentAsset, ExportConfig, OrchestratorConfig, RegistryComponent, GeminiJsonSchema } from '@/lib/types';
 import { PromptEditorDialog } from './PromptEditorDialog';
+import { ExportSection } from './ExportSection';
 import { ICONS } from '@/lib/icons';
 
 // Types
@@ -301,12 +302,12 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
         }
     });
 
-    // Fetch prompt templates from Supabase
+    // Fetch prompt templates from correctly synced storage
     const fetchTemplates = useCallback(async () => {
         setLoadingTemplates(true);
         try {
-            await storage.waitForAdapter();
-            const data = await storage.adapter.listTemplates();
+            const adapter = await getAssetStorageAdapter();
+            const data = await adapter.listTemplates();
             // Sort by name
             const sorted = data.sort((a, b) => a.name.localeCompare(b.name));
             setTemplates(sorted as unknown as PromptTemplate[]);
@@ -320,32 +321,9 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
     const fetchComponents = useCallback(async () => {
         setLoadingComponents(true);
         try {
-            await storage.waitForAdapter();
-            let components: RegistryComponent[] = [];
-
-            if (storage.adapter.constructor.name === "IndexedDBAdapter") {
-                const { db } = await import('@/lib/storage/IndexedDBAdapter');
-                const localComponents = await db.registry_components.where('is_active').equals(1).toArray();
-                components = localComponents as unknown as RegistryComponent[];
-
-                if (components.length === 0) {
-                    const { data } = await supabase.from('registry_components').select('id, name, description').eq('is_active', true).order('name');
-                    if (data) {
-                        components = data as unknown as RegistryComponent[];
-                        await db.registry_components.bulkPut(data as unknown as RegistryComponent[]);
-                    }
-                }
-            } else {
-                const { data, error } = await supabase
-                    .from('registry_components')
-                    .select('id, name, description')
-                    .eq('is_active', true)
-                    .order('name');
-                if (error) throw error;
-                components = (data as unknown as RegistryComponent[]) || [];
-            }
-
-            setRegistryComponents(components);
+            const adapter = await getAssetStorageAdapter();
+            const components = await adapter.listComponents();
+            setRegistryComponents(components as unknown as RegistryComponent[]);
         } catch (err) {
             console.error('Failed to fetch components:', err);
         } finally {
@@ -356,34 +334,8 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
     const fetchAiModels = useCallback(async () => {
         setLoadingAiModels(true);
         try {
-            await storage.waitForAdapter();
-            // Assuming `listAiModelSettings` exists in adapter, else we fallback to direct IndexedDB/Supabase mix
-            let models: AIModelSetting[] = [];
-
-            if (storage.adapter.constructor.name === "IndexedDBAdapter") {
-                const { db } = await import('@/lib/storage/IndexedDBAdapter');
-                const localModels = await db.ai_model_settings.where('is_active').equals(1).toArray() as AIModelSetting[];
-                models = localModels;
-
-                // If local is empty, try fetch from supabase just in case they are online but on free tier
-                if (models.length === 0) {
-                    const { data } = await supabase.from('ai_model_settings').select('*').eq('is_active', true).order('name');
-                    if (data) {
-                        models = data;
-                        // Cache them locally for next offline use
-                        await db.ai_model_settings.bulkPut(data.map(d => ({ ...d, id: d.model_id + '_local' })));
-                    }
-                }
-            } else {
-                const { data, error } = await supabase
-                    .from('ai_model_settings')
-                    .select('*')
-                    .eq('is_active', true)
-                    .order('name');
-                if (error) throw error;
-                models = data || [];
-            }
-
+            const adapter = await getAssetStorageAdapter();
+            const models = await adapter.listAiModelSettings();
             setAiModels(models);
 
             // Set default if form model_id is empty
@@ -401,30 +353,9 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
     const fetchDocuments = useCallback(async () => {
         setLoadingDocs(true);
         try {
+            // Documents are handled via storage.adapter directly as they might be tier-isolated
             await storage.waitForAdapter();
-            let documents: DocumentAsset[] = [];
-
-            if (storage.adapter.constructor.name === "IndexedDBAdapter") {
-                const { db } = await import('@/lib/storage/IndexedDBAdapter');
-                const localDocs = await db.document_assets.toArray();
-                documents = localDocs as unknown as DocumentAsset[];
-
-                if (documents.length === 0) {
-                    const { data } = await supabase.from('document_assets').select('*').order('name');
-                    if (data) {
-                        documents = data as unknown as DocumentAsset[];
-                        await db.document_assets.bulkPut(data as unknown as DocumentAsset[]);
-                    }
-                }
-            } else {
-                const { data, error } = await supabase
-                    .from('document_assets')
-                    .select('*')
-                    .order('name');
-                if (error) throw error;
-                documents = (data as unknown as DocumentAsset[]) || [];
-            }
-
+            const documents = await storage.adapter.listAssets();
             setAvailableDocuments(documents);
         } catch (err) {
             console.error('Failed to fetch documents:', err);
@@ -436,16 +367,20 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
     const fetchOrchestrations = useCallback(async () => {
         setLoadingOrch(true);
         try {
+            const config = useDesignerStore.getState().config;
             const list = await storage.adapter.listConfigs();
-            // Filter out the current one to prevent simple self-recursion (though detectCircularDependency handles it properly)
-            const filtered = list.filter(c => c.id !== nodes.find(n => n.id === stageId)?.data?.orchestrator_id);
+            // Filter out the current one to prevent self-recursion
+            const filtered = config?.id 
+                ? list.filter(c => c.id !== config.id)
+                : list;
+                
             setOrchestrations(filtered);
         } catch (err) {
             console.error('Failed to fetch orchestrations:', err);
         } finally {
             setLoadingOrch(false);
         }
-    }, [nodes, stageId]);
+    }, []);
 
     const watchedVariables = form.watch(['model_id', 'temperature', 'topP', 'topK', 'maxOutputTokens', 'generate_content_api', 'thinkingLevel', 'thinkingBudget', 'task_type', 'sub_orchestration_id', 'stage_key']);
     const taskType = watchedVariables[8];
@@ -512,96 +447,178 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
         }
     };
 
-    const handleSavePrompt = async () => {
-        if (!selectedTemplate) return;
+    const performAtomicSave = async (options: { 
+        promptContent?: string;
+        showToast?: boolean;
+        closeEditor?: boolean;
+    } = {}) => {
+        const { promptContent, showToast = true, closeEditor = false } = options;
+        const data = form.getValues() as StageFormData;
+        
+        if (!selectedTemplate && data.prompt_template_id) {
+            // If we have an ID but no selectedTemplate state, try to find it
+            const found = templates.find(t => t.id === data.prompt_template_id);
+            if (found) setSelectedTemplate(found);
+        }
 
-        setIsSavingPrompt(true);
         try {
-            // Construct stage config
-            const stageConfig: StepConfig = {
-                id: stageId,
-                name: form.getValues('name') || '',
-                label: form.getValues('label') || '',
-                dependsOn: [],
-                task_type: form.getValues('task_type') || '',
-                cardinality: form.getValues('cardinality') || '1:1',
-                split_path: form.getValues('split_path') || '',
-                split_mode: form.getValues('split_mode') || 'per_item',
-                merge_path: form.getValues('merge_path') || '',
-                output_mapping: form.getValues('output_mapping') || '',
-                requires_approval: form.getValues('requires_approval') || false,
-                timeout: form.getValues('timeout') || 300000,
-                retryConfig: {
-                    maxRetries: form.getValues('maxRetries') || 0,
-                    retryDelay: form.getValues('retryDelay') || 5000
+            const finalPrompt = promptContent !== undefined ? promptContent : (selectedTemplate?.template || '');
+            
+            // 1. Update local designer store (Zustand)
+            // This ensures the current orchestration design is up to date
+            updateStepData(stageId, {
+                name: data.name,
+                stage_key: data.stage_key,
+                label: data.label,
+                task_type: data.task_type,
+                cardinality: data.cardinality,
+                split_path: data.split_path,
+                split_mode: data.split_mode,
+                batch_grouping: data.batch_grouping,
+                merge_path: data.merge_path,
+                output_mapping: data.output_mapping,
+                prompt_template_id: data.prompt_template_id,
+                ai_settings: {
+                    model_id: data.model_id as AIModel,
+                    generate_content_api: (data.generate_content_api || 'generateContent') as "generateContent" | "streamGenerateContent",
+                    generationConfig: {
+                        temperature: data.temperature,
+                        topP: data.topP,
+                        topK: data.topK,
+                        maxOutputTokens: data.maxOutputTokens,
+                        thinkingLevel: data.thinkingLevel || undefined,
+                        thinkingBudget: data.thinkingBudget || undefined
+                    }
                 },
-                return_along_with: form.getValues('return_along_with')?.split(',').map(s => s.trim()).filter(Boolean) || [],
-                auxiliary_inputs: form.getValues('auxiliary_inputs') || [],
-                export_config: form.getValues('export_config') as ExportConfig
-            };
-
-            // Construct AI settings
-            const aiSettings: AISettings = {
-                model_id: form.getValues('model_id') as AIModel,
-                generate_content_api: form.getValues('generate_content_api') as unknown as "generateContent" | "streamGenerateContent",
-                generationConfig: {
-                    temperature: form.getValues('temperature'),
-                    topP: form.getValues('topP'),
-                    topK: form.getValues('topK'),
-                    maxOutputTokens: form.getValues('maxOutputTokens'),
-                    thinkingLevel: form.getValues('thinkingLevel'),
-                    thinkingBudget: form.getValues('thinkingBudget')
-                }
-            };
-
-            console.log('Saving Stage Config:', stageConfig);
-            console.log('Saving AI Settings:', aiSettings);
-
-            await storage.waitForAdapter();
-
-            // Map our specific types to the more general PromptTemplateRecord
-            const upsertDoc = {
-                id: selectedTemplate.id,
-                name: selectedTemplate.name,
-                description: selectedTemplate.description || undefined,
-                template: editedPrompt,
-                version: selectedTemplate.version,
-                is_active: true,
-                stage_config: stageConfig as unknown as Record<string, unknown>,
-                default_ai_settings: aiSettings as unknown as Record<string, unknown>,
-                custom_component_id: selectedTemplate.custom_component_id || undefined,
-            };
-
-            await storage.adapter.upsertTemplate(upsertDoc);
-            toast.success('Template and configuration saved');
-
-            // Update local state
-            const updatedTemplates = templates.map(t =>
-                t.id === selectedTemplate.id ? {
-                    ...t,
-                    template: editedPrompt,
-                    // We don't store stage_config in the lightweight template list usually, 
-                    // but we should probably update it if we did.
-                    // For now, just updating template string in local state is enough for the UI.
-                    default_ai_settings: aiSettings
-                } : t
-            );
-            setTemplates(updatedTemplates);
-
-            // Update selected template
-            setSelectedTemplate({
-                ...selectedTemplate,
-                template: editedPrompt,
-                default_ai_settings: aiSettings
+                timeout: data.timeout,
+                retryConfig: {
+                    maxRetries: data.maxRetries,
+                    retryDelay: data.retryDelay
+                },
+                pre_process: preProcessConfig,
+                post_process: postProcessConfig,
+                contract: contract,
+                export_config: data.export_config ? {
+                    enabled: data.export_config.enabled === true,
+                    destination: data.export_config.destination || 'webhook',
+                    settings: data.export_config.settings || { format: 'json' }
+                } : {
+                    enabled: false,
+                    destination: 'webhook',
+                    settings: { format: 'json' }
+                },
+                requires_approval: data.requires_approval,
+                custom_component_id: (data.custom_component_id === '_default' || !data.custom_component_id) ? null : data.custom_component_id,
+                return_along_with: data.return_along_with ? data.return_along_with.split(',').map(s => s.trim()).filter(Boolean) : [],
+                sub_orchestration_id: data.sub_orchestration_id,
+                sub_orchestration_output_path: data.sub_orchestration_output_path
             });
 
-            setIsEditorOpen(false);
+            // 2. Persist to Asset Storage (Template)
+            if (data.prompt_template_id && selectedTemplate) {
+                await storage.waitForAdapter();
+                
+                // Construct StepConfig for the template storage (used as default)
+                const templateStageConfig: StepConfig = {
+                    id: selectedTemplate.id,
+                    name: selectedTemplate.name,
+                    label: selectedTemplate.name,
+                    task_type: data.task_type || '', // Added task_type
+                    dependsOn: [],
+                    cardinality: (data.cardinality === 'many_to_one' || data.cardinality === 'N:1') ? 'many_to_one' : ((data.cardinality === 'one_to_many' || data.cardinality === '1:N') ? 'one_to_many' : 'one_to_one'),
+                    split_path: data.split_path || '',
+                    split_mode: data.split_mode || 'per_item',
+                    batch_grouping: data.batch_grouping || 'global',
+                    merge_path: data.merge_path || 'output_data',
+                    output_mapping: data.output_mapping || '',
+                    requires_approval: data.requires_approval || false,
+                    timeout: data.timeout || 300000,
+                    retryConfig: {
+                        maxRetries: data.maxRetries || 3,
+                        retryDelay: data.retryDelay || 5000
+                    },
+                    pre_process: preProcessConfig,
+                    post_process: postProcessConfig,
+                    contract: contract,
+                    export_config: data.export_config ? {
+                        enabled: data.export_config.enabled === true,
+                        destination: data.export_config.destination || 'webhook',
+                        settings: data.export_config.settings || { format: 'json' }
+                    } : {
+                        enabled: false,
+                        destination: 'webhook',
+                        settings: { format: 'json' }
+                    },
+                    return_along_with: data.return_along_with ? data.return_along_with.split(',').map(s => s.trim()).filter(Boolean) : [],
+                };
+
+                const aiSettings: AISettings = {
+                    model_id: data.model_id as AIModel,
+                    generate_content_api: (data.generate_content_api || 'generateContent') as "generateContent" | "streamGenerateContent",
+                    generationConfig: {
+                        temperature: data.temperature,
+                        topP: data.topP,
+                        topK: data.topK,
+                        maxOutputTokens: data.maxOutputTokens,
+                        thinkingLevel: data.thinkingLevel || undefined,
+                        thinkingBudget: data.thinkingBudget || undefined
+                    }
+                };
+
+                const upsertDoc = {
+                    id: selectedTemplate.id,
+                    name: selectedTemplate.name,
+                    description: selectedTemplate.description || undefined,
+                    template: finalPrompt,
+                    version: selectedTemplate.version,
+                    is_active: true,
+                    stage_config: templateStageConfig as unknown as Record<string, unknown>,
+                    default_ai_settings: aiSettings as unknown as Record<string, unknown>,
+                    custom_component_id: selectedTemplate.custom_component_id || undefined,
+                };
+
+                await storage.adapter.upsertTemplate(upsertDoc);
+                
+                // Update local templates list
+                setTemplates(prev => prev.map(t => 
+                    t.id === selectedTemplate.id 
+                        ? { ...t, template: finalPrompt, default_ai_settings: aiSettings, stage_config: templateStageConfig } 
+                        : t
+                ));
+
+                // Update selected template
+                setSelectedTemplate(prev => prev ? { 
+                    ...prev, 
+                    template: finalPrompt, 
+                    default_ai_settings: aiSettings, 
+                    stage_config: templateStageConfig 
+                } : null);
+            }
+
+            if (showToast) {
+                toast.success('Stage and prompt configuration saved');
+            }
+
+            if (closeEditor) {
+                setIsEditorOpen(false);
+            }
+            return true;
         } catch (err) {
-            console.error('Failed to update prompt:', err);
-            toast.error('Failed to update prompt template');
-        } finally {
-            setIsSavingPrompt(false);
+            console.error('Failed atomic save:', err);
+            if (showToast) {
+                toast.error('Failed to save configuration');
+            }
+            return false;
         }
+    };
+
+    const handleSavePrompt = async () => {
+        setIsSavingPrompt(true);
+        await performAtomicSave({ 
+            promptContent: editedPrompt, 
+            closeEditor: true 
+        });
+        setIsSavingPrompt(false);
     };
 
     const handleDeleteTemplate = async () => {
@@ -609,24 +626,9 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
 
         setIsDeleting(true);
         try {
-            await storage.waitForAdapter();
-            // NOTE: IndexedDBAdapter currently lacks deleteTemplate, but we emulate if possible,
-            // or we add it to StorageAdapter. For now, doing a best-effort or warning.
-            // A more robust app would have 'deleteTemplate' in the adapter. 
-            // In fact, the adapter definition doesn't have it. We'll bypass using Supabase fallback or skip.
-            // For now, since deleteTemplate is missing in IStorageAdapter, we do the direct call for supabase if needed,
-            // but for completeness, we'll try to use a placeholder or log.
-
-            if (storage.adapter.constructor.name === "SupabaseAdapter") {
-                const { error } = await supabase
-                    .from('prompt_templates')
-                    .delete()
-                    .eq('id', selectedTemplate.id);
-                if (error) throw error;
-            } else {
-                console.warn("Delete template not fully implemented for IndexedDB");
-            }
-
+            const adapter = await getAssetStorageAdapter();
+            await adapter.deleteTemplate(selectedTemplate.id);
+            
             toast.success(`Template "${selectedTemplate.name}" deleted`);
 
             // Remove from local state
@@ -873,10 +875,22 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
             const parentNode = nodes.find(n => n.id === id);
             if (parentNode?.data) {
                 const data = parentNode.data as unknown as StepConfig;
-                const schemaObj = data.contract?.output?.schema;
-                const outputFields: string[] = schemaObj?.properties
-                    ? Object.keys(schemaObj.properties)
-                    : (Array.isArray(schemaObj) ? schemaObj.map((f: { name: string }) => f.name) : []);
+                const schemaObj = data.contract?.output?.schema as GeminiJsonSchema | undefined;
+                const outputFields: string[] = [];
+
+                if (schemaObj) {
+                    if (schemaObj.properties) {
+                        outputFields.push(...Object.keys(schemaObj.properties));
+                    }
+                    // Handle array of objects: extract properties from items
+                    if (schemaObj.type === 'array' && schemaObj.items?.properties) {
+                        outputFields.push(...Object.keys(schemaObj.items.properties));
+                    }
+                    // Fallback for legacy array format
+                    if (Array.isArray(schemaObj)) {
+                        outputFields.push(...(schemaObj as Record<string, unknown>[]).map((f) => String(f.name || '')));
+                    }
+                }
                 // return_along_with fields
                 const returnAlongWith = Array.isArray(data.return_along_with)
                     ? data.return_along_with
@@ -1005,139 +1019,7 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
     };
 
     const onSubmit = async (data: StageFormData) => {
-        // Update local designer store
-        updateStepData(stageId, {
-            name: data.name,
-            stage_key: data.stage_key,
-            label: data.label,
-            task_type: data.task_type,
-            cardinality: data.cardinality,
-            split_path: data.split_path,
-            split_mode: data.split_mode,
-            batch_grouping: data.batch_grouping,
-            merge_path: data.merge_path,
-            output_mapping: data.output_mapping,
-            prompt_template_id: data.prompt_template_id,
-            ai_settings: {
-                model_id: data.model_id as AIModel,
-                generate_content_api: (data.generate_content_api || 'generateContent') as "generateContent" | "streamGenerateContent",
-                generationConfig: {
-                    temperature: data.temperature,
-                    topP: data.topP,
-                    topK: data.topK,
-                    maxOutputTokens: data.maxOutputTokens,
-                    thinkingLevel: data.thinkingLevel || undefined,
-                    thinkingBudget: data.thinkingBudget || undefined
-                }
-            },
-            timeout: data.timeout,
-            retryConfig: {
-                maxRetries: data.maxRetries,
-                retryDelay: data.retryDelay
-            },
-            // Pre/Post process hooks
-            pre_process: preProcessConfig,
-            post_process: postProcessConfig,
-            // Input/Output contract
-            contract: contract,
-            requires_approval: data.requires_approval,
-            custom_component_id: (data.custom_component_id === '_default' || !data.custom_component_id) ? null : data.custom_component_id,
-            return_along_with: data.return_along_with ? data.return_along_with.split(',').map(s => s.trim()).filter(Boolean) : [],
-            sub_orchestration_id: data.sub_orchestration_id,
-            sub_orchestration_output_path: data.sub_orchestration_output_path
-        });
-
-        // Also persist stage_config to Supabase prompt_templates table
-        if (data.prompt_template_id && selectedTemplate) {
-            try {
-                // Auto-sync prompt with output format section
-                let finalPrompt = selectedTemplate.template;
-                const formatSection = generateOutputFormatSection(contract);
-                if (formatSection) {
-                    finalPrompt = injectOutputFormatIntoPrompt(
-                        finalPrompt,
-                        formatSection,
-                        contract.output.format_injection || 'append'
-                    );
-                }
-
-                const stageConfig: StepConfig = {
-                    id: selectedTemplate.id,
-                    name: selectedTemplate.name,
-                    label: selectedTemplate.name,
-                    dependsOn: [],
-                    cardinality: (data.cardinality === 'N:1' ? 'N:1' : ((data.cardinality === 'one_to_many' || data.cardinality === '1:N') ? 'one_to_many' : 'one_to_one')) as Cardinality,
-                    split_path: data.split_path || '',
-                    split_mode: data.split_mode || 'per_item',
-                    batch_grouping: data.batch_grouping || 'global',
-                    merge_path: data.merge_path || 'output_data',
-                    output_mapping: data.output_mapping || '',
-                    requires_approval: data.requires_approval || false,
-                    timeout: data.timeout || 300000,
-                    retryConfig: {
-                        maxRetries: data.maxRetries || 3,
-                        retryDelay: data.retryDelay || 5000
-                    },
-                    return_along_with: data.return_along_with ? data.return_along_with.split(',').map(s => s.trim()).filter(Boolean) : [],
-                    auxiliary_inputs: data.auxiliary_inputs || [],
-                    sub_orchestration_id: data.sub_orchestration_id,
-                    sub_orchestration_output_path: data.sub_orchestration_output_path,
-                    export_config: data.export_config as ExportConfig
-                };
-
-                // Auto-set responseMimeType when schema is defined
-                const hasOutputSchema = contract?.output?.schema && contract.output.schema.type;
-
-                const aiSettings = {
-                    model_id: data.model_id,
-                    generate_content_api: data.generate_content_api,
-                    generationConfig: {
-                        temperature: data.temperature,
-                        topP: data.topP,
-                        topK: data.topK,
-                        maxOutputTokens: data.maxOutputTokens,
-                        ...(hasOutputSchema ? { responseMimeType: 'application/json' } : {})
-                    }
-                };
-
-                // Update local state immediately so subsequent re-renders don't read stale data
-                const updatedTemplate: PromptTemplate = {
-                    ...selectedTemplate,
-                    template: finalPrompt,
-                    stage_config: stageConfig,
-                    default_ai_settings: aiSettings as unknown as AISettings
-                };
-                setSelectedTemplate(updatedTemplate);
-                setTemplates((prev: PromptTemplate[]) => prev.map(t => t.id === updatedTemplate.id ? updatedTemplate : t));
-
-                console.log('Saving to Supabase - Stage Config:', stageConfig);
-
-                await storage.waitForAdapter();
-                const existing = await storage.adapter.getTemplate(data.prompt_template_id);
-
-                const upsertDoc = {
-                    ...(existing || {
-                        id: data.prompt_template_id,
-                        name: selectedTemplate.name,
-                        version: 1,
-                        is_active: true
-                    }),
-                    template: finalPrompt,
-                    stage_config: stageConfig as unknown as Record<string, unknown>,
-                    default_ai_settings: aiSettings as unknown as Record<string, unknown>,
-                    input_schema: mapContractToInputSchema(contract),
-                    output_schema: mapContractToOutputSchema(contract) as unknown as Record<string, unknown>,
-                    custom_component_id: (data.custom_component_id === '_default' || !data.custom_component_id) ? undefined : data.custom_component_id
-                };
-
-                await storage.adapter.upsertTemplate(upsertDoc);
-            } catch (err) {
-                console.error('Error saving to Supabase:', err);
-                toast.error('Failed to sync configuration');
-            }
-        } else {
-            toast.success('Stage updated locally');
-        }
+        await performAtomicSave();
     };
 
     if (!stage) return null;
@@ -2029,6 +1911,19 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                                         }
                                     }}
                                 />
+
+                                <ExportSection
+                                    config={form.watch('export_config') as ExportConfig}
+                                    onChange={(config) => {
+                                        form.setValue('export_config', config || {
+                                            enabled: false,
+                                            destination: 'webhook',
+                                            settings: { format: 'json' }
+                                        });
+                                        // Update designer store immediately for responsiveness
+                                        updateStepData(stageId, { export_config: config });
+                                    }}
+                                />
                             </TabsContent>
 
                             {/* Contract Tab */}
@@ -2051,18 +1946,6 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                                         form.setValue('auxiliary_inputs', ids);
                                         // Update designer store
                                         updateStepData(stageId, { auxiliary_inputs: ids });
-                                    }}
-                                    exportConfig={form.watch('export_config') as ExportConfig}
-                                    onExportConfigChange={(config) => {
-                                        // Ensure all required fields are present to satisfy ExportConfig type
-                                        const fullConfig: ExportConfig = {
-                                            enabled: config.enabled === true,
-                                            destination: (config.destination as "google_sheets" | "webhook" | "email") || 'webhook',
-                                            settings: config.settings || { format: 'json' }
-                                        };
-                                        form.setValue('export_config', fullConfig);
-                                        // Update designer store
-                                        updateStepData(stageId, { export_config: fullConfig });
                                     }}
                                 />
                             </TabsContent>

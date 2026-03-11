@@ -63,8 +63,9 @@ export function OutputSchemaEditor({ open, onOpenChange, schema, onSave }: Outpu
             const result = inferSchemaFromJson(json);
             setEditedSchema(result);
             toast.success("Schema inferred from JSON!");
-        } catch (error: any) {
-            toast.error(error.message || "Failed to parse JSON");
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : "Failed to parse JSON";
+            toast.error(message);
         }
     };
 
@@ -495,106 +496,54 @@ function PropertyEditor({ name, property, isRequired, onChange, onRemove, onTogg
 
             {/* Array Items */}
             {property.type === 'array' && isExpanded && (
-                <div className="space-y-2 pl-4 border-l-2 border-muted">
-                    <Label className="text-xs text-muted-foreground">Array Items Schema:</Label>
-                    <div className="flex items-center gap-2">
-                        <span className="text-xs">Item type:</span>
-                        <Select
-                            value={property.items?.type || 'string'}
-                            onValueChange={(type) => {
-                                const newItems: JsonSchemaProperty = { type: type as InputFieldType };
-                                if (type === 'object') {
-                                    newItems.properties = {};
-                                    newItems.required = [];
-                                }
-                                onChange(editingName, { items: newItems });
-                            }}
-                        >
-                            <SelectTrigger className="h-7 w-32">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {FIELD_TYPES.map(t => (
-                                    <SelectItem key={t.value} value={t.value}>
-                                        {t.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    {property.items?.type === 'object' && (
-                        <div className="space-y-2">
-                            <Label className="text-xs text-muted-foreground">Item Properties:</Label>
-                            {Object.entries(property.items.properties || {}).map(([childName, childProp]) => (
-                                <PropertyEditor
-                                    key={childName}
-                                    name={childName}
-                                    property={childProp}
-                                    isRequired={(property.items?.required || []).includes(childName)}
-                                    onChange={(newName, updates) => {
-                                        const newProps = { ...property.items?.properties };
-                                        const existing = newProps[childName] || { type: 'string' as InputFieldType };
-                                        if (childName !== newName && newName.trim()) {
-                                            delete newProps[childName];
-                                            newProps[newName] = { ...existing, ...updates };
-                                            const newReq = (property.items?.required || []).map(r => r === childName ? newName : r);
-                                            onChange(editingName, { items: { ...property.items!, properties: newProps, required: newReq } });
-                                        } else {
-                                            newProps[childName] = { ...existing, ...updates };
-                                            onChange(editingName, { items: { ...property.items!, properties: newProps } });
+                    <div className="space-y-2 border p-2 rounded bg-muted/20">
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold">Item Schema:</span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] uppercase text-muted-foreground font-bold">Type:</span>
+                                <Select
+                                    value={property.items?.type || 'string'}
+                                    onValueChange={(type) => {
+                                        const newItems: JsonSchemaProperty = { type: type as InputFieldType };
+                                        if (type === 'object') {
+                                            newItems.properties = {};
+                                            newItems.required = [];
+                                        } else if (type === 'array') {
+                                            newItems.items = { type: 'string' };
                                         }
+                                        onChange(editingName, { items: newItems });
                                     }}
-                                    onRemove={() => {
-                                        const newProps = { ...property.items?.properties };
-                                        delete newProps[childName];
-                                        onChange(editingName, {
-                                            items: {
-                                                ...property.items!,
-                                                properties: newProps,
-                                                required: (property.items?.required || []).filter(r => r !== childName),
-                                            }
-                                        });
-                                    }}
-                                    onToggleRequired={() => {
-                                        const isReq = (property.items?.required || []).includes(childName);
-                                        onChange(editingName, {
-                                            items: {
-                                                ...property.items!,
-                                                required: isReq
-                                                    ? (property.items?.required || []).filter(r => r !== childName)
-                                                    : [...(property.items?.required || []), childName],
-                                            }
-                                        });
-                                    }}
-                                    depth={depth + 1}
-                                />
-                            ))}
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 text-xs"
-                                onClick={() => {
-                                    const childName = `field_${Object.keys(property.items?.properties || {}).length + 1}`;
-                                    onChange(editingName, {
-                                        items: {
-                                            ...property.items!,
-                                            properties: {
-                                                ...property.items?.properties,
-                                                [childName]: { type: 'string' },
-                                            },
-                                            required: [...(property.items?.required || []), childName],
-                                        }
-                                    });
-                                }}
-                            >
-                                <Plus className="w-3 h-3 mr-1" />
-                                Add Item Property
-                            </Button>
+                                >
+                                    <SelectTrigger className="h-6 w-24 text-[10px]">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {FIELD_TYPES.map(t => (
+                                            <SelectItem key={t.value} value={t.value}>
+                                                {t.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
-                    )}
-                </div>
+
+                        {/* Recursive Property Editor for Array Items */}
+                        <PropertyEditor
+                            name="[item]"
+                            property={property.items || { type: 'string' }}
+                            isRequired={true}
+                            onChange={(_, updates) => {
+                                onChange(editingName, { items: { ...property.items!, ...updates } });
+                            }}
+                            onRemove={() => {
+                                // For items, remove might mean resetting to simple string
+                                onChange(editingName, { items: { type: 'string' } });
+                            }}
+                            onToggleRequired={() => {}} // Items are always required in this context
+                            depth={depth + 1}
+                        />
+                    </div>
             )}
         </div>
     );

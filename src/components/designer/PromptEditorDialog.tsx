@@ -77,7 +77,7 @@ export function PromptEditorDialog({
             const matchedText = match[0];
             const varName = matchedText.slice(delimiters.start.length, -delimiters.end.length);
 
-            const isInvalid = availableScope !== null && availableScope !== undefined && !availableScope.includes(varName);
+            const isWarning = availableScope !== null && availableScope !== undefined && !availableScope.includes(varName);
 
             // Highlighted match
             parts.push(
@@ -85,7 +85,7 @@ export function PromptEditorDialog({
                     key={match.index}
                     className={cn(
                         "rounded-sm bg-blue-500/20 text-blue-700 dark:text-blue-300 border-b border-blue-500/50",
-                        isInvalid && "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500/50"
+                        isWarning && "bg-amber-500/25 text-amber-700 dark:text-amber-300 border-amber-500/50"
                     )}
                 >
                     {match[0]}
@@ -137,9 +137,9 @@ export function PromptEditorDialog({
                 const varName = matchedText.slice(delimiters.start.length, -delimiters.end.length);
 
                 if (varName) {
-                    const isInvalid = availableScope !== null && availableScope !== undefined && !availableScope.includes(varName);
+                    const isWarning = availableScope !== null && availableScope !== undefined && !availableScope.includes(varName);
                     const list = usedMap.get(varName) || [];
-                    list.push({ name: varName, line: lineNum, type: isInvalid ? 'invalid' : 'used' });
+                    list.push({ name: varName, line: lineNum, type: isWarning ? 'invalid' : 'used' });
                     usedMap.set(varName, list);
                 }
             }
@@ -258,7 +258,7 @@ export function PromptEditorDialog({
                                                     <span className="truncate">{v.name}</span>
                                                 </div>
                                                 {v.type === 'invalid' && (
-                                                    <Badge variant="destructive" className="h-4 px-1 text-[8px]">Invalid</Badge>
+                                                    <Badge variant="outline" className="h-4 px-1 text-[8px] border-amber-200 bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400">External</Badge>
                                                 )}
                                             </div>
                                         ))

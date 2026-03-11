@@ -6,6 +6,7 @@ import type {
 	StepConfig,
 	Execution,
 	StageContract,
+	AIModel,
 } from "@/lib/types";
 import type { KeyConfig } from "@/services/keyPoolService";
 import type { UserTier } from "@/lib/storage";
@@ -658,16 +659,57 @@ async function processTask(task: AiTask) {
 			// Execute Webhook if configured
 			if (postProcess.webhook_url) {
 				try {
+					// Task 4.1: Respect input_source and custom_input_mapping
+					let webhookPayload: unknown = result;
+
+					if (postProcess.input_source === "input_and_output") {
+						webhookPayload = {
+							input: currentInputData,
+							output: result,
+						};
+					} else if (
+						postProcess.input_source === "custom" &&
+						postProcess.custom_input_mapping
+					) {
+						// Simple mapping parser: "input.a, output.b, fieldC"
+						const keys = postProcess.custom_input_mapping
+							.split(",")
+							.map((k) => k.trim());
+						const customData: Record<string, unknown> = {};
+						const context = {
+							input: currentInputData,
+							output: result,
+						};
+
+						keys.forEach((key) => {
+							if (key === "input" || key === "output") {
+								customData[key] =
+									context[key as keyof typeof context];
+							} else if (key.startsWith("input.")) {
+								const field = key.substring(6);
+								customData[field] = currentInputData[field];
+							} else if (key.startsWith("output.")) {
+								const field = key.substring(7);
+								customData[field] = (
+									result as Record<string, unknown>
+								)[field];
+							} else {
+								// Assume it's a field in result if not prefixed
+								customData[key] = (
+									result as Record<string, unknown>
+								)[key];
+							}
+						});
+						webhookPayload = customData;
+					}
+
 					await executeWebhook(
 						{
 							webhook_url: postProcess.webhook_url,
 							webhook_method: postProcess.webhook_method,
 							webhook_headers: postProcess.webhook_headers,
 						},
-						{
-							input: currentInputData,
-							output: result,
-						},
+						webhookPayload,
 					);
 				} catch (e) {
 					const error = e as Error;
@@ -902,7 +944,21 @@ async function callGemini(
 	globalContextStr?: string,
 	taskId?: string,
 ) {
-	const model = aiSettings?.model_id || "gemini-2.0-flash";
+	let model = aiSettings?.model_id || ("gemini-2.0-flash" as AIModel);
+
+	// Task 4.2: Proactive model fallback for free tier to prevent "No API keys" errors
+	// if the UI allowed selection of premium models.
+	if (currentTier === "free") {
+		const freeModelsPrefixes = ["gemini-"];
+		const isNativeFree = freeModelsPrefixes.some((p) => model.startsWith(p));
+		if (!isNativeFree) {
+			console.warn(
+				`[Worker] Model ${model} is likely premium but user is on free tier. Falling back to gemini-2.0-flash.`,
+			);
+			model = "gemini-2.0-flash" as AIModel;
+		}
+	}
+
 	let bodyPayload: Record<string, unknown> = {
 		contents: [{ parts: [{ text: prompt }] }],
 		generationConfig: aiSettings?.generationConfig || {},
