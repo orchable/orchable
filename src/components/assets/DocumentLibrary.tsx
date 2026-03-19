@@ -26,6 +26,7 @@ import {
 import { DocumentAsset } from '@/lib/types';
 import { toast } from 'sonner';
 import { getStorageAdapterForType } from '@/lib/storage';
+import { DocumentPreviewModal } from './DocumentPreviewModal';
 
 interface Props {
     documents: DocumentAsset[];
@@ -40,6 +41,8 @@ export const DocumentLibrary: React.FC<Props> = ({
     onUpload,
     onRefresh
 }) => {
+    const [previewDoc, setPreviewDoc] = React.useState<DocumentAsset | null>(null);
+    const [isPreviewOpen, setIsPreviewOpen] = React.useState(false);
 
     const handleDelete = async (doc: DocumentAsset) => {
         if (!confirm(`Are you sure you want to delete "${doc.name}"?`)) return;
@@ -112,7 +115,7 @@ export const DocumentLibrary: React.FC<Props> = ({
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                    <DropdownMenuItem className="gap-2" onClick={() => toast.info('Preview coming soon')}>
+                                    <DropdownMenuItem className="gap-2" onClick={() => { setPreviewDoc(doc); setIsPreviewOpen(true); }}>
                                         <FileText className="w-4 h-4" />
                                         Preview
                                     </DropdownMenuItem>
@@ -161,6 +164,12 @@ export const DocumentLibrary: React.FC<Props> = ({
                 <Plus className="w-8 h-8 mb-2" />
                 <span className="text-sm font-medium">Add New Document</span>
             </button>
+
+            <DocumentPreviewModal 
+                open={isPreviewOpen} 
+                onOpenChange={setIsPreviewOpen} 
+                document={previewDoc} 
+            />
         </div>
     );
 };

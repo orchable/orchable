@@ -65,7 +65,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTier } from '@/hooks/useTier';
 import { ComponentEditor } from '@/components/batch/ComponentEditor';
 import { db } from '@/lib/storage/IndexedDBAdapter';
-import { storage, getAssetStorageAdapter } from '@/lib/storage';
+import { storage, getAssetStorageAdapter, getStorageAdapterForType } from '@/lib/storage';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { PromptEditorDialog } from '@/components/designer/PromptEditorDialog';
 import { Label } from "@/components/ui/label";

@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "prompt-optimizer": {
+      "source": "daymade/claude-code-skills",
+      "sourceType": "github",
+      "computedHash": "82e8cb3d6a34f3d8e3827402851b5d300e6e9ba9303b11634a93f5b281c94d52"
+    },
     "supabase-postgres-best-practices": {
       "source": "supabase/agent-skills",
       "sourceType": "github",
