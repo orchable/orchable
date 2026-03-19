@@ -171,9 +171,18 @@ export class SupabaseAdapter implements IStorageAdapter {
 			data: { user },
 		} = await supabase.auth.getUser();
 
+		// Fetch existing to preserve created_by if missing in payload
+		let finalCreatedBy = template.created_by;
+		if (finalCreatedBy === undefined) {
+			const existing = await this.getTemplate(template.id);
+			if (existing && existing.created_by !== undefined) {
+				finalCreatedBy = existing.created_by;
+			}
+		}
+
 		const { error } = await supabase.from("prompt_templates").upsert({
 			...template,
-			created_by: template.created_by || user?.id,
+			created_by: finalCreatedBy !== undefined ? finalCreatedBy : user?.id,
 		});
 
 		if (error) {

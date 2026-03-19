@@ -26,3 +26,6 @@ apps/docs/.next/*
 
 .env.*
 .env
+.agent
+.agents
+.skills-lock.json

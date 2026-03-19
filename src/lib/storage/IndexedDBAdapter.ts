@@ -394,7 +394,8 @@ export class IndexedDBAdapter implements IStorageAdapter {
 	}
 
 	async listAssets(): Promise<DocumentAsset[]> {
-		return db.document_assets.orderBy("created_at").reverse().toArray();
+		const assets = await db.document_assets.toArray();
+		return assets.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 	}
 
 	async getAsset(id: string): Promise<DocumentAsset | null> {

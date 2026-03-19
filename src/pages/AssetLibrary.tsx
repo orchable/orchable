@@ -162,13 +162,10 @@ export function AssetLibrary() {
             }
 
             // Fetch Documents safely
-            if (tier === 'premium') {
-                const docList = await supabase.from('document_assets').select('*').order('created_at', { ascending: false });
-                if (docList.data) setDocuments(docList.data as DocumentAsset[]);
-            } else {
-                const localDocs = await db.document_assets.orderBy('created_at').reverse().toArray();
-                setDocuments(localDocs as DocumentAsset[]);
-            }
+            const storageType = tier === 'premium' ? 'supabase' : 'indexeddb';
+            const documentStorage = getStorageAdapterForType(storageType);
+            const docList = await documentStorage.listAssets();
+            setDocuments(docList as DocumentAsset[]);
         } catch (error) {
             console.error('Failed to fetch assets:', error);
             toast.error('Failed to load resource list');

@@ -97,7 +97,7 @@ export const UploadDocumentModal: React.FC<Props> = ({
         }
     };
 
-    const isOverLimit = tier === 'free' && tokenEstimate > 10000;
+    const isOverLimit = tier === 'free' && tokenEstimate > 14000;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -138,7 +138,7 @@ export const UploadDocumentModal: React.FC<Props> = ({
                                     <AlertCircle className="h-4 w-4" />
                                     <AlertTitle className="text-xs">Token Limit Exceeded</AlertTitle>
                                     <AlertDescription className="text-[10px]">
-                                        Free tier documents are limited to 10k tokens (~7.5k words).
+                                        Free tier documents are limited to 14k tokens (~10.5k words).
                                     </AlertDescription>
                                 </Alert>
                             )}

@@ -202,6 +202,7 @@ export function ApiKeyManager() {
         try {
             let isSuccess = false;
             let errorMsg = '';
+            let statusCode = 0;
 
             if (key.provider === 'gemini' || !key.provider) {
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key.api_key_encrypted}`, {
@@ -210,6 +211,7 @@ export function ApiKeyManager() {
                     body: JSON.stringify({ contents: [{ parts: [{ text: "Hi" }] }] })
                 });
                 isSuccess = res.ok;
+                statusCode = res.status;
                 if (!res.ok) errorMsg = await res.text();
             } else if (key.provider === 'deepseek') {
                 const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
@@ -218,6 +220,7 @@ export function ApiKeyManager() {
                     body: JSON.stringify({ model: 'deepseek-chat', messages: [{ role: 'user', content: 'Hi' }] })
                 });
                 isSuccess = res.ok;
+                statusCode = res.status;
                 if (!res.ok) errorMsg = await res.text();
             } else if (key.provider === 'qwen') {
                 const res = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
@@ -226,6 +229,7 @@ export function ApiKeyManager() {
                     body: JSON.stringify({ model: 'qwen-plus', messages: [{ role: 'user', content: 'Hi' }] })
                 });
                 isSuccess = res.ok;
+                statusCode = res.status;
                 if (!res.ok) errorMsg = await res.text();
             } else if (key.provider === 'minimax') {
                 const res = await fetch('https://api.minimax.chat/v1/chat/completions', {
@@ -234,6 +238,7 @@ export function ApiKeyManager() {
                     body: JSON.stringify({ model: 'minimax-01', messages: [{ role: 'user', content: 'Hi' }] })
                 });
                 isSuccess = res.ok;
+                statusCode = res.status;
                 if (!res.ok) errorMsg = await res.text();
             }
 
@@ -255,9 +260,38 @@ export function ApiKeyManager() {
                 await executorService.reloadKeys(tier);
             } else {
                 toast.error(`${key.key_name} failed: ${errorMsg || 'Unknown error'}`, { id: toastId });
+                // Update health to reflect failure
+                const healthStatus = statusCode === 429 ? 'rate_limited' : 'blocked';
+                await db.api_key_health.put({
+                    user_api_key_id: key.api_key_encrypted,
+                    health_status: healthStatus,
+                    consecutive_failures: 1,
+                    successful_requests: 0,
+                    total_requests: 1,
+                    failed_requests: 1,
+                    blocked_until: statusCode === 429 ? new Date(Date.now() + 60000).toISOString() : null,
+                    last_error_code: String(statusCode),
+                    updated_at: new Date().toISOString()
+                });
+                await fetchKeys();
+                await executorService.reloadKeys(tier);
             }
         } catch (err) {
             toast.error(`Test failed: ${err instanceof Error ? err.message : 'Unknown error'}`, { id: toastId });
+            // Network fallback error
+            await db.api_key_health.put({
+                user_api_key_id: key.api_key_encrypted,
+                health_status: 'blocked',
+                consecutive_failures: 1,
+                successful_requests: 0,
+                total_requests: 1,
+                failed_requests: 1,
+                blocked_until: null,
+                last_error_code: 'network_error',
+                updated_at: new Date().toISOString()
+            });
+            await fetchKeys();
+            await executorService.reloadKeys(tier);
         }
     }
 
