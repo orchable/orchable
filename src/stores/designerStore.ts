@@ -48,6 +48,8 @@ interface DesignerState {
 	// Input data state (transient, not persisted)
 	inputData: {
 		mode: "tsv" | "json";
+		batchMode?: "per_item" | "all_in_one";
+		rawText?: string;
 		fileName: string | null;
 		syllabusData: unknown[]; // TSV mode (SyllabusRow[])
 		jsonData: unknown | null; // JSON mode
@@ -79,6 +81,8 @@ export const useDesignerStore = create<DesignerState>()(
 			config: null,
 			inputData: {
 				mode: "tsv",
+				batchMode: "per_item",
+				rawText: "",
 				fileName: null,
 				syllabusData: [],
 				jsonData: null,
@@ -102,6 +106,8 @@ export const useDesignerStore = create<DesignerState>()(
 				set({
 					inputData: {
 						mode: "tsv",
+						batchMode: "per_item",
+						rawText: "",
 						fileName: null,
 						syllabusData: [],
 						jsonData: null,

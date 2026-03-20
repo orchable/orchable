@@ -58,6 +58,7 @@ Không thêm các escape syntax dưa thừa xung quanh object JSON.
 
 ```json
 {
+  "lesson_id": "[Mã hoặc ID của bài]",
   "markdown_content": "# Giáo án Bài [X]: [Tên Bài]\n\n## 1. Thông tin chung\n* **Thời lượng:** ...\n\n## 2. Tài liệu / Hướng dẫn công nghệ\n...\n\n## 3. Tiến trình 5E\n### 3.1 Engage\n..."
 }
 ```

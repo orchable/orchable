@@ -155,6 +155,7 @@ export function StartConfigPanel() {
                         const mapping = savedMapping as JsonInputMapping;
                         setInputData({
                             mode: "json",
+                            rawText: text,
                             fileName: file.name,
                             jsonData: json,
                             jsonAnalysis: analysis,
@@ -168,6 +169,7 @@ export function StartConfigPanel() {
                     } else {
                         setInputData({
                             mode: "json",
+                            rawText: text,
                             fileName: file.name,
                             jsonData: json,
                             jsonAnalysis: analysis,
@@ -206,6 +208,7 @@ export function StartConfigPanel() {
 
                     setInputData({
                         mode: "tsv",
+                        rawText: text,
                         fileName: file.name,
                         syllabusData: data,
                     });
@@ -349,32 +352,59 @@ export function StartConfigPanel() {
                     </div>
 
                     {inputData.fileName && (
-                        <div className="p-3 rounded-md bg-success/5 border border-success/20">
-                            <div className="flex items-center gap-2">
-                                {inputData.mode === "json" ? (
-                                    <FileJson className="w-4 h-4 text-success" />
-                                ) : (
-                                    <FileSpreadsheet className="w-4 h-4 text-success" />
-                                )}
-                                <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-[11px] truncate">
-                                        {inputData.fileName}
-                                    </p>
-                                    <p className="text-[9px] text-muted-foreground">
-                                        {inputData.mode === "json"
-                                            ? `${(inputData.jsonAnalysis as AnalysisResult)?.sampleTasks?.length || 0} tasks`
-                                            : `${inputData.syllabusData.length} rows`}{" "}
-                                        detected
-                                    </p>
+                        <div className="space-y-3">
+                            <div className="p-3 rounded-md bg-success/5 border border-success/20">
+                                <div className="flex items-center gap-2">
+                                    {inputData.mode === "json" ? (
+                                        <FileJson className="w-4 h-4 text-success" />
+                                    ) : (
+                                        <FileSpreadsheet className="w-4 h-4 text-success" />
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-medium text-[11px] truncate">
+                                            {inputData.fileName}
+                                        </p>
+                                        <p className="text-[9px] text-muted-foreground">
+                                            {inputData.mode === "json"
+                                                ? `${(inputData.jsonAnalysis as AnalysisResult)?.sampleTasks?.length || 0} tasks`
+                                                : `${inputData.syllabusData.length} rows`}{" "}
+                                            detected
+                                        </p>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 w-6 p-0 hover:bg-destructive/10 hover:text-destructive"
+                                        onClick={clearInputData}
+                                    >
+                                        ×
+                                    </Button>
                                 </div>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6 p-0 hover:bg-destructive/10 hover:text-destructive"
-                                    onClick={clearInputData}
-                                >
-                                    ×
-                                </Button>
+                            </div>
+                            <div className="p-3 rounded-md bg-muted/30 border">
+                                <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80 mb-2 block">Execution Strategy</Label>
+                                <div className="space-y-2">
+                                    <label className="flex items-center space-x-2 cursor-pointer">
+                                        <input 
+                                            type="radio" 
+                                            name="strategy" 
+                                            checked={inputData.batchMode === 'per_item' || !inputData.batchMode} 
+                                            onChange={() => setInputData({ batchMode: 'per_item' })} 
+                                            className="w-3.5 h-3.5 text-primary border-primary focus:ring-primary"
+                                        />
+                                        <span className="text-[11px] font-medium">Split File (Run 1 Task Per Row/Item)</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 cursor-pointer">
+                                        <input 
+                                            type="radio" 
+                                            name="strategy" 
+                                            checked={inputData.batchMode === 'all_in_one'} 
+                                            onChange={() => setInputData({ batchMode: 'all_in_one' })} 
+                                            className="w-3.5 h-3.5 text-primary border-primary focus:ring-primary"
+                                        />
+                                        <span className="text-[11px] font-medium">Pass Entire File to 1 Task (as <code className="bg-muted px-1 py-0.5 rounded border">raw_input</code>)</span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     )}

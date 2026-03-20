@@ -85,6 +85,7 @@ export class SupabaseAdapter implements IStorageAdapter {
 			const { data, error } = await supabase.rpc(
 				"submit_free_tier_tasks",
 				{
+					p_batch_id: tasks[0]?.batch_id,
 					p_tasks: tasks,
 				},
 			);

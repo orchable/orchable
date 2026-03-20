@@ -4,7 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useDesignerStore } from '@/stores/designerStore';
 import { supabase } from '@/lib/supabase';
-import { storage, getAssetStorageAdapter } from '@/lib/storage';
+import { storage, getAssetStorageAdapter, getStorageAdapterForType } from '@/lib/storage';
+import { useTier } from '@/hooks/useTier';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -223,6 +224,7 @@ function extractVariables(template: string, delimiters?: { start: string; end: s
 export function StageConfigPanel({ stageId }: { stageId: string }) {
     const { nodes, edges, updateStepData, removeStep, duplicateStep } = useDesignerStore();
     const navigate = useNavigate();
+    const { tier } = useTier();
     const stage = nodes.find(n => n.id === stageId);
     const [activeTab, setActiveTab] = useState('basic');
     const designerConfig = useDesignerStore(state => state.config);
@@ -353,16 +355,17 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
     const fetchDocuments = useCallback(async () => {
         setLoadingDocs(true);
         try {
-            // Documents are handled via storage.adapter directly as they might be tier-isolated
-            await storage.waitForAdapter();
-            const documents = await storage.adapter.listAssets();
+            // Documents are handled via tier-isolated storage adapter as defined in AssetLibrary
+            const storageType = tier === 'premium' ? 'supabase' : 'indexeddb';
+            const documentStorage = getStorageAdapterForType(storageType);
+            const documents = await documentStorage.listAssets();
             setAvailableDocuments(documents);
         } catch (err) {
             console.error('Failed to fetch documents:', err);
         } finally {
             setLoadingDocs(false);
         }
-    }, []);
+    }, [tier]);
 
     const fetchOrchestrations = useCallback(async () => {
         setLoadingOrch(true);
@@ -511,7 +514,8 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                 custom_component_id: (data.custom_component_id === '_default' || !data.custom_component_id) ? null : data.custom_component_id,
                 return_along_with: data.return_along_with ? data.return_along_with.split(',').map(s => s.trim()).filter(Boolean) : [],
                 sub_orchestration_id: data.sub_orchestration_id,
-                sub_orchestration_output_path: data.sub_orchestration_output_path
+                sub_orchestration_output_path: data.sub_orchestration_output_path,
+                auxiliary_inputs: data.auxiliary_inputs || []
             });
 
             // 2. Persist to Asset Storage (Template)
@@ -550,6 +554,7 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                         settings: { format: 'json' }
                     },
                     return_along_with: data.return_along_with ? data.return_along_with.split(',').map(s => s.trim()).filter(Boolean) : [],
+                    auxiliary_inputs: data.auxiliary_inputs || [],
                 };
 
                 const aiSettings: AISettings = {
@@ -933,6 +938,7 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
             merge_path: form.getValues('merge_path'),
             output_mapping: form.getValues('output_mapping'),
             prompt_template_id: form.getValues('prompt_template_id'),
+            auxiliary_inputs: form.getValues('auxiliary_inputs'),
             ai_settings: {
                 model_id: form.getValues('model_id'),
                 temperature: form.getValues('temperature'),
@@ -998,6 +1004,7 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                     timeout: imported.timeout ?? imported.ai_settings?.timeout ?? 300000,
                     maxRetries: imported.retryConfig?.maxRetries ?? imported.ai_settings?.maxRetries ?? 3,
                     retryDelay: imported.retryConfig?.retryDelay ?? imported.ai_settings?.retryDelay ?? 5000,
+                    auxiliary_inputs: imported.auxiliary_inputs || [],
                 });
 
                 // Update store directly for non-form data

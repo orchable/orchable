@@ -160,6 +160,12 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
                 });
             }
 
+            if (inputData.batchMode === 'all_in_one') {
+                inputItems = [{
+                    raw_input: inputData.rawText || JSON.stringify(inputItems, null, 2)
+                }];
+            }
+
             if (!Array.isArray(inputItems) || inputItems.length === 0) {
                 toast.error('Input must be a non-empty array');
                 setIsCreating(false);
@@ -273,7 +279,11 @@ export function RunExecutionDialog({ disabled }: RunExecutionDialogProps) {
                                     <div className="bg-background/50 p-2 rounded border border-success/10">
                                         <p className="text-[10px] text-muted-foreground uppercase font-bold">Total Items</p>
                                         <p className="text-lg font-mono font-bold">
-                                            {inputData.mode === 'json' ? (inputData.jsonAnalysis as unknown as AnalysisResult)?.sampleTasks?.length : inputData.syllabusData.length}
+                                            {inputData.batchMode === 'all_in_one' 
+                                                ? '1 (All-in-one)' 
+                                                : (inputData.mode === 'json' 
+                                                    ? (inputData.jsonAnalysis as unknown as AnalysisResult)?.sampleTasks?.length 
+                                                    : inputData.syllabusData.length)}
                                         </p>
                                     </div>
                                     <div className="bg-background/50 p-2 rounded border border-success/10">
