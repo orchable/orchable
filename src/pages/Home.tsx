@@ -24,17 +24,17 @@ export function HomePage() {
       {/* Pipeline Visual Demo */}
       <PipelineDemo />
 
-      {/* Feature 1: Simplicity */}
+      {/* Feature 1: AI-Native Architecture */}
       <FeatureSection
         id="features"
-        tagline="Design without limits"
-        headline="One prompt. One Stage. Infinite scale."
-        description="Don't spend weeks learning complex automation tools. If you can write a prompt, you can build a multi-stage AI pipeline in Orchable. Focus on your expertise, not the infrastructure."
+        tagline="AI-Native Architecture"
+        headline="Built for Prompts. Not Just APIs."
+        description="General automation platforms like n8n are incredible for connecting services, but managing complex AI chaining, strict JSON contracts, and prompt versioning can get messy. Orchable's DAG is purpose-built from the ground up for LLMs—giving you a visual designer that understands AI Context and Structural Validation natively."
         bullets={[
-          "Single node type architecture",
-          "Zero-config AI stages",
-          "Visual drag-and-drop designer",
-          "Real-time token cost estimation"
+          "Native JSON Schema enforcement",
+          "Built-in token cost estimation",
+          "Dedicated Prompt Versioning",
+          "Seamless Auxiliary Data Context"
         ]}
         visual={
           <div className="p-8 flex items-center justify-center bg-primary/5 h-full w-full">
@@ -60,17 +60,17 @@ export function HomePage() {
         }
       />
 
-      {/* Feature 2: Visibility & Control */}
+      {/* Feature 2: High-Throughput Iteration */}
       <FeatureSection
         reverse
-        tagline="Full Visibility"
-        headline="Glass box, not a black box."
-        description="Monitor every single task live as it flows through your pipeline. Orchable gives you the power to pause, approve, or retry failed tasks at any stage without restarting the whole batch."
+        tagline="High-Throughput Map-Reduce"
+        headline="Deterministic Scale. Zero Agentic Loops."
+        description="Autonomous agents (OpenClaw/CrewAI) are perfect for open-ended exploration, but when you need to generate a 30-lesson curriculum or 10,000 product descriptions reliably, you need deterministic parallel scale. Orchable splits your data, runs thousands of LLM nodes instantly, and merges the results exactly as your Schema demands."
         bullets={[
-          "Real-time task tracking",
-          "Human-in-the-loop approvals",
-          "One-click retry for failures",
-          "Detailed execution history"
+          "Cardinality-aware flow (1:N, N:1)",
+          "Simultaneous multi-node execution",
+          "Absolute execution predictability",
+          "No risk of infinite agent loops"
         ]}
         visual={
           <div className="p-8 space-y-4 bg-muted/20 h-full w-full overflow-hidden">

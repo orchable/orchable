@@ -29,7 +29,7 @@ export function HeroSection() {
                 >
                     <Sparkles className="w-4 h-4 text-primary" />
                     <span className="text-sm font-bold text-primary tracking-wide uppercase">
-                        Built for Batch AI Processing at Scale
+                        The Mass-Production Pipeline for AI
                     </span>
                 </motion.div>
 
@@ -39,8 +39,8 @@ export function HeroSection() {
                     transition={{ duration: 0.6, delay: 0.1 }}
                     className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight leading-[1.05] mb-8"
                 >
-                    Turn Your Expertise into an <br />
-                    <span className="gradient-text drop-shadow-sm">AI Content Factory.</span>
+                    Built for AI Scale. <br />
+                    <span className="gradient-text drop-shadow-sm">Not Just Another Automation Tool.</span>
                 </motion.h1>
 
                 <motion.p
@@ -49,9 +49,9 @@ export function HeroSection() {
                     transition={{ duration: 0.6, delay: 0.2 }}
                     className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto mb-12 leading-relaxed"
                 >
-                    Design multi-step AI pipelines visually. Upload your data.
-                    Watch thousands of tasks run — structured, traceable, and ready to use.
-                    <span className="hidden md:inline"> Built with IO contracts and cardinality-aware flow.</span>
+                    While general platforms wire APIs, and agent frameworks explore open-ended tasks, 
+                    Orchable is laser-focused on one thing: Transforming your prompts into high-throughput, 
+                    100% deterministic AI content factories.
                 </motion.p>
 
                 <motion.div
