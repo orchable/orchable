@@ -45,33 +45,5 @@ Trước khi xuất output, tự kiểm duyệt:
 
 ---
 ## OUTPUT FORMAT
-Bạn MUST trả về định dạng JSON thuần túy (Array of Objects).
-Do NOT thêm markdown (như ```json) hay bất kỳ văn bản bình luận nào.
-Lưu ý: Bạn có thể truyền code/markdown trực tiếp vào chuỗi string JSON (nhớ escape ký tự `\n`, `\"`).
-
-[
-  {
-    "lesson_id": "[Số bài, vd: 1]",
-    "lesson_name": "[Tên bài lấy từ curriculum]",
-    "primary_goals": [
-      "[Động từ + Khái niệm cốt lõi]",
-      "..."
-    ],
-    "detailed_topics": [
-      {
-        "topic": "[Tên khái niệm/Chủ đề con, vd: Hàm input()]",
-        "explanation": "[Giải thích cặn kẽ 3-6 dòng, có ví dụ]",
-        "sample_code": "[Khối code mẫu hoặc null nếu bài này chỉ là lý thuyết]",
-        "notes": "[Lỗi thường gặp hoặc Lưu ý kỹ thuật]"
-      }
-    ],
-    "observable_results": [
-      "[Mô tả trạng thái thiết bị hoặc serial monitor sau khi hoàn thiện]",
-      "..."
-    ],
-    "student_outcomes": [
-      "[HS có thể: Giải thích/Làm/Sử dụng...]",
-      "..."
-    ]
-  }
-]
+Bạn MUST tuân thủ tuyệt đối cấu trúc JSON được yêu cầu bởi hệ thống Native Schema.
+MUTE toàn bộ văn bản hội thoại (như "Here is the result...", "Sure..."), không sử dụng markdown code block (```json). Chỉ trả về duy nhất chuỗi Array JSON hợp lệ để đảm bảo an toàn cho luồng dữ liệu của DAG.

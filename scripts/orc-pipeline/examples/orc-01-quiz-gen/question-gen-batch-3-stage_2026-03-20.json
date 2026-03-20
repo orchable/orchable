@@ -1,0 +1,1013 @@
+{
+  "_version": 1,
+  "_exportedAt": "2026-03-20T01:03:16.672Z",
+  "orchestratorName": "Question Gen Batch - 3 Stage",
+  "orchestratorDescription": "3 stage question gen batch preset",
+  "config": {
+    "id": "c13fc761-dcbd-47d5-8972-a417312b4d7c",
+    "name": "Question Gen Batch - 3 Stage",
+    "description": "3 stage question gen batch preset",
+    "steps": [
+      {
+        "id": "step_1769876400823",
+        "name": "A",
+        "label": "Core Question",
+        "stage_key": "core_question",
+        "task_type": "core_question_gen",
+        "prompt_template_id": "c13fc761-dcbd-47d5-8972-a417312b4d7c_core_question_step_1769876400823",
+        "cardinality": "one_to_one",
+        "split_path": "",
+        "split_mode": "per_item",
+        "output_mapping": "result",
+        "return_along_with": [],
+        "ai_settings": {
+          "model_id": "gemini-flash-latest",
+          "generate_content_api": "generateContent",
+          "generationConfig": {
+            "topK": 40,
+            "topP": 0.95,
+            "temperature": 1,
+            "maxOutputTokens": 32000
+          }
+        },
+        "timeout": 300000,
+        "retryConfig": {
+          "maxRetries": 3,
+          "retryDelay": 5000
+        },
+        "position": {
+          "x": 231.89229848548717,
+          "y": 135.13814545992372
+        },
+        "dependsOn": [],
+        "contract": {
+          "input": {
+            "fields": [
+              {
+                "name": "batch_number",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "lo_count",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "target_question_count",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "input_data",
+                "type": "string",
+                "required": true
+              }
+            ],
+            "delimiters": {
+              "end": "%%",
+              "start": "%%"
+            },
+            "auto_extracted": true
+          },
+          "output": {
+            "schema": {
+              "type": "object",
+              "required": [
+                "batch_info",
+                "output_data"
+              ],
+              "properties": {
+                "batch_info": {
+                  "type": "object",
+                  "required": [
+                    "total_los",
+                    "generated_questions"
+                  ],
+                  "properties": {
+                    "total_los": {
+                      "type": "number"
+                    },
+                    "generated_questions": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "output_data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "lo_code",
+                      "bloom_level",
+                      "context_code",
+                      "difficulty",
+                      "target_question_type",
+                      "original_question_type",
+                      "scenario",
+                      "core_question",
+                      "ideal_response",
+                      "explanation",
+                      "misconceptions",
+                      "image_description"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "number"
+                      },
+                      "lo_code": {
+                        "type": "string"
+                      },
+                      "scenario": {
+                        "type": "string"
+                      },
+                      "difficulty": {
+                        "type": "string"
+                      },
+                      "bloom_level": {
+                        "type": "string"
+                      },
+                      "explanation": {
+                        "type": "string"
+                      },
+                      "context_code": {
+                        "type": "string"
+                      },
+                      "core_question": {
+                        "type": "string"
+                      },
+                      "ideal_response": {
+                        "type": "string"
+                      },
+                      "misconceptions": {
+                        "type": "string"
+                      },
+                      "image_description": {
+                        "type": "string"
+                      },
+                      "target_question_type": {
+                        "type": "string"
+                      },
+                      "original_question_type": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "validation": "loose",
+            "format_injection": "append"
+          }
+        },
+        "requires_approval": false
+      },
+      {
+        "id": "step_1769876401997",
+        "name": "B",
+        "label": "Formatted Question",
+        "stage_key": "formatted_question",
+        "task_type": "formatted_question_gen",
+        "prompt_template_id": "c13fc761-dcbd-47d5-8972-a417312b4d7c_formatted_question_step_1769876401997",
+        "cardinality": "many_to_one",
+        "split_path": "",
+        "split_mode": "per_item",
+        "output_mapping": "result",
+        "return_along_with": [],
+        "ai_settings": {
+          "model_id": "gemini-flash-latest",
+          "generate_content_api": "generateContent",
+          "generationConfig": {
+            "topK": 40,
+            "topP": 0.95,
+            "temperature": 1,
+            "maxOutputTokens": 32000
+          }
+        },
+        "timeout": 300000,
+        "retryConfig": {
+          "maxRetries": 3,
+          "retryDelay": 5000
+        },
+        "position": {
+          "x": 230.9984538957463,
+          "y": 337.4819528270181
+        },
+        "dependsOn": [
+          "step_1769876400823"
+        ],
+        "contract": {
+          "input": {
+            "fields": [
+              {
+                "name": "assessment_item_format",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "input_data",
+                "type": "string",
+                "required": true
+              }
+            ],
+            "delimiters": {
+              "end": "%%",
+              "start": "%%"
+            },
+            "auto_extracted": true
+          },
+          "output": {
+            "schema": {
+              "type": "object",
+              "required": [
+                "batch_info",
+                "output_data"
+              ],
+              "properties": {
+                "batch_info": {
+                  "type": "object",
+                  "required": [
+                    "source_questions",
+                    "formatted_questions"
+                  ],
+                  "properties": {
+                    "source_questions": {
+                      "type": "number"
+                    },
+                    "formatted_questions": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "output_data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "code",
+                      "lo_code",
+                      "questionTypeCode",
+                      "prompt",
+                      "options",
+                      "correctAnswer",
+                      "tolerance",
+                      "explanation",
+                      "points",
+                      "learningObjectiveCodes",
+                      "bloomLevelCode",
+                      "difficultyCode",
+                      "contextCode",
+                      "knowledgeDimensionCode"
+                    ],
+                    "properties": {
+                      "code": {
+                        "type": "string"
+                      },
+                      "points": {
+                        "type": "number"
+                      },
+                      "prompt": {
+                        "type": "string"
+                      },
+                      "lo_code": {
+                        "type": "string"
+                      },
+                      "options": {
+                        "type": "string"
+                      },
+                      "tolerance": {
+                        "type": "number"
+                      },
+                      "contextCode": {
+                        "type": "string"
+                      },
+                      "explanation": {
+                        "type": "string"
+                      },
+                      "correctAnswer": {
+                        "type": "string"
+                      },
+                      "bloomLevelCode": {
+                        "type": "string"
+                      },
+                      "difficultyCode": {
+                        "type": "string"
+                      },
+                      "questionTypeCode": {
+                        "type": "string"
+                      },
+                      "knowledgeDimensionCode": {
+                        "type": "string"
+                      },
+                      "learningObjectiveCodes": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "validation": "loose",
+            "format_injection": "append"
+          }
+        },
+        "requires_approval": false
+      },
+      {
+        "id": "step_1771551751620",
+        "name": "C",
+        "label": "Qualified Question",
+        "stage_key": "qualified_question",
+        "task_type": "qualified_question_gen",
+        "prompt_template_id": "c13fc761-dcbd-47d5-8972-a417312b4d7c_qualified_question_step_1771551751620",
+        "cardinality": "one_to_one",
+        "split_path": "",
+        "split_mode": "per_item",
+        "output_mapping": "result",
+        "return_along_with": [],
+        "ai_settings": {
+          "model_id": "gemini-flash-latest",
+          "generate_content_api": "generateContent",
+          "generationConfig": {
+            "topK": 40,
+            "topP": 0.95,
+            "temperature": 1,
+            "maxOutputTokens": 32000
+          }
+        },
+        "timeout": 300000,
+        "retryConfig": {
+          "maxRetries": 3,
+          "retryDelay": 5000
+        },
+        "position": {
+          "x": 230.59566638463755,
+          "y": 547.0295077148164
+        },
+        "dependsOn": [
+          "step_1769876401997"
+        ],
+        "post_process": {
+          "type": "merge_with_input",
+          "enabled": true,
+          "merge_key": "code",
+          "on_failure": "continue",
+          "input_source": "custom",
+          "input_array_path": "output_data",
+          "merge_array_path": "output_data"
+        },
+        "contract": {
+          "input": {
+            "fields": [
+              {
+                "name": "input_data",
+                "type": "string",
+                "required": true
+              }
+            ],
+            "delimiters": {
+              "end": "%%",
+              "start": "%%"
+            },
+            "auto_extracted": true
+          },
+          "output": {
+            "schema": {
+              "type": "object",
+              "required": [
+                "batch_info",
+                "output_data"
+              ],
+              "properties": {
+                "batch_info": {
+                  "type": "object",
+                  "required": [
+                    "formatted_questions",
+                    "qualified_questions"
+                  ],
+                  "properties": {
+                    "formatted_questions": {
+                      "type": "number"
+                    },
+                    "qualified_questions": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "output_data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "code",
+                      "lo_code",
+                      "questionTypeCode",
+                      "prompt",
+                      "options",
+                      "correctAnswer",
+                      "tolerance",
+                      "explanation",
+                      "points",
+                      "learningObjectiveCodes",
+                      "bloomLevelCode",
+                      "difficultyCode",
+                      "contextCode",
+                      "knowledgeDimensionCode"
+                    ],
+                    "properties": {
+                      "code": {
+                        "type": "string"
+                      },
+                      "points": {
+                        "type": "number"
+                      },
+                      "prompt": {
+                        "type": "string"
+                      },
+                      "lo_code": {
+                        "type": "string"
+                      },
+                      "options": {
+                        "type": "string"
+                      },
+                      "tolerance": {
+                        "type": "number"
+                      },
+                      "contextCode": {
+                        "type": "string"
+                      },
+                      "explanation": {
+                        "type": "string"
+                      },
+                      "correctAnswer": {
+                        "type": "string"
+                      },
+                      "bloomLevelCode": {
+                        "type": "string"
+                      },
+                      "difficultyCode": {
+                        "type": "string"
+                      },
+                      "questionTypeCode": {
+                        "type": "string"
+                      },
+                      "knowledgeDimensionCode": {
+                        "type": "string"
+                      },
+                      "learningObjectiveCodes": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "validation": "loose",
+            "format_injection": "append"
+          }
+        },
+        "requires_approval": false
+      }
+    ],
+    "created_at": "2026-01-31T16:24:13.70124+00:00",
+    "updated_at": "2026-03-08T09:51:29.705+00:00",
+    "created_by": "4ecc3a2e-75fe-45da-b007-9a5075faa0fd",
+    "viewport": {
+      "x": 239.86116499985587,
+      "y": 695.3097545125049,
+      "zoom": 0.7863989484481688
+    },
+    "n8n_workflow_id": null,
+    "input_mapping": {
+      "mode": "json",
+      "fileName": "tasks_G3_weekly_5_v8.json",
+      "fieldMapping": {},
+      "fieldSelection": {
+        "shared": [
+          "metadata"
+        ],
+        "perTask": [
+          "task_id",
+          "lo_count",
+          "input_data",
+          "extra"
+        ]
+      },
+      "selectedTaskIndices": [
+        0
+      ]
+    },
+    "hub_asset_id": "68c12a23-0998-4a78-a51c-789213e824d3",
+    "is_public": true,
+    "tags": [],
+    "execution_delay_seconds": 0
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "type": "startNode",
+      "position": {
+        "x": 250,
+        "y": 0
+      },
+      "data": {
+        "label": "Start"
+      },
+      "deletable": false,
+      "measured": {
+        "width": 172,
+        "height": 48
+      }
+    },
+    {
+      "id": "step_1769876400823",
+      "type": "stepNode",
+      "position": {
+        "x": 231.89229848548717,
+        "y": 135.13814545992372
+      },
+      "data": {
+        "stepId": "step_1769876400823",
+        "name": "A",
+        "label": "Core Question",
+        "timeout": 300000,
+        "retryConfig": {
+          "maxRetries": 3,
+          "retryDelay": 5000
+        },
+        "stage_key": "core_question",
+        "task_type": "core_question_gen",
+        "prompt_template_id": "c13fc761-dcbd-47d5-8972-a417312b4d7c_core_question_step_1769876400823",
+        "cardinality": "one_to_one",
+        "ai_settings": {
+          "model_id": "gemini-flash-latest",
+          "generationConfig": {
+            "topK": 40,
+            "topP": 0.95,
+            "temperature": 1,
+            "maxOutputTokens": 32000
+          },
+          "generate_content_api": "generateContent"
+        },
+        "contract": {
+          "input": {
+            "fields": [
+              {
+                "name": "batch_number",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "lo_count",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "target_question_count",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "input_data",
+                "type": "string",
+                "required": true
+              }
+            ],
+            "delimiters": {
+              "end": "%%",
+              "start": "%%"
+            },
+            "auto_extracted": true
+          },
+          "output": {
+            "schema": {
+              "type": "object",
+              "required": [
+                "batch_info",
+                "output_data"
+              ],
+              "properties": {
+                "batch_info": {
+                  "type": "object",
+                  "required": [
+                    "total_los",
+                    "generated_questions"
+                  ],
+                  "properties": {
+                    "total_los": {
+                      "type": "number"
+                    },
+                    "generated_questions": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "output_data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "lo_code",
+                      "bloom_level",
+                      "context_code",
+                      "difficulty",
+                      "target_question_type",
+                      "original_question_type",
+                      "scenario",
+                      "core_question",
+                      "ideal_response",
+                      "explanation",
+                      "misconceptions",
+                      "image_description"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "number"
+                      },
+                      "lo_code": {
+                        "type": "string"
+                      },
+                      "scenario": {
+                        "type": "string"
+                      },
+                      "difficulty": {
+                        "type": "string"
+                      },
+                      "bloom_level": {
+                        "type": "string"
+                      },
+                      "explanation": {
+                        "type": "string"
+                      },
+                      "context_code": {
+                        "type": "string"
+                      },
+                      "core_question": {
+                        "type": "string"
+                      },
+                      "ideal_response": {
+                        "type": "string"
+                      },
+                      "misconceptions": {
+                        "type": "string"
+                      },
+                      "image_description": {
+                        "type": "string"
+                      },
+                      "target_question_type": {
+                        "type": "string"
+                      },
+                      "original_question_type": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "validation": "loose",
+            "format_injection": "append"
+          }
+        }
+      },
+      "deletable": true,
+      "measured": {
+        "width": 208,
+        "height": 121
+      }
+    },
+    {
+      "id": "step_1769876401997",
+      "type": "stepNode",
+      "position": {
+        "x": 230.9984538957463,
+        "y": 337.4819528270181
+      },
+      "data": {
+        "stepId": "step_1769876401997",
+        "name": "B",
+        "label": "Formatted Question",
+        "timeout": 300000,
+        "retryConfig": {
+          "maxRetries": 3,
+          "retryDelay": 5000
+        },
+        "stage_key": "formatted_question",
+        "task_type": "formatted_question_gen",
+        "prompt_template_id": "c13fc761-dcbd-47d5-8972-a417312b4d7c_formatted_question_step_1769876401997",
+        "cardinality": "many_to_one",
+        "ai_settings": {
+          "model_id": "gemini-flash-latest",
+          "generationConfig": {
+            "topK": 40,
+            "topP": 0.95,
+            "temperature": 1,
+            "maxOutputTokens": 32000
+          },
+          "generate_content_api": "generateContent"
+        },
+        "contract": {
+          "input": {
+            "fields": [
+              {
+                "name": "assessment_item_format",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "input_data",
+                "type": "string",
+                "required": true
+              }
+            ],
+            "delimiters": {
+              "end": "%%",
+              "start": "%%"
+            },
+            "auto_extracted": true
+          },
+          "output": {
+            "schema": {
+              "type": "object",
+              "required": [
+                "batch_info",
+                "output_data"
+              ],
+              "properties": {
+                "batch_info": {
+                  "type": "object",
+                  "required": [
+                    "source_questions",
+                    "formatted_questions"
+                  ],
+                  "properties": {
+                    "source_questions": {
+                      "type": "number"
+                    },
+                    "formatted_questions": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "output_data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "code",
+                      "lo_code",
+                      "questionTypeCode",
+                      "prompt",
+                      "options",
+                      "correctAnswer",
+                      "tolerance",
+                      "explanation",
+                      "points",
+                      "learningObjectiveCodes",
+                      "bloomLevelCode",
+                      "difficultyCode",
+                      "contextCode",
+                      "knowledgeDimensionCode"
+                    ],
+                    "properties": {
+                      "code": {
+                        "type": "string"
+                      },
+                      "points": {
+                        "type": "number"
+                      },
+                      "prompt": {
+                        "type": "string"
+                      },
+                      "lo_code": {
+                        "type": "string"
+                      },
+                      "options": {
+                        "type": "string"
+                      },
+                      "tolerance": {
+                        "type": "number"
+                      },
+                      "contextCode": {
+                        "type": "string"
+                      },
+                      "explanation": {
+                        "type": "string"
+                      },
+                      "correctAnswer": {
+                        "type": "string"
+                      },
+                      "bloomLevelCode": {
+                        "type": "string"
+                      },
+                      "difficultyCode": {
+                        "type": "string"
+                      },
+                      "questionTypeCode": {
+                        "type": "string"
+                      },
+                      "knowledgeDimensionCode": {
+                        "type": "string"
+                      },
+                      "learningObjectiveCodes": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "validation": "loose",
+            "format_injection": "append"
+          }
+        }
+      },
+      "deletable": true,
+      "measured": {
+        "width": 208,
+        "height": 121
+      }
+    },
+    {
+      "id": "step_1771551751620",
+      "type": "stepNode",
+      "position": {
+        "x": 230.59566638463755,
+        "y": 547.0295077148164
+      },
+      "data": {
+        "stepId": "step_1771551751620",
+        "name": "C",
+        "label": "Qualified Question",
+        "timeout": 300000,
+        "retryConfig": {
+          "maxRetries": 3,
+          "retryDelay": 5000
+        },
+        "stage_key": "qualified_question",
+        "task_type": "qualified_question_gen",
+        "prompt_template_id": "c13fc761-dcbd-47d5-8972-a417312b4d7c_qualified_question_step_1771551751620",
+        "cardinality": "one_to_one",
+        "ai_settings": {
+          "model_id": "gemini-flash-latest",
+          "generationConfig": {
+            "topK": 40,
+            "topP": 0.95,
+            "temperature": 1,
+            "maxOutputTokens": 32000
+          },
+          "generate_content_api": "generateContent"
+        },
+        "post_process": {
+          "type": "merge_with_input",
+          "enabled": true,
+          "merge_key": "code",
+          "on_failure": "continue",
+          "input_source": "custom",
+          "input_array_path": "output_data",
+          "merge_array_path": "output_data"
+        },
+        "contract": {
+          "input": {
+            "fields": [
+              {
+                "name": "input_data",
+                "type": "string",
+                "required": true
+              }
+            ],
+            "delimiters": {
+              "end": "%%",
+              "start": "%%"
+            },
+            "auto_extracted": true
+          },
+          "output": {
+            "schema": {
+              "type": "object",
+              "required": [
+                "batch_info",
+                "output_data"
+              ],
+              "properties": {
+                "batch_info": {
+                  "type": "object",
+                  "required": [
+                    "formatted_questions",
+                    "qualified_questions"
+                  ],
+                  "properties": {
+                    "formatted_questions": {
+                      "type": "number"
+                    },
+                    "qualified_questions": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "output_data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "code",
+                      "lo_code",
+                      "questionTypeCode",
+                      "prompt",
+                      "options",
+                      "correctAnswer",
+                      "tolerance",
+                      "explanation",
+                      "points",
+                      "learningObjectiveCodes",
+                      "bloomLevelCode",
+                      "difficultyCode",
+                      "contextCode",
+                      "knowledgeDimensionCode"
+                    ],
+                    "properties": {
+                      "code": {
+                        "type": "string"
+                      },
+                      "points": {
+                        "type": "number"
+                      },
+                      "prompt": {
+                        "type": "string"
+                      },
+                      "lo_code": {
+                        "type": "string"
+                      },
+                      "options": {
+                        "type": "string"
+                      },
+                      "tolerance": {
+                        "type": "number"
+                      },
+                      "contextCode": {
+                        "type": "string"
+                      },
+                      "explanation": {
+                        "type": "string"
+                      },
+                      "correctAnswer": {
+                        "type": "string"
+                      },
+                      "bloomLevelCode": {
+                        "type": "string"
+                      },
+                      "difficultyCode": {
+                        "type": "string"
+                      },
+                      "questionTypeCode": {
+                        "type": "string"
+                      },
+                      "knowledgeDimensionCode": {
+                        "type": "string"
+                      },
+                      "learningObjectiveCodes": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "validation": "loose",
+            "format_injection": "append"
+          }
+        }
+      },
+      "deletable": true,
+      "measured": {
+        "width": 208,
+        "height": 121
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_start-step_1769876400823",
+      "source": "start",
+      "target": "step_1769876400823",
+      "animated": true
+    },
+    {
+      "id": "e_step_1769876400823-step_1769876401997",
+      "source": "step_1769876400823",
+      "target": "step_1769876401997"
+    },
+    {
+      "id": "e_step_1769876401997-step_1771551751620",
+      "source": "step_1769876401997",
+      "target": "step_1771551751620"
+    }
+  ],
+  "viewport": {
+    "x": -72.27701725498144,
+    "y": 214.7917298444511,
+    "zoom": 1.3975190628062217
+  }
+}

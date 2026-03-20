@@ -1,80 +1,835 @@
 {
-  "_version": "1.0.0",
+  "_version": 1,
+  "_exportedAt": "2026-03-20T01:40:57.123Z",
   "orchestratorName": "ORC-10: Advanced Lesson Plan Generator",
   "orchestratorDescription": "Tái tạo tài liệu giáo án chi tiết theo chuẩn định dạng 5E từ Khung Chương trình",
-  "steps": [
+  "config": {
+    "id": "bd5ac273-94a8-485e-9a6e-a3947ce80458",
+    "name": "ORC-10: Advanced Lesson Plan Generator",
+    "description": "Tái tạo tài liệu giáo án chi tiết theo chuẩn định dạng 5E từ Khung Chương trình",
+    "steps": [
+      {
+        "id": "step_A",
+        "name": "P1",
+        "label": "Xác định Dự án Cuối",
+        "stage_key": "p1_final_product",
+        "task_type": "generic",
+        "prompt_template_id": "bd5ac273-94a8-485e-9a6e-a3947ce80458_p1_final_product_step_A",
+        "cardinality": "one_to_one",
+        "split_path": "",
+        "split_mode": "per_item",
+        "output_mapping": "result",
+        "return_along_with": [],
+        "ai_settings": {
+          "model_id": "gemini-2.5-flash",
+          "generate_content_api": "generateContent",
+          "generationConfig": {
+            "topK": 40,
+            "topP": 0.95,
+            "temperature": 1,
+            "thinkingBudget": 6656,
+            "maxOutputTokens": 32000
+          }
+        },
+        "timeout": 300000,
+        "retryConfig": {
+          "maxRetries": 3,
+          "retryDelay": 5000
+        },
+        "position": {
+          "x": 250,
+          "y": -21.008052955088637
+        },
+        "dependsOn": [],
+        "contract": {
+          "input": {
+            "fields": [
+              {
+                "name": "curriculum_table",
+                "type": "string",
+                "required": true
+              }
+            ],
+            "delimiters": {
+              "end": "%%",
+              "start": "%%"
+            },
+            "auto_extracted": true
+          },
+          "output": {
+            "validation": "loose",
+            "format_injection": "none",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "output_data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "number"
+                      },
+                      "final_product": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "final_product"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "output_data"
+              ]
+            }
+          }
+        },
+        "requires_approval": false
+      },
+      {
+        "id": "step_B",
+        "name": "P2",
+        "label": "Sản phẩm Từng bài",
+        "stage_key": "p2_lesson_products",
+        "task_type": "generic",
+        "prompt_template_id": "bd5ac273-94a8-485e-9a6e-a3947ce80458_p2_lesson_products_step_B",
+        "cardinality": "one_to_one",
+        "split_path": "",
+        "split_mode": "per_item",
+        "output_mapping": "result",
+        "return_along_with": [],
+        "ai_settings": {
+          "model_id": "gemini-2.5-flash-lite",
+          "generate_content_api": "generateContent",
+          "generationConfig": {
+            "topK": 40,
+            "topP": 0.95,
+            "temperature": 1,
+            "maxOutputTokens": 32000
+          }
+        },
+        "timeout": 120000,
+        "retryConfig": {
+          "maxRetries": 3,
+          "retryDelay": 5000
+        },
+        "position": {
+          "x": 601.0538953779585,
+          "y": 247.88423591022877
+        },
+        "dependsOn": [
+          "step_A"
+        ],
+        "contract": {
+          "input": {
+            "fields": [
+              {
+                "name": "curriculum_table",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "final_product",
+                "type": "string",
+                "required": true
+              }
+            ],
+            "delimiters": {
+              "end": "%%",
+              "start": "%%"
+            },
+            "auto_extracted": true
+          },
+          "output": {
+            "validation": "loose",
+            "format_injection": "none",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "output_data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "lesson_id": {
+                        "type": "string"
+                      },
+                      "lesson_product": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "lesson_id",
+                      "lesson_product"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "output_data"
+              ]
+            }
+          }
+        },
+        "requires_approval": false
+      },
+      {
+        "id": "step_C",
+        "name": "P3",
+        "label": "Tóm tắt Học phần",
+        "stage_key": "p3_module_summary",
+        "task_type": "generic",
+        "prompt_template_id": "bd5ac273-94a8-485e-9a6e-a3947ce80458_p3_module_summary_step_C",
+        "cardinality": "one_to_one",
+        "split_path": "",
+        "split_mode": "per_item",
+        "output_mapping": "result",
+        "return_along_with": [],
+        "ai_settings": {
+          "model_id": "gemini-2.5-flash-lite",
+          "generate_content_api": "generateContent",
+          "generationConfig": {
+            "topK": 40,
+            "topP": 0.95,
+            "temperature": 1,
+            "maxOutputTokens": 32000
+          }
+        },
+        "timeout": 120000,
+        "retryConfig": {
+          "maxRetries": 3,
+          "retryDelay": 5000
+        },
+        "position": {
+          "x": -105.56566875231624,
+          "y": 433.48488286172255
+        },
+        "dependsOn": [
+          "step_A",
+          "step_B"
+        ],
+        "contract": {
+          "input": {
+            "fields": [
+              {
+                "name": "curriculum_table",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "learning_objectives",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "final_product",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "lesson_products",
+                "type": "string",
+                "required": true
+              }
+            ],
+            "delimiters": {
+              "end": "%%",
+              "start": "%%"
+            },
+            "auto_extracted": true
+          },
+          "output": {
+            "validation": "loose",
+            "format_injection": "none",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "output_data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "lesson_id": {
+                        "type": "string"
+                      },
+                      "lesson_summary": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "lesson_id",
+                      "lesson_summary"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "output_data"
+              ]
+            }
+          }
+        },
+        "requires_approval": false
+      },
+      {
+        "id": "step_D",
+        "name": "P4",
+        "label": "Giáo án Chi tiết",
+        "stage_key": "p4_detailed_lesson",
+        "task_type": "generic",
+        "prompt_template_id": "bd5ac273-94a8-485e-9a6e-a3947ce80458_p4_detailed_lesson_step_D",
+        "cardinality": "one_to_one",
+        "split_path": "output_data",
+        "split_mode": "per_item",
+        "output_mapping": "result",
+        "return_along_with": [],
+        "ai_settings": {
+          "model_id": "gemini-2.5-flash",
+          "generate_content_api": "generateContent",
+          "generationConfig": {
+            "topK": 40,
+            "topP": 0.95,
+            "temperature": 1,
+            "thinkingBudget": 9728,
+            "maxOutputTokens": 32000
+          }
+        },
+        "timeout": 300000,
+        "retryConfig": {
+          "maxRetries": 3,
+          "retryDelay": 5000
+        },
+        "position": {
+          "x": 250,
+          "y": 777.1678302266982
+        },
+        "dependsOn": [
+          "step_A",
+          "step_B",
+          "step_C"
+        ],
+        "contract": {
+          "input": {
+            "fields": [
+              {
+                "name": "metadata",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "lesson_summary_prev",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "lesson_summary_current",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "lesson_summary_next",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "lesson_product_current",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "final_product",
+                "type": "string",
+                "required": true
+              }
+            ],
+            "delimiters": {
+              "end": "%%",
+              "start": "%%"
+            },
+            "auto_extracted": true
+          },
+          "output": {
+            "validation": "loose",
+            "format_injection": "none",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "lesson_id": {
+                  "type": "string"
+                },
+                "markdown_content": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "lesson_id",
+                "markdown_content"
+              ]
+            }
+          }
+        },
+        "requires_approval": false
+      }
+    ],
+    "created_at": "2026-03-11T04:29:22.274968+00:00",
+    "updated_at": "2026-03-19T15:34:19.594+00:00",
+    "created_by": "082b66d7-f8fc-4484-a5ee-79b51ad1f63c",
+    "viewport": {
+      "x": 267.9848694798974,
+      "y": 252.68590924138283,
+      "zoom": 0.5486659687896283
+    },
+    "n8n_workflow_id": null,
+    "input_mapping": {
+      "mode": "tsv",
+      "fileName": null,
+      "fieldMapping": {},
+      "fieldSelection": {
+        "shared": [],
+        "perTask": []
+      },
+      "selectedTaskIndices": []
+    },
+    "hub_asset_id": null,
+    "is_public": true,
+    "tags": [],
+    "execution_delay_seconds": 0
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "type": "startNode",
+      "position": {
+        "x": 250,
+        "y": 0
+      },
+      "data": {
+        "label": "Start"
+      },
+      "deletable": false,
+      "measured": {
+        "width": 172,
+        "height": 48
+      }
+    },
     {
       "id": "step_A",
-      "name": "Process 1",
-      "label": "Xác định Dự án Cuối",
-      "stage_key": "p1_final_product",
-      "task_type": "generation",
-      "cardinality": "1:1",
-      "dependsOn": [],
-      "ai_settings": {
-        "model_id": "gemini-1.5-pro-002",
-        "generationConfig": {
-          "temperature": 0.5,
-          "maxOutputTokens": 2048
-        }
+      "type": "stepNode",
+      "position": {
+        "x": 250,
+        "y": -21.008052955088637
+      },
+      "data": {
+        "stepId": "step_A",
+        "name": "P1",
+        "label": "Xác định Dự án Cuối",
+        "timeout": 300000,
+        "retryConfig": {
+          "maxRetries": 3,
+          "retryDelay": 5000
+        },
+        "stage_key": "p1_final_product",
+        "task_type": "generic",
+        "prompt_template_id": "bd5ac273-94a8-485e-9a6e-a3947ce80458_p1_final_product_step_A",
+        "cardinality": "one_to_one",
+        "ai_settings": {
+          "model_id": "gemini-2.5-flash",
+          "generationConfig": {
+            "topK": 40,
+            "topP": 0.95,
+            "temperature": 1,
+            "thinkingBudget": 6656,
+            "maxOutputTokens": 32000
+          },
+          "generate_content_api": "generateContent"
+        },
+        "contract": {
+          "input": {
+            "fields": [
+              {
+                "name": "curriculum_table",
+                "type": "string",
+                "required": true
+              }
+            ],
+            "delimiters": {
+              "end": "%%",
+              "start": "%%"
+            },
+            "auto_extracted": true
+          },
+          "output": {
+            "validation": "loose",
+            "format_injection": "none",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "output_data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "number"
+                      },
+                      "final_product": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "final_product"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "output_data"
+              ]
+            }
+          }
+        },
+        "custom_component_id": null
+      },
+      "deletable": true,
+      "measured": {
+        "width": 208,
+        "height": 121
       }
     },
     {
       "id": "step_B",
-      "name": "Process 2",
-      "label": "Sản phẩm Từng bài",
-      "stage_key": "p2_lesson_products",
-      "task_type": "generation",
-      "cardinality": "1:1",
-      "dependsOn": [
-        "step_A"
-      ],
-      "ai_settings": {
-        "model_id": "gemini-1.5-pro-002",
-        "generationConfig": {
-          "temperature": 0.5,
-          "maxOutputTokens": 4096
-        }
+      "type": "stepNode",
+      "position": {
+        "x": 601.0538953779585,
+        "y": 247.88423591022877
+      },
+      "data": {
+        "stepId": "step_B",
+        "name": "P2",
+        "label": "Sản phẩm Từng bài",
+        "timeout": 120000,
+        "retryConfig": {
+          "maxRetries": 3,
+          "retryDelay": 5000
+        },
+        "stage_key": "p2_lesson_products",
+        "task_type": "generic",
+        "prompt_template_id": "bd5ac273-94a8-485e-9a6e-a3947ce80458_p2_lesson_products_step_B",
+        "cardinality": "one_to_one",
+        "ai_settings": {
+          "model_id": "gemini-2.5-flash-lite",
+          "generationConfig": {
+            "topK": 40,
+            "topP": 0.95,
+            "temperature": 1,
+            "maxOutputTokens": 32000
+          },
+          "generate_content_api": "generateContent"
+        },
+        "contract": {
+          "input": {
+            "fields": [
+              {
+                "name": "curriculum_table",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "final_product",
+                "type": "string",
+                "required": true
+              }
+            ],
+            "delimiters": {
+              "end": "%%",
+              "start": "%%"
+            },
+            "auto_extracted": true
+          },
+          "output": {
+            "validation": "loose",
+            "format_injection": "none",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "output_data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "lesson_id": {
+                        "type": "string"
+                      },
+                      "lesson_product": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "lesson_id",
+                      "lesson_product"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "output_data"
+              ]
+            }
+          }
+        },
+        "custom_component_id": null
+      },
+      "deletable": true,
+      "measured": {
+        "width": 208,
+        "height": 121
       }
     },
     {
       "id": "step_C",
-      "name": "Process 3",
-      "label": "Tóm tắt Học phần",
-      "stage_key": "p3_module_summary",
-      "task_type": "generation",
-      "cardinality": "1:1",
-      "dependsOn": [
-        "step_A",
-        "step_B"
-      ],
-      "ai_settings": {
-        "model_id": "gemini-1.5-pro-002",
-        "generationConfig": {
-          "temperature": 0.5,
-          "maxOutputTokens": 8192
-        }
+      "type": "stepNode",
+      "position": {
+        "x": -105.56566875231624,
+        "y": 433.48488286172255
+      },
+      "data": {
+        "stepId": "step_C",
+        "name": "P3",
+        "label": "Tóm tắt Học phần",
+        "timeout": 120000,
+        "retryConfig": {
+          "maxRetries": 3,
+          "retryDelay": 5000
+        },
+        "stage_key": "p3_module_summary",
+        "task_type": "generic",
+        "prompt_template_id": "bd5ac273-94a8-485e-9a6e-a3947ce80458_p3_module_summary_step_C",
+        "cardinality": "one_to_one",
+        "ai_settings": {
+          "model_id": "gemini-2.5-flash-lite",
+          "generationConfig": {
+            "topK": 40,
+            "topP": 0.95,
+            "temperature": 1,
+            "maxOutputTokens": 32000
+          },
+          "generate_content_api": "generateContent"
+        },
+        "contract": {
+          "input": {
+            "fields": [
+              {
+                "name": "curriculum_table",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "learning_objectives",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "final_product",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "lesson_products",
+                "type": "string",
+                "required": true
+              }
+            ],
+            "delimiters": {
+              "end": "%%",
+              "start": "%%"
+            },
+            "auto_extracted": true
+          },
+          "output": {
+            "validation": "loose",
+            "format_injection": "none",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "output_data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "lesson_id": {
+                        "type": "string"
+                      },
+                      "lesson_summary": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "lesson_id",
+                      "lesson_summary"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "output_data"
+              ]
+            }
+          }
+        },
+        "custom_component_id": null
+      },
+      "deletable": true,
+      "measured": {
+        "width": 208,
+        "height": 121
       }
     },
     {
       "id": "step_D",
-      "name": "Process 4",
-      "label": "Giáo án Chi tiết (5E)",
-      "stage_key": "p4_detailed_lesson",
-      "task_type": "generation",
-      "cardinality": "1:1",
-      "dependsOn": [
-        "step_A",
-        "step_B",
-        "step_C"
-      ],
-      "ai_settings": {
-        "model_id": "gemini-1.5-pro-002",
-        "generationConfig": {
-          "temperature": 0.5,
-          "maxOutputTokens": 8192
-        }
+      "type": "stepNode",
+      "position": {
+        "x": 250,
+        "y": 777.1678302266982
+      },
+      "data": {
+        "stepId": "step_D",
+        "name": "P4",
+        "label": "Giáo án Chi tiết",
+        "timeout": 300000,
+        "retryConfig": {
+          "maxRetries": 3,
+          "retryDelay": 5000
+        },
+        "stage_key": "p4_detailed_lesson",
+        "task_type": "generic",
+        "prompt_template_id": "bd5ac273-94a8-485e-9a6e-a3947ce80458_p4_detailed_lesson_step_D",
+        "cardinality": "one_to_one",
+        "ai_settings": {
+          "model_id": "gemini-2.5-flash",
+          "generationConfig": {
+            "topK": 40,
+            "topP": 0.95,
+            "temperature": 1,
+            "thinkingBudget": 9728,
+            "maxOutputTokens": 32000
+          },
+          "generate_content_api": "generateContent"
+        },
+        "contract": {
+          "input": {
+            "fields": [
+              {
+                "name": "metadata",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "lesson_summary_prev",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "lesson_summary_current",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "lesson_summary_next",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "lesson_product_current",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "final_product",
+                "type": "string",
+                "required": true
+              }
+            ],
+            "delimiters": {
+              "end": "%%",
+              "start": "%%"
+            },
+            "auto_extracted": true
+          },
+          "output": {
+            "validation": "loose",
+            "format_injection": "none",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "lesson_id": {
+                  "type": "string"
+                },
+                "markdown_content": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "lesson_id",
+                "markdown_content"
+              ]
+            }
+          }
+        },
+        "custom_component_id": null,
+        "split_path": "output_data"
+      },
+      "deletable": true,
+      "measured": {
+        "width": 208,
+        "height": 121
       }
     }
-  ]
+  ],
+  "edges": [
+    {
+      "id": "e_start-step_A",
+      "source": "start",
+      "target": "step_A",
+      "animated": true
+    },
+    {
+      "id": "e_step_A-step_B",
+      "source": "step_A",
+      "target": "step_B"
+    },
+    {
+      "id": "e_step_A-step_C",
+      "source": "step_A",
+      "target": "step_C"
+    },
+    {
+      "id": "e_step_B-step_C",
+      "source": "step_B",
+      "target": "step_C"
+    },
+    {
+      "id": "e_step_A-step_D",
+      "source": "step_A",
+      "target": "step_D"
+    },
+    {
+      "id": "e_step_B-step_D",
+      "source": "step_B",
+      "target": "step_D"
+    },
+    {
+      "id": "e_step_C-step_D",
+      "source": "step_C",
+      "target": "step_D"
+    }
+  ],
+  "viewport": {
+    "x": 267.9848694798974,
+    "y": 252.68590924138283,
+    "zoom": 0.5486659687896283
+  }
 }

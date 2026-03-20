@@ -36,16 +36,5 @@ Xem xét cẩn thận Khung Chương trình và Sản phẩm Cuối:
 
 ---
 ## OUTPUT FORMAT
-Bạn MUST trả về định dạng JSON thuần túy chứa một Array các object.
-Do NOT thêm markdown (như ```json) hay bất kỳ văn bản bình luận nào.
-
-[
-  {
-    "lesson_id": "[Số bài, vd: 1]",
-    "lesson_name": "[Tên bài lấy từ curriculum]",
-    "product_name": "[Tên sản phẩm ngắn gọn, cụ thể của buổi hôm nay]",
-    "activity_description": "[2-3 câu: mô tả hệ thống hôm nay làm gì, test như thế nào]",
-    "inherited_from_previous": "[Tên thành phần, file code được giữ lại từ bài trước (hoặc null nếu là bài 1)]",
-    "contribution_to_final": "[Bước đệm này sẽ đóng góp tính năng cụ thể nào vào dự án cuối]"
-  }
-]
+Bạn MUST tuân thủ tuyệt đối cấu trúc JSON được yêu cầu bởi hệ thống Native Schema.
+MUTE toàn bộ văn bản hội thoại (như "Here is the result...", "Sure..."), không sử dụng markdown code block (```json). Chỉ trả về duy nhất chuỗi Array JSON hợp lệ để đảm bảo an toàn cho luồng dữ liệu.

@@ -559,11 +559,12 @@ async function processTask(task: AiTask) {
 		const extra = (task.extra || {}) as Record<string, unknown>;
 
 		let globalContextStr = "";
+		let globalContextObj: Record<string, string> | undefined = undefined;
 		if (task.batch_id) {
 			const batch = await db.task_batches.get(task.batch_id);
 			if (batch && batch.global_context) {
-				const gc = batch.global_context as Record<string, string>;
-				globalContextStr = Object.entries(gc)
+				globalContextObj = batch.global_context as Record<string, string>;
+				globalContextStr = Object.entries(globalContextObj)
 					.map(
 						([name, content]) =>
 							`--- DOCUMENT: ${name} ---\n${content}\n--- END OF DOCUMENT ---`,
@@ -617,6 +618,7 @@ async function processTask(task: AiTask) {
 			task.batch_id,
 			globalContextStr,
 			task.id,
+			globalContextObj
 		);
 		let result = apiResult;
 
@@ -943,6 +945,7 @@ async function callGemini(
 	batchId?: string,
 	globalContextStr?: string,
 	taskId?: string,
+	globalContextObj?: Record<string, string>
 ) {
 	let model = aiSettings?.model_id || ("gemini-2.0-flash" as AIModel);
 
@@ -968,6 +971,9 @@ async function callGemini(
 		bodyPayload.batch_id = batchId;
 		bodyPayload.prompt = prompt;
 		bodyPayload.ai_settings = aiSettings;
+		if (globalContextObj) {
+			bodyPayload.global_context = globalContextObj;
+		}
 		bodyPayload.provider =
 			aiSettings?.provider ||
 			(model.startsWith("deepseek")
@@ -980,7 +986,7 @@ async function callGemini(
 		bodyPayload.system_instruction = (
 			aiSettings as unknown as Record<string, unknown>
 		).systemInstruction;
-	} else if (globalContextStr) {
+	} else if (globalContextStr && !prompt.includes("--- DOCUMENT: ")) {
 		(bodyPayload.contents as unknown[])[0] = {
 			parts: [{ text: `${globalContextStr}\n\n${prompt}` }],
 		};
@@ -1040,6 +1046,7 @@ async function callGemini(
 					settings: aiSettings,
 					tier: currentTier,
 					pool: currentConfig.poolType,
+					...(globalContextObj ? { global_context: globalContextObj } : {}),
 				},
 			);
 			return { data: webhookResult, usedKeyName };
