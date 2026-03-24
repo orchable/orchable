@@ -174,7 +174,7 @@ export function useSaveOrchestrator() {
 						source: e.source,
 						target: e.target,
 						edgeConfig: ec || {
-							cardinality: "1:1" as const,
+							cardinality: "one_to_one" as const,
 							split_path: "",
 							split_mode: "per_item" as const,
 							batch_grouping: "global" as const,

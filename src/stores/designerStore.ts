@@ -191,7 +191,7 @@ export const useDesignerStore = create<DesignerState>()(
 					id: `e_${connection.source}-${connection.target}`,
 					data: {
 						edgeConfig: {
-							cardinality: "1:1",
+							cardinality: "one_to_one",
 							split_path: "",
 							split_mode: "per_item",
 							batch_grouping: "global",
@@ -416,7 +416,7 @@ export const useDesignerStore = create<DesignerState>()(
 								target: step.id,
 								data: {
 									edgeConfig: {
-										cardinality: "1:1",
+										cardinality: "one_to_one",
 										split_path: "",
 										split_mode: "per_item",
 										batch_grouping: "global",
@@ -438,7 +438,7 @@ export const useDesignerStore = create<DesignerState>()(
 								animated: true,
 								data: {
 									edgeConfig: {
-										cardinality: "1:1",
+										cardinality: "one_to_one",
 										split_path: "",
 										split_mode: "per_item",
 										batch_grouping: "global",
@@ -534,7 +534,7 @@ export const useDesignerStore = create<DesignerState>()(
 								animated: true,
 								data: {
 									edgeConfig: {
-										cardinality: "1:1",
+										cardinality: "one_to_one",
 										split_path: "",
 										split_mode: "per_item",
 										batch_grouping: "global",
@@ -558,7 +558,7 @@ export const useDesignerStore = create<DesignerState>()(
 								animated: true,
 								data: {
 									edgeConfig: {
-										cardinality: "1:1",
+										cardinality: "one_to_one",
 										split_path: "",
 										split_mode: "per_item",
 										batch_grouping: "global",
@@ -623,7 +623,7 @@ export const useDesignerStore = create<DesignerState>()(
 					target: idMap[edge.target],
 					data: edge.data ? JSON.parse(JSON.stringify(edge.data)) : {
 						edgeConfig: {
-							cardinality: "1:1",
+							cardinality: "one_to_one",
 							split_path: "",
 							split_mode: "per_item",
 							batch_grouping: "global",
