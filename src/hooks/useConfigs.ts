@@ -203,7 +203,7 @@ export function useSaveOrchestrator() {
 					savedConfig.id,
 					savedConfig.name,
 					steps,
-					edges,
+					payload.edges,
 				);
 
 				// Update local nodes with the generated prompt_template_ids
