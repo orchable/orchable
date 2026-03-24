@@ -25,28 +25,28 @@
 - [x] 3.6 Update `OrchestratorDesigner.tsx` to handle `selectedEdge` state and render `EdgeConfigPanel` in right sidebar
 
 ## 4. Stage Service — Prompt Template Sync
-- [ ] 4.1 Update `syncStagesToPromptTemplates` to build routing metadata from edge configs
-- [ ] 4.2 Remove `stageConfig.cardinality` mapping from stage sync logic
+- [x] 4.1 Update `syncStagesToPromptTemplates` to build routing metadata from edge configs
+- [x] 4.2 Remove `stageConfig.cardinality` mapping from stage sync logic
 
 ## 5. Execution Engine — Worker & Batch Service
-- [ ] 5.1 Update `batchService.createLaunch` to build `next_stage_configs[]` from edge configs
-- [ ] 5.2 Remove stage-level cardinality from `current_stage_config` in batchService
-- [ ] 5.3 Refactor `handleNextStages` in worker: outer loop per-edge, inner logic per-cardinality
-- [ ] 5.4 Update N:1 merge check to be per-edge scoped (atomic transaction)
-- [ ] 5.5 Update 1:N split logic to read `split_path`/`split_mode` from per-edge config
-- [ ] 5.6 Update hydration logic to read edge config from template metadata
+- [x] 5.1 Update `batchService.createLaunch` to build `next_stage_configs[]` from edge configs
+- [x] 5.2 Remove stage-level cardinality from `current_stage_config` in batchService
+- [x] 5.3 Refactor `handleNextStages` in worker: outer loop per-edge, inner logic per-cardinality
+- [x] 5.4 Update N:1 merge check to be per-edge scoped (atomic transaction)
+- [x] 5.5 Update 1:N split logic to read `split_path`/`split_mode` from per-edge config
+- [x] 5.6 Update hydration logic to read edge config from template metadata
 
 ## 6. Peripheral Components
-- [ ] 6.1 Update `Launcher.tsx` orchestrationMetadata to read from edge configs
-- [ ] 6.2 Update `Calculator.tsx` cost estimation to read cardinality from edges
-- [ ] 6.3 Update `AssetLibrary.tsx` template defaults (if applicable)
+- [x] 6.1 Update `Launcher.tsx` orchestrationMetadata to read from edge configs
+- [x] 6.2 Update `Calculator.tsx` cost estimation to read cardinality from edges
+- [x] 6.3 Update `AssetLibrary.tsx` template defaults (if applicable)
 
 ## 7. n8n Workflows (Optional — May Defer)
 - [ ] 7.1 Update `[Base] Base Agent with Key.json` JS code nodes
 - [ ] 7.2 Update `[Base] Load Batch - Supabase to n8n.json` stage config mapping
 
 ## 8. Verification
-- [ ] 8.1 TypeScript compiler pass: `npx tsc --noEmit`
+- [x] 8.1 TypeScript compiler pass: `npx tsc --noEmit`
 - [ ] 8.2 Manual: Designer roundtrip (create → config edges → save → reload)
 - [ ] 8.3 Manual: Mixed 1:N + 1:1 execution test
 - [ ] 8.4 Manual: N:1 merge test (last sibling triggers merge)

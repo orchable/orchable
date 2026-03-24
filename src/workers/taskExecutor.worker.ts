@@ -1447,28 +1447,35 @@ async function handleNextStages(
 		(extra.next_stage_configs as Record<string, unknown>[]) || [];
 
 	// Hydrate from template if not present (N8n behaviour)
+	// Edge routing is stored under template.stage_config.edge_routing[targetTemplateId]
 	if (
 		nextStageConfigs.length === 0 &&
 		template.next_stage_template_ids &&
 		template.next_stage_template_ids.length > 0
 	) {
 		const { db } = await import("../lib/storage/IndexedDBAdapter");
+		// Read edge_routing from the CURRENT template's stage_config (set by stageService)
+		const currentSc = (template.stage_config as Record<string, unknown>) || {};
+		const edgeRoutingMap = (currentSc.edge_routing as Record<string, Record<string, unknown>>) || {};
+
 		nextStageConfigs = await Promise.all(
 			template.next_stage_template_ids.map(async (id) => {
 				const tpl = await db.prompt_templates.get(id);
-				const sc = (tpl?.stage_config as Record<string, unknown>) || {};
+				const tplSc = (tpl?.stage_config as Record<string, unknown>) || {};
+				// Prefer edge_routing from the source template (per-edge config)
+				const er = edgeRoutingMap[id] || {};
 				return {
 					template_id: id,
-					cardinality: sc.cardinality || "one_to_one",
-					split_path: sc.split_path || null,
-					split_mode: sc.split_mode || "per_item",
-					merge_path: sc.merge_path || null,
-					output_mapping: sc.output_mapping || "result",
-					batch_grouping: sc.batch_grouping || null,
-					requires_approval: sc.requires_approval || false,
-					export_config: sc.export_config || undefined,
-					delimiters: sc.delimiters || undefined,
-					dependsOn: (sc.dependsOn as string[]) || [],
+					cardinality: er.cardinality || "one_to_one",
+					split_path: er.split_path || null,
+					split_mode: er.split_mode || "per_item",
+					merge_path: er.merge_path || null,
+					output_mapping: er.output_mapping || "result",
+					batch_grouping: er.batch_grouping || null,
+					requires_approval: tplSc.requires_approval || false,
+					export_config: tplSc.export_config || undefined,
+					delimiters: tplSc.delimiters || undefined,
+					dependsOn: (tplSc.dependsOn as string[]) || [],
 				};
 			}),
 		);
@@ -1476,77 +1483,64 @@ async function handleNextStages(
 
 	if (nextStageConfigs.length === 0) return;
 
-	const currentStageConfig =
-		(extra.current_stage_config as Record<string, unknown>) ||
-		template.stage_config ||
-		{};
-	const cardinality = currentStageConfig.cardinality || "one_to_one";
+	for (const nextConfig of nextStageConfigs) {
+		const cardinality = nextConfig.cardinality || "one_to_one";
 
-	if (cardinality === "many_to_one" || cardinality === "N:1") {
-		// N:1 logic: Wait for siblings, then aggregate to spawn next stages
-		await handleManyToOne(task, result, template, nextStageConfigs);
-		return;
-	}
+		if (cardinality === "many_to_one" || cardinality === "N:1") {
+			// N:1 logic: Wait for siblings, then aggregate to spawn this specific next stage
+			await handleManyToOne(task, result, template, nextConfig);
+			continue;
+		}
 
-	if (cardinality === "one_to_many" || cardinality === "1:N") {
-		const splitMode = currentStageConfig.split_mode || "per_item";
-		const splitPath: string =
-			(currentStageConfig.split_path as string) || "result";
+		if (cardinality === "one_to_many" || cardinality === "1:N") {
+			const splitMode = nextConfig.split_mode || "per_item";
+			const splitPath: string = (nextConfig.split_path as string) || "result";
 
-		// 🔥 Parallel Join Check for 1:N
-		let effectiveResult = result;
-		let isJoinMet = true;
+			// 🔥 Parallel Join Check for 1:N
+			let effectiveResult = result;
+			let isJoinMet = true;
 
-		const first1N = nextStageConfigs.find(
-			(nc) =>
-				nc.cardinality === "one_to_many" || nc.cardinality === "1:N",
-		);
-		if (first1N) {
-			const dependsOn = (first1N.dependsOn as string[]) || [];
+			const dependsOn = (nextConfig.dependsOn as string[]) || [];
 			if (
 				dependsOn.length > 1 ||
 				(dependsOn.length === 1 && dependsOn[0] !== task.stage_key)
 			) {
-				const mergedInput = await checkDependenciesMet(task, first1N);
+				const mergedInput = await checkDependenciesMet(task, nextConfig);
 				if (!mergedInput) {
 					console.log(
-						`[Worker] Parallel dependencies for 1:N stage ${first1N.template_id} not met. Waiting.`,
+						`[Worker] Parallel dependencies for 1:N stage ${nextConfig.template_id} not met. Waiting.`,
 					);
 					isJoinMet = false;
 				} else {
 					effectiveResult = mergedInput;
 				}
 			}
-		}
 
-		if (isJoinMet) {
-			let items: unknown;
-			if (splitPath === "result" || splitPath === ".") {
-				items = effectiveResult;
-			} else {
-				const cleanPath = splitPath.startsWith("result.")
-					? splitPath.slice(7)
-					: splitPath;
-				items = getValueByPath(
-					effectiveResult as Record<string, unknown>,
-					cleanPath,
-				);
-			}
+			if (isJoinMet) {
+				let items: unknown;
+				if (splitPath === "result" || splitPath === ".") {
+					items = effectiveResult;
+				} else {
+					const cleanPath = splitPath.startsWith("result.")
+						? splitPath.slice(7)
+						: splitPath;
+					items = getValueByPath(
+						effectiveResult as Record<string, unknown>,
+						cleanPath,
+					);
+				}
 
-			if (Array.isArray(items)) {
-				if (splitMode === "per_item") {
-					for (const nextConfig of nextStageConfigs) {
-						const nextTemplateId = nextConfig.template_id;
-						const nextTemplate =
-							await db.prompt_templates.get(nextTemplateId);
-						if (!nextTemplate) continue;
+				if (Array.isArray(items)) {
+					const { db } = await import("../lib/storage/IndexedDBAdapter");
+					const nextTemplateId = nextConfig.template_id as string;
+					const nextTemplate = await db.prompt_templates.get(nextTemplateId);
+					if (!nextTemplate) continue;
 
+					if (splitMode === "per_item") {
 						const newTasks = items.map((item, idx) => ({
 							id: crypto.randomUUID(),
 							batch_id: task.batch_id,
-							stage_key:
-								nextTemplate.stage_key ||
-								extractStageKey(nextTemplate.id),
+							stage_key: nextTemplate.stage_key || extractStageKey(nextTemplateId),
 							step_number: (task.step_number || 0) + 1,
 							status: "plan",
 							input_data: {
@@ -1561,73 +1555,42 @@ async function handleNextStages(
 								...(task.hierarchy_path || []),
 								`${task.id}#${idx}`,
 							],
-							launch_id:
-								task.launch_id ||
-								((task as unknown as Record<string, unknown>)
-									.launch_id as string),
-							split_group_id:
-								((task as unknown as Record<string, unknown>)
-									.split_group_id as string) || task.id,
-							task_type: extractStageKey(nextTemplate.id),
-							prompt_template_id: nextTemplate.id,
+							launch_id: task.launch_id || ((task as unknown as Record<string, unknown>).launch_id as string),
+							split_group_id: ((task as unknown as Record<string, unknown>).split_group_id as string) || task.id,
+							task_type: extractStageKey(nextTemplateId),
+							prompt_template_id: nextTemplateId,
 							created_at: new Date().toISOString(),
 							sequence: idx + 1,
 							extra: {
 								current_stage_config: {
 									template_id: nextTemplateId,
-									cardinality:
-										nextConfig.cardinality || "one_to_one",
+									cardinality: nextConfig.cardinality || "one_to_one",
 									split_path: nextConfig.split_path || null,
-									split_mode:
-										nextConfig.split_mode || "per_item",
+									split_mode: nextConfig.split_mode || "per_item",
 									merge_path: nextConfig.merge_path || null,
-									output_mapping:
-										nextConfig.output_mapping || "result",
-									export_config:
-										nextConfig.export_config || undefined,
+									output_mapping: nextConfig.output_mapping || "result",
+									export_config: nextConfig.export_config || undefined,
 								},
 								delimiters: nextConfig.delimiters || undefined,
 								parent_stage_key: task.stage_key,
 								parent_task_id: task.id,
 							},
 						}));
-						await db.ai_tasks.bulkAdd(
-							newTasks as unknown as AiTask[],
-						);
-						await incrementBatchTotalTasks(
-							task.batch_id,
-							newTasks.length,
-						);
-					}
-				} else if (splitMode === "per_batch") {
-					const batchSize =
-						(currentStageConfig.batch_size as number) || 10;
-					for (const nextConfig of nextStageConfigs) {
-						const nextTemplateId = nextConfig.template_id;
-						const nextTemplate =
-							await db.prompt_templates.get(nextTemplateId);
-						if (!nextTemplate) continue;
-
+						await db.ai_tasks.bulkAdd(newTasks as unknown as AiTask[]);
+						await incrementBatchTotalTasks(task.batch_id, newTasks.length);
+					} else if (splitMode === "per_batch") {
+						const batchSize = (nextConfig.batch_size as number) || 10;
 						const newTasks = [];
-						for (
-							let i = 0, bIdx = 0;
-							i < items.length;
-							i += batchSize, bIdx++
-						) {
+						for (let i = 0, bIdx = 0; i < items.length; i += batchSize, bIdx++) {
 							const batchItems = items.slice(i, i + batchSize);
 							newTasks.push({
 								id: crypto.randomUUID(),
 								batch_id: task.batch_id,
-								stage_key:
-									nextTemplate.stage_key ||
-									extractStageKey(nextTemplate.id),
+								stage_key: nextTemplate.stage_key || extractStageKey(nextTemplateId),
 								step_number: (task.step_number || 0) + 1,
 								status: "plan",
 								input_data: {
-									...(task.input_data as Record<
-										string,
-										unknown
-									>),
+									...(task.input_data as Record<string, unknown>),
 									items: batchItems,
 									_batch_index: bIdx,
 								},
@@ -1637,65 +1600,58 @@ async function handleNextStages(
 									...(task.hierarchy_path || []),
 									`${task.id}#b${bIdx}`,
 								],
-								launch_id:
-									task.launch_id ||
-									((
-										task as unknown as Record<
-											string,
-											unknown
-										>
-									).launch_id as string),
-								split_group_id:
-									((
-										task as unknown as Record<
-											string,
-											unknown
-										>
-									).split_group_id as string) || task.id,
-								task_type: extractStageKey(nextTemplate.id),
-								prompt_template_id: nextTemplate.id,
+								launch_id: task.launch_id || ((task as unknown as Record<string, unknown>).launch_id as string),
+								split_group_id: ((task as unknown as Record<string, unknown>).split_group_id as string) || task.id,
+								task_type: extractStageKey(nextTemplateId),
+								prompt_template_id: nextTemplateId,
 								created_at: new Date().toISOString(),
 								sequence: bIdx + 1,
 								extra: {
 									current_stage_config: {
 										template_id: nextTemplateId,
-										cardinality:
-											nextConfig.cardinality ||
-											"one_to_one",
-										split_path:
-											nextConfig.split_path || null,
-										split_mode:
-											nextConfig.split_mode || "per_item",
-										merge_path:
-											nextConfig.merge_path || null,
-										output_mapping:
-											nextConfig.output_mapping ||
-											"result",
-										export_config:
-											nextConfig.export_config ||
-											undefined,
+										cardinality: nextConfig.cardinality || "one_to_one",
+										split_path: nextConfig.split_path || null,
+										split_mode: nextConfig.split_mode || "per_item",
+										merge_path: nextConfig.merge_path || null,
+										output_mapping: nextConfig.output_mapping || "result",
+										export_config: nextConfig.export_config || undefined,
 									},
-									delimiters:
-										nextConfig.delimiters || undefined,
+									delimiters: nextConfig.delimiters || undefined,
 									parent_stage_key: task.stage_key,
 									parent_task_id: task.id,
 								},
 							});
 						}
-						await db.ai_tasks.bulkAdd(
-							newTasks as unknown as AiTask[],
-						);
-						await incrementBatchTotalTasks(
-							task.batch_id,
-							newTasks.length,
-						);
+						await db.ai_tasks.bulkAdd(newTasks as unknown as AiTask[]);
+						await incrementBatchTotalTasks(task.batch_id, newTasks.length);
 					}
 				}
 			}
+			continue;
 		}
-	} else {
-		// Standard 1:1 or 1:N branching
-		for (const nextConfig of nextStageConfigs) {
+
+		// Standard 1:1 branching
+		const dependsOn = (nextConfig.dependsOn as string[]) || [];
+		let effectiveResult = result;
+		let isJoinMet = true;
+
+		if (
+			dependsOn.length > 1 ||
+			(dependsOn.length === 1 && dependsOn[0] !== task.stage_key)
+		) {
+			const mergedInput = await checkDependenciesMet(task, nextConfig);
+			if (!mergedInput) {
+				console.log(
+					`[Worker] Parallel dependencies for stage ${nextConfig.template_id} not met. Waiting.`,
+				);
+				isJoinMet = false;
+			} else {
+				effectiveResult = mergedInput;
+			}
+		}
+
+		if (isJoinMet) {
+			const { db } = await import("../lib/storage/IndexedDBAdapter");
 			const nextTemplateId = nextConfig.template_id as string;
 			const nextTemplate = await db.prompt_templates.get(nextTemplateId);
 			if (!nextTemplate) continue;
@@ -1703,27 +1659,20 @@ async function handleNextStages(
 			const newTask = {
 				id: crypto.randomUUID(),
 				batch_id: task.batch_id,
-				stage_key:
-					nextTemplate.stage_key || extractStageKey(nextTemplate.id),
+				stage_key: nextTemplate.stage_key || extractStageKey(nextTemplateId),
 				step_number: (task.step_number || 0) + 1,
 				status: "plan",
-				// 1:1 replaces instead of merging inputs!
 				input_data: {
-					...(result as Record<string, unknown>),
+					...(effectiveResult as Record<string, unknown>),
 					_parent_id: task.id,
 				},
 				parent_task_id: task.id,
 				root_task_id: task.root_task_id || task.id,
 				hierarchy_path: [...(task.hierarchy_path || []), task.id],
-				launch_id:
-					task.launch_id ||
-					((task as unknown as Record<string, unknown>)
-						.launch_id as string),
-				split_group_id:
-					((task as unknown as Record<string, unknown>)
-						.split_group_id as string) || task.id,
-				task_type: extractStageKey(nextTemplate.id),
-				prompt_template_id: nextTemplate.id,
+				launch_id: task.launch_id || ((task as unknown as Record<string, unknown>).launch_id as string),
+				split_group_id: ((task as unknown as Record<string, unknown>).split_group_id as string) || task.id,
+				task_type: extractStageKey(nextTemplateId),
+				prompt_template_id: nextTemplateId,
 				created_at: new Date().toISOString(),
 				extra: {
 					current_stage_config: {
@@ -1731,6 +1680,7 @@ async function handleNextStages(
 						cardinality: nextConfig.cardinality || "one_to_one",
 						split_path: nextConfig.split_path || null,
 						split_mode: nextConfig.split_mode || "per_item",
+						output_mapping: nextConfig.output_mapping || "result",
 						export_config: nextConfig.export_config || undefined,
 					},
 					delimiters: nextConfig.delimiters || undefined,
@@ -1738,28 +1688,6 @@ async function handleNextStages(
 					parent_task_id: task.id,
 				},
 			};
-
-			// 🔥 Parallel Join Check
-			const dependsOn = (nextConfig.dependsOn as string[]) || [];
-			if (
-				dependsOn.length > 1 ||
-				(dependsOn.length === 1 && dependsOn[0] !== task.stage_key)
-			) {
-				const mergedInput = await checkDependenciesMet(
-					task,
-					nextConfig,
-				);
-				if (!mergedInput) {
-					console.log(
-						`[Worker] Parallel dependencies for ${nextTemplate.stage_key} not met. Waiting.`,
-					);
-					continue;
-				}
-				newTask.input_data = {
-					...mergedInput,
-					_parent_id: task.id,
-				};
-			}
 
 			await db.ai_tasks.add(newTask as unknown as AiTask);
 			await incrementBatchTotalTasks(task.batch_id, 1);
@@ -1771,19 +1699,13 @@ async function handleManyToOne(
 	task: AiTask,
 	result: unknown,
 	template: PromptTemplate,
-	nextStageConfigs: Record<string, unknown>[],
+	nextConfig: Record<string, unknown>,
 ) {
-	const extra = (task.extra || {}) as Record<string, unknown>;
-	const currentStageConfig =
-		(extra.current_stage_config as Record<string, unknown>) ||
-		template.stage_config ||
-		{};
-
 	const batchId = task.batch_id;
 	const launchId = task.launch_id;
 	const stageKey = task.stage_key;
 
-	const grouping = (currentStageConfig.batch_grouping as string) || "batch";
+	const grouping = (nextConfig.batch_grouping as string) || "batch";
 
 	if (!batchId && !launchId) return;
 
@@ -1845,7 +1767,7 @@ async function handleManyToOne(
 			}
 
 			// 4. Aggregate data
-			const mergePath = (currentStageConfig.merge_path as string) || null;
+			const mergePath = (nextConfig.merge_path as string) || null;
 			const completedSiblings = siblings.filter(
 				(s) => s.status === "completed" || s.id === task.id,
 			);
@@ -1876,89 +1798,75 @@ async function handleManyToOne(
 				? { [mergePathStr]: aggregatedData }
 				: { merged_data: aggregatedData };
 
-			// 5. Use existing nextStageConfigs from arguments
-			// No need to hydrate again
+			// 5. Create next task
+			const nextTemplateId = nextConfig.template_id;
+			if (!nextTemplateId) return;
 
-			// 6. Create next tasks (IF NOT ALREADY CREATED)
-			for (const nextConfig of nextStageConfigs) {
-				const nextTemplateId = nextConfig.template_id;
-				if (!nextTemplateId) continue;
+			const nextTemplate = await db.prompt_templates.get(nextTemplateId as string);
+			const nextStageKey =
+				nextTemplate?.stage_key ||
+				extractStageKey(nextTemplateId as string);
 
-				const nextTemplate =
-					await db.prompt_templates.get(nextTemplateId);
-				const nextStageKey =
-					nextTemplate?.stage_key ||
-					extractStageKey(nextTemplateId as string);
-
-				// Check for existing merge task to prevent duplicates
-				// For global grouping, check across launch_id. For batch, check across batch_id.
-				let existing;
-				if (grouping === "global" && launchId) {
-					existing = await db.ai_tasks
-						.where("[launch_id+stage_key]")
-						.equals([launchId, nextStageKey])
-						.first();
-				} else {
-					existing = await db.ai_tasks
-						.where("[batch_id+stage_key]")
-						.equals([batchId, nextStageKey])
-						.first();
-				}
-
-				if (existing) {
-					console.log(
-						`[Worker] Merge task for ${nextStageKey} already exists. Skipping.`,
-					);
-					continue;
-				}
-
-				await db.ai_tasks.add({
-					id: crypto.randomUUID(),
-					batch_id: batchId,
-					stage_key: nextStageKey,
-					step_number: (task.step_number || 0) + 1,
-					status: "plan",
-					input_data: {
-						...mergedInputData,
-					},
-					// Phase 8 Fix: Neutral Parenting - Merged task inherits its parents' parent_id to be a sibling
-					parent_task_id:
-						grouping === "global" ? undefined : task.parent_task_id,
-					root_task_id: task.root_task_id || task.id,
-					hierarchy_path: task.hierarchy_path || [],
-					launch_id: launchId,
-					split_group_id:
-						((task as unknown as Record<string, unknown>)
-							.split_group_id as string) || task.id,
-					task_type: extractStageKey(nextTemplateId as string),
-					prompt_template_id: nextTemplateId as string,
-					created_at: new Date().toISOString(),
-					extra: {
-						current_stage_config: {
-							template_id: nextTemplateId as string,
-							cardinality:
-								(nextConfig.cardinality as string) ||
-								"one_to_one",
-							split_path:
-								(nextConfig.split_path as string) || null,
-							split_mode:
-								(nextConfig.split_mode as string) || "per_item",
-							output_mapping:
-								(nextConfig.output_mapping as string) ||
-								"result",
-							merge_path:
-								(nextConfig.merge_path as string) || null,
-							export_config:
-								nextConfig.export_config || undefined,
-						},
-						delimiters: nextConfig.delimiters || undefined,
-						parent_stage_key: task.stage_key,
-						parent_task_id: task.id,
-						_merged_from_count: completedSiblings.length,
-					},
-				} as unknown as AiTask);
-				await incrementBatchTotalTasks(batchId, 1);
+			// Check for existing merge task to prevent duplicates
+			// For global grouping, check across launch_id. For batch, check across batch_id.
+			let existing;
+			if (grouping === "global" && launchId) {
+				existing = await db.ai_tasks
+					.where("[launch_id+stage_key]")
+					.equals([launchId, nextStageKey])
+					.first();
+			} else {
+				existing = await db.ai_tasks
+					.where("[batch_id+stage_key]")
+					.equals([batchId, nextStageKey])
+					.first();
 			}
+
+			if (existing) {
+				console.log(
+					`[Worker] Merge task for ${nextStageKey} already exists. Skipping.`,
+				);
+				return;
+			}
+
+			await db.ai_tasks.add({
+				id: crypto.randomUUID(),
+				batch_id: batchId,
+				stage_key: nextStageKey,
+				step_number: (task.step_number || 0) + 1,
+				status: "plan",
+				input_data: {
+					...mergedInputData,
+				},
+				// Phase 8 Fix: Neutral Parenting - Merged task inherits its parents' parent_id to be a sibling
+				parent_task_id:
+					grouping === "global" ? undefined : task.parent_task_id,
+				root_task_id: task.root_task_id || task.id,
+				hierarchy_path: task.hierarchy_path || [],
+				launch_id: launchId,
+				split_group_id:
+					((task as unknown as Record<string, unknown>)
+						.split_group_id as string) || task.id,
+				task_type: extractStageKey(nextTemplateId as string),
+				prompt_template_id: nextTemplateId as string,
+				created_at: new Date().toISOString(),
+				extra: {
+					current_stage_config: {
+						template_id: nextTemplateId as string,
+						cardinality: (nextConfig.cardinality as string) || "one_to_one",
+						split_path: (nextConfig.split_path as string) || null,
+						split_mode: (nextConfig.split_mode as string) || "per_item",
+						output_mapping: (nextConfig.output_mapping as string) || "result",
+						merge_path: (nextConfig.merge_path as string) || null,
+						export_config: nextConfig.export_config || undefined,
+					},
+					delimiters: nextConfig.delimiters || undefined,
+					parent_stage_key: task.stage_key,
+					parent_task_id: task.id,
+					_merged_from_count: completedSiblings.length,
+				},
+			} as unknown as AiTask);
+			await incrementBatchTotalTasks(batchId, 1);
 		},
 	);
 }

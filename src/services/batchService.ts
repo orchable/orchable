@@ -164,46 +164,51 @@ export const batchService = {
 			extra: {
 				current_stage_config: {
 					template_id: firstStage.prompt_template_id,
-					cardinality:
-						firstStage.cardinality === "1:N" ||
-						firstStage.cardinality === "one_to_many"
-							? "one_to_many"
-							: firstStage.cardinality === "N:1" ||
-								  firstStage.cardinality === "many_to_one"
-								? "many_to_one"
-								: "one_to_one",
-					split_path: firstStage.split_path || null,
-					split_mode: firstStage.split_mode || "per_item",
+					cardinality: "one_to_one",
+					split_path: null,
+					split_mode: "per_item",
 					output_mapping: firstStage.output_mapping || "result",
 					export_config: firstStage.export_config,
 				},
-				next_stage_configs: nextStages.map((ns) => ({
-					template_id:
-						ns.prompt_template_id ||
-						`${config.id}_${ns.stage_key || ns.name?.toLowerCase() || ns.id}`,
-					cardinality:
-						ns.cardinality === "1:N" ||
-						ns.cardinality === "one_to_many"
-							? "one_to_many"
-							: ns.cardinality === "N:1" ||
-								  ns.cardinality === "many_to_one"
-								? "many_to_one"
-								: "one_to_one",
-					split_path: ns.split_path || "result.questions",
-					split_mode: ns.split_mode || "per_item",
-					output_mapping: ns.output_mapping || "result",
-					batch_grouping: ns.batch_grouping || null,
-					delimiters: ns.contract?.input?.delimiters,
-					dependsOn:
-						ns.dependsOn?.map(
-							(ident) =>
-								resolvedSteps.find(
-									(s) =>
-										s.id === ident || s.stage_key === ident,
-								)?.stage_key || ident,
-						) || [],
-					export_config: ns.export_config,
-				})),
+				next_stage_configs: nextStages.map((ns) => {
+					// Look up the edge configuration for routing metadata
+					const edge = config.edges?.find(e => e.source === firstStage.id && e.target === ns.id);
+					const edgeRouting = edge?.edgeConfig || {
+						cardinality: "one_to_one",
+						split_path: null,
+						split_mode: "per_item",
+						output_mapping: "result",
+						batch_grouping: null,
+						merge_path: null
+					};
+
+					const cardinality = edgeRouting.cardinality === "1:N" || edgeRouting.cardinality === "one_to_many" 
+						? "one_to_many" 
+						: edgeRouting.cardinality === "N:1" || edgeRouting.cardinality === "many_to_one"
+							? "many_to_one"
+							: "one_to_one";
+
+					return {
+						template_id:
+							ns.prompt_template_id ||
+							`${config.id}_${ns.stage_key || ns.name?.toLowerCase() || ns.id}`,
+						cardinality,
+						split_path: edgeRouting.split_path || null,
+						split_mode: edgeRouting.split_mode || "per_item",
+						output_mapping: edgeRouting.output_mapping || "result",
+						batch_grouping: edgeRouting.batch_grouping || null,
+						delimiters: ns.contract?.input?.delimiters,
+						dependsOn:
+							ns.dependsOn?.map(
+								(ident) =>
+									resolvedSteps.find(
+										(s) =>
+											s.id === ident || s.stage_key === ident,
+									)?.stage_key || ident,
+							) || [],
+						export_config: ns.export_config,
+					};
+				}),
 				delimiters: firstStage.contract?.input?.delimiters,
 				execution_delay_seconds: config.execution_delay_seconds || 0,
 				...extraMetadata,

@@ -8,6 +8,8 @@ import type {
 	ExportConfig,
 	OrchestratorConfig,
 	StepConfig,
+	EdgeDefinition,
+	EdgeConfig,
 } from "@/lib/types";
 import { configService } from "@/services/configService";
 import {
@@ -95,7 +97,7 @@ export interface PromptTemplateRecord {
  */
 export function topologicalSortStages(
 	stages: StageData[],
-	edges: Array<{ source: string; target: string }>,
+	edges: EdgeDefinition[],
 ): StageData[] {
 	const stageMap = new Map(stages.map((s) => [s.id, s]));
 	const idByKey = new Map(stages.map((s) => [s.stage_key || s.id, s.id]));
@@ -159,7 +161,7 @@ export function topologicalSortStages(
  */
 function getNextStages(
 	stageId: string,
-	edges: Array<{ source: string; target: string }>,
+	edges: EdgeDefinition[],
 	stageMap: Map<string, StageData>,
 ): StageData[] {
 	return edges
@@ -177,7 +179,7 @@ export async function syncStagesToPromptTemplates(
 	orchestratorId: string,
 	orchestratorName: string,
 	stages: StageData[],
-	edges: Array<{ source: string; target: string }>,
+	edges: EdgeDefinition[],
 ): Promise<Map<string, string>> {
 	// 1. Resolve nested orchestrations via Inline Merge
 	const config: OrchestratorConfig = {
@@ -272,19 +274,6 @@ export async function syncStagesToPromptTemplates(
 
 		// Build stage-specific config
 		const stageConfig = {
-			cardinality:
-				stage.cardinality === "many_to_one" ||
-				stage.cardinality === "N:1"
-					? "many_to_one"
-					: stage.cardinality === "one_to_many" ||
-						  stage.cardinality === "1:N"
-						? "one_to_many"
-						: "one_to_one",
-			split_path: stage.split_path,
-			split_mode: stage.split_mode,
-			batch_grouping: stage.batch_grouping || "global",
-			merge_path: stage.merge_path || "output_data",
-			output_mapping: stage.output_mapping,
 			pre_process: stage.pre_process,
 			post_process: stage.post_process,
 			timeout: stage.timeout,
@@ -330,19 +319,38 @@ export async function syncStagesToPromptTemplates(
 		const templateId = templateIdMap.get(stage.id)!;
 
 		// Find next stage(s)
-		const nextStages = getNextStages(stage.id, edges, stageMap);
-		const nextTemplateIds = nextStages
-			.map((ns) => templateIdMap.get(ns.id))
-			.filter(Boolean) as string[];
-		const nextTemplateId =
-			nextTemplateIds.length > 0 ? nextTemplateIds[0] : null;
+		const outgoingEdges = edges.filter(e => e.source === stage.id);
+		const nextStages = outgoingEdges.map(e => stageMap.get(e.target)).filter(Boolean) as StageData[];
+		
+		const nextTemplateIds: string[] = [];
+		const edgeRouting: Record<string, EdgeConfig> = {};
+
+		for (const edge of outgoingEdges) {
+			const targetId = edge.target;
+			const targetTemplateId = templateIdMap.get(targetId);
+			if (targetTemplateId) {
+				nextTemplateIds.push(targetTemplateId);
+				edgeRouting[targetTemplateId] = edge.edgeConfig || {
+					cardinality: "one_to_one",
+					split_path: "",
+					split_mode: "per_item",
+					batch_grouping: "global",
+					merge_path: "output_data"
+				};
+			}
+		}
 
 		if (nextTemplateIds.length > 0) {
 			const existing = await assetStorage.getTemplate(templateId);
 			if (existing) {
+				const existingStageConfig = (existing.stage_config || {}) as Record<string, unknown>;
 				await assetStorage.upsertTemplate({
 					...existing,
 					next_stage_template_ids: nextTemplateIds,
+					stage_config: {
+						...existingStageConfig,
+						edge_routing: edgeRouting
+					}
 				});
 			}
 		}
@@ -541,7 +549,7 @@ export async function detectCircularDependency(
 export async function resolveInlineMerge(
 	config: OrchestratorConfig,
 	depth = 0,
-): Promise<{ steps: StepConfig[]; edges: any[] }> {
+): Promise<{ steps: StepConfig[]; edges: EdgeDefinition[] }> {
 	if (depth > MAX_NESTING_DEPTH) {
 		console.warn("Độ sâu lồng nhau vượt quá giới hạn", MAX_NESTING_DEPTH);
 		return { steps: config.steps, edges: [] };
@@ -688,7 +696,7 @@ export function isConnectedSubgraph(
 export function extractSubOrchestration(
 	selectedNodeIds: string[],
 	allSteps: StepConfig[],
-	allEdges: { source: string; target: string }[],
+	allEdges: EdgeDefinition[],
 	newOrchConfig: {
 		id: string;
 		name: string;
@@ -730,6 +738,9 @@ export function extractSubOrchestration(
 		name: newOrchConfig.name,
 		description: newOrchConfig.description || "",
 		steps: subOrchSteps,
+		edges: internalEdges,
+		created_at: new Date().toISOString(),
+		updated_at: new Date().toISOString(),
 	};
 
 	// 3. Create sub-orch replacement node for Parent

@@ -30,7 +30,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { pricingService, ModelPricing } from '@/services/pricingService';
 import { tokenUtils } from '@/lib/tokenUtils';
-import { OrchestratorConfig, AISettings, DocumentAsset, AIModel } from '@/lib/types';
+import { OrchestratorConfig, AISettings, DocumentAsset, AIModel, EdgeDefinition } from '@/lib/types';
 
 export function CalculatorPage() {
     const { data: configs, isLoading: isLoadingConfigs } = useConfigs();
@@ -213,13 +213,24 @@ export function CalculatorPage() {
             // 1:1 -> next count = current count
             // 1:N -> next count = current count * N
             // N:1 -> next count = 1 (simplified global merge) or current count / groups
-            const cardinality = (step.cardinality || '1:1').toLowerCase();
+            const outgoingEdges = selectedConfig.edges?.filter((e: EdgeDefinition) => e.source === step.id) || [];
+            let cardinality = '1:1';
+            if (outgoingEdges.length > 0) {
+                const has1N = outgoingEdges.find((e: EdgeDefinition) => e.edgeConfig?.cardinality === '1:N' || e.edgeConfig?.cardinality === 'one_to_many');
+                const hasN1 = outgoingEdges.find((e: EdgeDefinition) => e.edgeConfig?.cardinality === 'N:1' || e.edgeConfig?.cardinality === 'many_to_one');
+                if (has1N) {
+                    cardinality = '1:n';
+                } else if (hasN1) {
+                    cardinality = 'n:1';
+                }
+            }
+
             const multiplier = stageMultipliers[step.id] || 1;
 
             let tasksProducedByThisStage = currentStageTaskCount;
-            if (cardinality === '1:n' || cardinality === 'one_to_many') {
+            if (cardinality === '1:n') {
                 tasksProducedByThisStage = currentStageTaskCount * multiplier;
-            } else if (cardinality === 'n:1' || cardinality === 'many_to_one') {
+            } else if (cardinality === 'n:1') {
                 tasksProducedByThisStage = 1; // Simplified: assume global merge
             }
 

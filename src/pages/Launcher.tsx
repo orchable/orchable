@@ -150,13 +150,16 @@ export function LauncherPage() {
     const firstStageTemplateId = `${config.id}_${firstStage.stage_key}_${firstStage.id}`;
     const nextStageTemplateId = nextStage ? `${config.id}_${nextStage.stage_key}_${nextStage.id}` : null;
 
+    const outgoingEdge = config.edges?.find(e => e.source === firstStage.id && e.target === nextStage?.id);
+    const edgeConfig = outgoingEdge?.edgeConfig as (Record<string, unknown> | undefined);
+
     return {
       next_stage_config: nextStageTemplateId ? {
         template_id: nextStageTemplateId,
-        cardinality: (nextStage?.cardinality === '1:N') ? 'one_to_many' : 'one_to_one',
-        split_path: nextStage?.split_path || null,
-        split_mode: nextStage?.split_mode || 'per_item',
-        output_mapping: nextStage?.output_mapping || 'result',
+        cardinality: (edgeConfig?.cardinality as string) || 'one_to_one',
+        split_path: (edgeConfig?.split_path as string) || null,
+        split_mode: (edgeConfig?.split_mode as string) || 'per_item',
+        output_mapping: (edgeConfig?.output_mapping as string) || 'result',
         delimiters: nextStage?.contract?.input?.delimiters
       } : null,
       pre_process: firstStage.pre_process?.enabled ? firstStage.pre_process : undefined,
