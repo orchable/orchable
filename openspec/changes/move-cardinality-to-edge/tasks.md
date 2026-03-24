@@ -1,28 +1,28 @@
 ## 1. Foundation — Types & Data Model
-- [ ] 1.1 Add `EdgeConfig` interface to `src/lib/types.ts`
-- [ ] 1.2 Add `EdgeDefinition` interface to `src/lib/types.ts`
-- [ ] 1.3 Extend `DesignerEdge` with `data.edgeConfig` in `src/lib/types.ts`
-- [ ] 1.4 Add `edges: EdgeDefinition[]` to `OrchestratorConfig` interface
-- [ ] 1.5 Remove `cardinality`, `split_path`, `split_mode`, `merge_path`, `batch_grouping` from `StepConfig`
-- [ ] 1.6 Remove routing fields from `DEFAULT_STAGE_CONFIG` in `src/lib/constants/defaultStepConfig.ts`
+- [x] 1.1 Add `EdgeConfig` interface to `src/lib/types.ts`
+- [x] 1.2 Add `EdgeDefinition` interface to `src/lib/types.ts`
+- [x] 1.3 Extend `DesignerEdge` with `data.edgeConfig` in `src/lib/types.ts`
+- [x] 1.4 Add `edges: EdgeDefinition[]` to `OrchestratorConfig` interface
+- [x] 1.5 Remove `cardinality`, `split_path`, `split_mode`, `merge_path`, `batch_grouping` from `StepConfig`
+- [x] 1.6 Remove routing fields from `DEFAULT_STAGE_CONFIG` in `src/lib/constants/defaultStepConfig.ts`
 
 ## 2. Designer Store & Persistence
-- [ ] 2.1 Update `designerStore.onConnect` to create edges with default `edgeConfig`
-- [ ] 2.2 Update `designerStore.loadConfig` to reconstruct edges from `config.edges[]`
-- [ ] 2.3 Update `designerStore.duplicateStep` and `duplicateOrchestrationToCanvas` to clone edge configs
-- [ ] 2.4 Update `designerStore.replaceNodesWithSubOrch` to preserve edge configs
-- [ ] 2.5 Add `updateEdgeData(edgeId, data)` action to designer store
-- [ ] 2.6 Update `useConfigs.useSaveOrchestrator.save()` to serialize edge configs into `OrchestratorConfig`
-- [ ] 2.7 Remove routing fields from step serialization in `useConfigs.ts`
-- [ ] 2.8 Update `useImportExport` to export/import edge configs
+- [x] 2.1 Update `designerStore.onConnect` to create edges with default `edgeConfig`
+- [x] 2.2 Update `designerStore.loadConfig` to reconstruct edges from `config.edges[]`
+- [x] 2.3 Update `designerStore.duplicateStep` and `duplicateOrchestrationToCanvas` to clone edge configs
+- [x] 2.4 Update `designerStore.replaceNodesWithSubOrch` to preserve edge configs
+- [x] 2.5 Add `updateEdgeData(edgeId, data)` action to designer store
+- [x] 2.6 Update `useConfigs.useSaveOrchestrator.save()` to serialize edge configs into `OrchestratorConfig`
+- [x] 2.7 Remove routing fields from step serialization in `useConfigs.ts`
+- [x] 2.8 Update `useImportExport` to export/import edge configs
 
 ## 3. Designer UI — Edge Config Panel
-- [ ] 3.1 Create `EdgeConfigPanel.tsx` component with cardinality select, conditional split/merge fields
-- [ ] 3.2 Create custom edge component (`CardinalityEdge.tsx`) for visual label display
-- [ ] 3.3 Remove cardinality section from `StageConfigPanel.tsx` (~100+ lines)
-- [ ] 3.4 Update `FlowCanvas.tsx` to register custom edge type and handle `onEdgeClick`
-- [ ] 3.5 Remove cardinality badge from `StepNode.tsx`
-- [ ] 3.6 Update `OrchestratorDesigner.tsx` to handle `selectedEdge` state and render `EdgeConfigPanel` in right sidebar
+- [x] 3.1 Create `EdgeConfigPanel.tsx` component with cardinality select, conditional split/merge fields
+- [x] 3.2 Create custom edge component (`CardinalityEdge.tsx`) for visual label display
+- [x] 3.3 Remove cardinality section from `StageConfigPanel.tsx` (~100+ lines)
+- [x] 3.4 Update `FlowCanvas.tsx` to register custom edge type and handle `onEdgeClick`
+- [x] 3.5 Remove cardinality badge from `StepNode.tsx`
+- [x] 3.6 Update `OrchestratorDesigner.tsx` to handle `selectedEdge` state and render `EdgeConfigPanel` in right sidebar
 
 ## 4. Stage Service — Prompt Template Sync
 - [ ] 4.1 Update `syncStagesToPromptTemplates` to build routing metadata from edge configs

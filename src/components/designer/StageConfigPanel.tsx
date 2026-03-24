@@ -100,28 +100,13 @@ interface CustomComponentOption {
 
 // Removing hardcoded AI_MODELS in favor of dynamic fetching
 
-const CARDINALITY_OPTIONS: { value: Cardinality; label: string; description: string }[] = [
-    { value: 'one_to_one', label: '1:1 (One to One)', description: 'One input → One output' },
-    { value: 'one_to_many', label: '1:N (One to Many)', description: 'One input → Multiple outputs' },
-    { value: 'many_to_one', label: 'N:1 (Many to One)', description: 'Multiple inputs → One output (Merge)' }
-];
 
-const SPLIT_MODES = [
-    { value: 'per_item', label: 'Per Item (One task per element)' },
-    { value: 'per_batch', label: 'Per Batch (Group elements)' }
-];
 
 const stageConfigSchema = z.object({
     name: z.string().min(1, 'Name is required').max(50, 'Max 50 chars'),
     stage_key: z.string().min(1, 'Stage key is required').regex(/^[a-z0-9_]+$/, 'Only lowercase, numbers, underscores'),
     label: z.string().min(1, 'Label is required'),
     task_type: z.string().min(1, 'Task type is required'),
-    cardinality: z.enum(['1:1', '1:N', 'N:1', 'one_to_one', 'one_to_many', 'many_to_one']),
-    split_path: z.string().optional(),
-    split_mode: z.enum(['per_item', 'per_batch']).optional(),
-    batch_grouping: z.enum(['global', 'isolated']).default('global'),
-    merge_path: z.string().optional(),
-    output_mapping: z.string().optional(),
     prompt_template_id: z.string().optional(),
     custom_component_id: z.string().optional(),
     model_id: z.string().min(1, 'Model is required'),
@@ -273,12 +258,6 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
             stage_key: '',
             label: '',
             task_type: '',
-            cardinality: '1:1',
-            split_path: '',
-            split_mode: 'per_item',
-            batch_grouping: 'global',
-            merge_path: 'output_data',
-            output_mapping: 'result',
             prompt_template_id: '',
             custom_component_id: '',
             model_id: 'gemini-2.0-flash',
@@ -474,12 +453,6 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                 stage_key: data.stage_key,
                 label: data.label,
                 task_type: data.task_type,
-                cardinality: data.cardinality,
-                split_path: data.split_path,
-                split_mode: data.split_mode,
-                batch_grouping: data.batch_grouping,
-                merge_path: data.merge_path,
-                output_mapping: data.output_mapping,
                 prompt_template_id: data.prompt_template_id,
                 ai_settings: {
                     model_id: data.model_id as AIModel,
@@ -529,12 +502,6 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                     label: selectedTemplate.name,
                     task_type: data.task_type || '', // Added task_type
                     dependsOn: [],
-                    cardinality: (data.cardinality === 'many_to_one' || data.cardinality === 'N:1') ? 'many_to_one' : ((data.cardinality === 'one_to_many' || data.cardinality === '1:N') ? 'one_to_many' : 'one_to_one'),
-                    split_path: data.split_path || '',
-                    split_mode: data.split_mode || 'per_item',
-                    batch_grouping: data.batch_grouping || 'global',
-                    merge_path: data.merge_path || 'output_data',
-                    output_mapping: data.output_mapping || '',
                     requires_approval: data.requires_approval || false,
                     timeout: data.timeout || 300000,
                     retryConfig: {
@@ -691,12 +658,6 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                 stage_key: data.stage_key || data.name || '',
                 label: data.label || '',
                 task_type: data.task_type || '',
-                cardinality: (data.cardinality === 'many_to_one' || data.cardinality === 'N:1') ? 'many_to_one' : ((data.cardinality === 'one_to_many' || data.cardinality === '1:N') ? 'one_to_many' : 'one_to_one'),
-                split_path: data.split_path || '',
-                split_mode: data.split_mode || 'per_item',
-                batch_grouping: data.batch_grouping || 'global',
-                merge_path: data.merge_path || 'output_data',
-                output_mapping: data.output_mapping || 'result',
                 prompt_template_id: templateId,
                 model_id: ai.model_id || 'gemini-2.0-flash',
                 temperature: (gc.temperature as number) ?? (ai as unknown as Record<string, number>).temperature ?? 1.0,
@@ -756,15 +717,6 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
             if (found.stage_config) {
                 const sc = found.stage_config;
                 if (sc.task_type) form.setValue('task_type', sc.task_type);
-                if (sc.cardinality) {
-                    const mapped = (sc.cardinality === 'many_to_one' || sc.cardinality === 'N:1') ? 'many_to_one' : ((sc.cardinality === 'one_to_many' || sc.cardinality === '1:N') ? 'one_to_many' : 'one_to_one');
-                    form.setValue('cardinality', mapped as Cardinality);
-                }
-                if (sc.split_path) form.setValue('split_path', sc.split_path);
-                if (sc.split_mode) form.setValue('split_mode', sc.split_mode);
-                if (sc.batch_grouping) form.setValue('batch_grouping', sc.batch_grouping);
-                if (sc.merge_path) form.setValue('merge_path', sc.merge_path);
-                if (sc.output_mapping) form.setValue('output_mapping', sc.output_mapping);
                 if (sc.requires_approval !== undefined) form.setValue('requires_approval', sc.requires_approval);
                 if (sc.timeout) form.setValue('timeout', sc.timeout);
 
@@ -931,12 +883,6 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
             stage_key: form.getValues('stage_key'),
             label: form.getValues('label'),
             task_type: form.getValues('task_type'),
-            cardinality: form.getValues('cardinality'),
-            split_path: form.getValues('split_path'),
-            split_mode: form.getValues('split_mode'),
-            batch_grouping: form.getValues('batch_grouping'),
-            merge_path: form.getValues('merge_path'),
-            output_mapping: form.getValues('output_mapping'),
             prompt_template_id: form.getValues('prompt_template_id'),
             auxiliary_inputs: form.getValues('auxiliary_inputs'),
             ai_settings: {
@@ -987,12 +933,6 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                     stage_key: imported.stage_key || '',
                     label: imported.label || '',
                     task_type: imported.task_type || '',
-                    cardinality: imported.cardinality || '1:1',
-                    split_path: imported.split_path || '',
-                    split_mode: imported.split_mode || 'per_item',
-                    batch_grouping: imported.batch_grouping || 'global',
-                    merge_path: imported.merge_path || 'output_data',
-                    output_mapping: imported.output_mapping || '',
                     prompt_template_id: imported.prompt_template_id || '',
                     model_id: imported.ai_settings?.model_id || 'gemini-flash-latest',
                     temperature: imported.ai_settings?.generationConfig?.temperature ?? imported.ai_settings?.temperature ?? 0.7,
@@ -1054,9 +994,7 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                                 Validation Error
                             </Badge>
                         )}
-                        <Badge variant="outline" className="font-mono text-xs mr-1">
-                            {form.watch('cardinality')}
-                        </Badge>
+
                         <Button
                             variant="ghost"
                             size="icon"
@@ -1285,144 +1223,7 @@ export function StageConfigPanel({ stageId }: { stageId: string }) {
                                     )}
                                 />
 
-                                <FormField
-                                    control={form.control}
-                                    name="cardinality"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Cardinality</FormLabel>
-                                            <Select onValueChange={field.onChange} value={field.value}>
-                                                <FormControl>
-                                                    <SelectTrigger>
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                </FormControl>
-                                                <SelectContent>
-                                                    {CARDINALITY_OPTIONS.map(opt => (
-                                                        <SelectItem key={opt.value} value={opt.value}>
-                                                            <div className="flex items-center gap-2">
-                                                                <Badge variant="secondary" className="font-mono">
-                                                                    {opt.label}
-                                                                </Badge>
-                                                                <span className="text-muted-foreground text-xs">
-                                                                    {opt.description}
-                                                                </span>
-                                                            </div>
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
 
-                                {(form.watch('cardinality') === '1:N' || form.watch('cardinality') === 'one_to_many' || form.watch('cardinality') === 'N:1' || form.watch('cardinality') === 'many_to_one') && (
-                                    <div className="space-y-4 pl-4 border-l-2 border-muted">
-                                        {(form.watch('cardinality') === '1:N' || form.watch('cardinality') === 'one_to_many') && (
-                                            <>
-                                                <FormField
-                                                    control={form.control}
-                                                    name="split_path"
-                                                    render={({ field }) => (
-                                                        <FormItem>
-                                                            <FormLabel>Split Path</FormLabel>
-                                                            <FormControl>
-                                                                <Input {...field} placeholder="e.g. result.questions" className="font-mono text-sm" />
-                                                            </FormControl>
-                                                            <FormDescription>JSON path to the array to split</FormDescription>
-                                                            <FormMessage />
-                                                        </FormItem>
-                                                    )}
-                                                />
-
-                                                <FormField
-                                                    control={form.control}
-                                                    name="split_mode"
-                                                    render={({ field }) => (
-                                                        <FormItem>
-                                                            <FormLabel>Split Mode</FormLabel>
-                                                            <Select onValueChange={field.onChange} value={field.value}>
-                                                                <FormControl>
-                                                                    <SelectTrigger>
-                                                                        <SelectValue />
-                                                                    </SelectTrigger>
-                                                                </FormControl>
-                                                                <SelectContent>
-                                                                    {SPLIT_MODES.map(mode => (
-                                                                        <SelectItem key={mode.value} value={mode.value}>
-                                                                            {mode.label}
-                                                                        </SelectItem>
-                                                                    ))}
-                                                                </SelectContent>
-                                                            </Select>
-                                                            <FormMessage />
-                                                        </FormItem>
-                                                    )}
-                                                />
-                                            </>
-                                        )}
-
-                                        <FormField
-                                            control={form.control}
-                                            name="batch_grouping"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Batch Grouping</FormLabel>
-                                                    <Select onValueChange={field.onChange} value={field.value}>
-                                                        <FormControl>
-                                                            <SelectTrigger>
-                                                                <SelectValue />
-                                                            </SelectTrigger>
-                                                        </FormControl>
-                                                        <SelectContent>
-                                                            <SelectItem value="global">Global (All items in Launch)</SelectItem>
-                                                            <SelectItem value="isolated">Isolated (Per Parent item)</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                    <FormDescription>
-                                                        How downstream Many to One merges should aggregate tasks.
-                                                    </FormDescription>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-                                )}
-
-                                {(form.watch('cardinality') === 'N:1' || form.watch('cardinality') === 'many_to_one') && (
-                                    <div className="space-y-4 pl-4 border-l-2 border-orange-500">
-                                        <FormField
-                                            control={form.control}
-                                            name="merge_path"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-orange-600 dark:text-orange-400">Merge Path</FormLabel>
-                                                    <FormControl>
-                                                        <Input {...field} placeholder="e.g. output_data" className="font-mono text-sm border-orange-200 focus-visible:ring-orange-500" />
-                                                    </FormControl>
-                                                    <FormDescription>JSON path in sibling outputs to aggregate (e.g. "output_data" moves task.output_data[] into one array)</FormDescription>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-                                )}
-
-                                <FormField
-                                    control={form.control}
-                                    name="output_mapping"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Output Mapping</FormLabel>
-                                            <FormControl>
-                                                <Input {...field} placeholder="e.g. result" className="font-mono text-sm" />
-                                            </FormControl>
-                                            <FormDescription>Key to map content to for next stage</FormDescription>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
 
                                 <FormField
                                     control={form.control}

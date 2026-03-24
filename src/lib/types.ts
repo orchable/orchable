@@ -4,6 +4,7 @@ export interface OrchestratorConfig {
 	name: string;
 	description?: string;
 	steps: StepConfig[];
+	edges: EdgeDefinition[];
 	created_at: string;
 	updated_at: string;
 	hub_asset_id?: string;
@@ -55,17 +56,8 @@ export interface StepConfig {
 	stage_key?: string;
 	task_type?: string;
 	prompt_template_id?: string;
-	cardinality?: Cardinality;
 	ai_settings?: AISettings;
 	requires_approval?: boolean;
-
-	// Splitting & Routing (for 1:N cardinality)
-	split_path?: string;
-	split_mode?: "per_item" | "per_batch";
-	batch_size?: number;
-	batch_grouping?: "global" | "isolated";
-	merge_path?: string;
-	output_mapping?: string;
 
 	// Context Passing
 	return_along_with?: string[];
@@ -160,6 +152,23 @@ export type Cardinality =
 	| "one_to_one"
 	| "one_to_many"
 	| "many_to_one";
+
+export interface EdgeConfig {
+	cardinality: Cardinality;
+	split_path?: string;
+	split_mode?: "per_item" | "per_batch";
+	batch_size?: number;
+	batch_grouping?: "global" | "isolated";
+	merge_path?: string;
+	output_mapping?: string;
+}
+
+export interface EdgeDefinition {
+	source: string;
+	target: string;
+	edgeConfig: EdgeConfig;
+}
+
 export type AIModel =
 	| "gemini-flash-latest"
 	| "gemini-pro-latest"
@@ -334,7 +343,6 @@ export interface StageConfig {
 	ai_settings: AISettings;
 
 	// Stage Relationship
-	cardinality: Cardinality;
 	dependsOn: string[]; // Stage IDs this depends on
 
 	// Schema (optional)
@@ -478,6 +486,9 @@ export interface DesignerEdge {
 	id: string;
 	source: string;
 	target: string;
+	data?: {
+		edgeConfig: EdgeConfig;
+	};
 }
 
 // JSON Launcher Input Types

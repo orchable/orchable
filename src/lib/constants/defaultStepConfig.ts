@@ -62,10 +62,6 @@ Before generating the final JSON output, verify:
 export const DEFAULT_STAGE_CONFIG = {
 	stage_key: "core_question",
 	task_type: "core_question_gen",
-	cardinality: "1:1" as const,
-	split_path: "result.questions",
-	split_mode: "per_item" as const,
-	output_mapping: "result",
 	prompt_template_id: "",
 	ai_settings: {
 		model_id: "gemini-2.0-flash" as const,

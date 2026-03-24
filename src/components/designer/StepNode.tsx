@@ -8,7 +8,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import type { Cardinality, StageContract, JsonSchemaProperty } from '@/lib/types';
+import type { StageContract, JsonSchemaProperty } from '@/lib/types';
 import { summarizeInputFields, summarizeOutputSchema, extractInputFields } from '@/lib/schemaUtils';
 import { Layers } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -41,7 +41,6 @@ interface StepNodeProps {
         webhookUrl?: string;       // Legacy
         task_type?: string;        // New: stage task type
         stage_key?: string;        // New: stage key
-        cardinality?: Cardinality; // New: 1:1, 1:N, N:1
         prompt_template?: string;  // Prompt template content for input extraction
         contract?: StageContract;  // Input/Output contract
         sub_orchestration_id?: string;
@@ -97,7 +96,6 @@ export function StepNode({ data, selected }: StepNodeProps) {
 
     // Check if configured: either webhook (legacy) or task_type (new)
     const isConfigured = !!(data.webhookUrl || data.task_type);
-    const cardinality = data.cardinality || '1:1';
     const navigate = useNavigate();
     const isSubOrch = data.task_type === 'sub_orchestration';
 
@@ -180,15 +178,7 @@ export function StepNode({ data, selected }: StepNodeProps) {
                                     </div>
                                 )}
 
-                                {/* Cardinality Badge */}
-                                {cardinality !== '1:1' && (
-                                    <Badge
-                                        variant="secondary"
-                                        className="absolute -top-2 -right-2 text-[10px] font-mono px-1.5 py-0"
-                                    >
-                                        {cardinality}
-                                    </Badge>
-                                )}
+
 
                                 {/* Sub-orchestration Indicator */}
                                 {isSubOrch && (

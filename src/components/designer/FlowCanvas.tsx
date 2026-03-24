@@ -13,6 +13,7 @@ import '@xyflow/react/dist/style.css';
 import { useDesignerStore } from '@/stores/designerStore';
 import { StartNode } from './StartNode';
 import { StepNode } from './StepNode';
+import { CardinalityEdge } from './CardinalityEdge';
 import { resolveInlineMerge, isConnectedSubgraph } from '@/services/stageService';
 import type { OrchestratorConfig } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,7 @@ export function FlowCanvas({ expandAll }: FlowCanvasProps) {
         onEdgesChange,
         onConnect,
         setSelectedNode,
+        setSelectedEdge,
         removeStep,
         config,
         viewport,
@@ -118,10 +120,19 @@ export function FlowCanvas({ expandAll }: FlowCanvasProps) {
         startNode: StartNode
     }), []);
 
+    const edgeTypes = useMemo(() => ({
+        cardinalityEdge: CardinalityEdge
+    }), []);
+
     // Handle node selection
     const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
         setSelectedNode(node);
     }, [setSelectedNode]);
+
+    // Handle edge selection
+    const onEdgeClick = useCallback((_: React.MouseEvent, edge: Edge) => {
+        setSelectedEdge(edge);
+    }, [setSelectedEdge]);
 
     // Handle pane click to deselect
     const onPaneClick = useCallback(() => {
@@ -208,16 +219,18 @@ export function FlowCanvas({ expandAll }: FlowCanvasProps) {
                     onEdgesChange={expandAll ? undefined : handleEdgesChange}
                     onConnect={expandAll ? undefined : onConnect}
                     onNodeClick={onNodeClick}
+                    onEdgeClick={onEdgeClick}
                     onPaneClick={onPaneClick}
                     onNodesDelete={expandAll ? undefined : onNodesDelete}
                     onMoveEnd={(_, viewport) => setViewport(viewport)}
                     nodeTypes={nodeTypes}
+                    edgeTypes={edgeTypes}
                     defaultViewport={viewport}
                     deleteKeyCode={expandAll ? null : ['Backspace', 'Delete']}
                     defaultEdgeOptions={{
                         animated: true,
                         style: { stroke: '#94a3b8', strokeWidth: 2 }, // slate-400, visible on both
-                        type: 'smoothstep'
+                        type: 'cardinalityEdge'
                     }}
                     proOptions={{ hideAttribution: true }}
                 >

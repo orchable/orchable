@@ -20,6 +20,7 @@ interface DesignerState {
 	nodes: Node[];
 	edges: Edge[];
 	selectedNode: Node | null;
+	selectedEdge: import('@xyflow/react').Edge | null;
 	config: OrchestratorConfig | null;
 
 	// Actions
@@ -30,7 +31,9 @@ interface DesignerState {
 	removeStep: (id: string) => void;
 	duplicateStep: (id: string) => void;
 	updateStepData: (id: string, data: Record<string, unknown>) => void;
+	updateEdgeData: (id: string, data: Record<string, unknown>) => void;
 	setSelectedNode: (node: Node | null) => void;
+	setSelectedEdge: (edge: import('@xyflow/react').Edge | null) => void;
 	loadConfig: (config: OrchestratorConfig) => void;
 	replaceNodesWithSubOrch: (
 		selectedIds: Set<string>,
@@ -78,6 +81,7 @@ export const useDesignerStore = create<DesignerState>()(
 			nodes: [INITIAL_START_NODE],
 			edges: [],
 			selectedNode: null,
+			selectedEdge: null,
 			config: null,
 			inputData: {
 				mode: "tsv",
@@ -182,8 +186,21 @@ export const useDesignerStore = create<DesignerState>()(
 			},
 
 			onConnect: (connection: Connection) => {
+				const newEdge: Edge = {
+					...connection,
+					id: `e_${connection.source}-${connection.target}`,
+					data: {
+						edgeConfig: {
+							cardinality: "1:1",
+							split_path: "",
+							split_mode: "per_item",
+							batch_grouping: "global",
+							merge_path: "output_data",
+						},
+					},
+				};
 				set({
-					edges: addEdge(connection, get().edges),
+					edges: addEdge(newEdge, get().edges),
 				});
 			},
 
@@ -320,8 +337,25 @@ export const useDesignerStore = create<DesignerState>()(
 				}
 			},
 
+			updateEdgeData: (id: string, data: Record<string, unknown>) => {
+				set({
+					edges: get().edges.map((edge) => {
+						if (edge.id === id) {
+							return {
+								...edge,
+								data: { ...edge.data, ...data },
+							};
+						}
+						return edge;
+					}),
+				});
+			},
+
 			setSelectedNode: (node: Node | null) => {
-				set({ selectedNode: node });
+				set({ selectedNode: node, selectedEdge: null }); // Clear edge selection when node is selected
+			},
+			setSelectedEdge: (edge: import('@xyflow/react').Edge | null) => {
+				set({ selectedEdge: edge, selectedNode: null }); // Clear node selection when edge is selected
 			},
 
 			loadConfig: (config: OrchestratorConfig) => {
@@ -345,7 +379,6 @@ export const useDesignerStore = create<DesignerState>()(
 						stage_key: step.stage_key,
 						task_type: step.task_type,
 						prompt_template_id: step.prompt_template_id,
-						cardinality: step.cardinality,
 						ai_settings: step.ai_settings,
 						// Pre/Post Process Hooks
 						pre_process: step.pre_process,
@@ -358,27 +391,63 @@ export const useDesignerStore = create<DesignerState>()(
 
 				// Reconstruct edges
 				const edges: Edge[] = [];
+				const fallbackEdges: Record<string, boolean> = {};
+
+				if (config.edges && config.edges.length > 0) {
+					config.edges.forEach((edgeDef) => {
+						edges.push({
+							id: ('id' in edgeDef ? String(edgeDef.id) : undefined) || `e_${edgeDef.source}-${edgeDef.target}`,
+							source: edgeDef.source,
+							target: edgeDef.target,
+							data: { edgeConfig: edgeDef.edgeConfig || ('data' in edgeDef ? (edgeDef.data as { edgeConfig?: import('@/lib/types').EdgeConfig })?.edgeConfig : undefined) || { cardinality: 'one_to_one' } },
+						});
+						fallbackEdges[`${edgeDef.source}-${edgeDef.target}`] = true;
+					});
+				}
+
 				config.steps.forEach((step) => {
 					// Create edges based on dependencies
 					const dependsOn = step.dependsOn || []; // Ensure dependsOn exists
 					dependsOn.forEach((depId) => {
-						edges.push({
-							id: `e_${depId}-${step.id}`,
-							source: depId,
-							target: step.id,
-						});
+						if (!fallbackEdges[`${depId}-${step.id}`]) {
+							edges.push({
+								id: `e_${depId}-${step.id}`,
+								source: depId,
+								target: step.id,
+								data: {
+									edgeConfig: {
+										cardinality: "1:1",
+										split_path: "",
+										split_mode: "per_item",
+										batch_grouping: "global",
+										merge_path: "output_data",
+									},
+								},
+							});
+							fallbackEdges[`${depId}-${step.id}`] = true;
+						}
 					});
 
-					// If a step has NO dependencies, we could optionally connect it to 'start'
-					// to make the graph look connected, but strictly speaking 'dependsOn' is empty.
-					// Let's connect roots to start for visual flow.
+					// If a step has NO dependencies, connect roots to start
 					if (dependsOn.length === 0) { // Use the checked dependsOn
-						edges.push({
-							id: `e_start-${step.id}`,
-							source: "start",
-							target: step.id,
-							animated: true,
-						});
+						if (!fallbackEdges[`start-${step.id}`]) {
+							edges.push({
+								id: `e_start-${step.id}`,
+								source: "start",
+								target: step.id,
+								animated: true,
+								data: {
+									edgeConfig: {
+										cardinality: "1:1",
+										split_path: "",
+										split_mode: "per_item",
+										batch_grouping: "global",
+										merge_path: "output_data",
+									},
+								},
+							});
+							fallbackEdges[`start-${step.id}`] = true;
+						}
 					}
 				});
 
@@ -463,6 +532,15 @@ export const useDesignerStore = create<DesignerState>()(
 								source: sourceId,
 								target: targetId,
 								animated: true,
+								data: {
+									edgeConfig: {
+										cardinality: "1:1",
+										split_path: "",
+										split_mode: "per_item",
+										batch_grouping: "global",
+										merge_path: "output_data",
+									},
+								},
 							});
 						});
 					});
@@ -478,6 +556,15 @@ export const useDesignerStore = create<DesignerState>()(
 								source: "start",
 								target: step.id,
 								animated: true,
+								data: {
+									edgeConfig: {
+										cardinality: "1:1",
+										split_path: "",
+										split_mode: "per_item",
+										batch_grouping: "global",
+										merge_path: "output_data",
+									},
+								},
 							});
 						}
 					});
@@ -534,6 +621,15 @@ export const useDesignerStore = create<DesignerState>()(
 					id: `e_${idMap[edge.source]}-${idMap[edge.target]}`,
 					source: idMap[edge.source],
 					target: idMap[edge.target],
+					data: edge.data ? JSON.parse(JSON.stringify(edge.data)) : {
+						edgeConfig: {
+							cardinality: "1:1",
+							split_path: "",
+							split_mode: "per_item",
+							batch_grouping: "global",
+							merge_path: "output_data",
+						},
+					},
 				}));
 
 				// 4. Reset state with new cloned data and clear config ID

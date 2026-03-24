@@ -4,6 +4,7 @@ import { FlowCanvas } from './FlowCanvas';
 import { StepPalette } from './StepPalette';
 import { StageConfigPanel } from './StageConfigPanel';
 import { StartConfigPanel } from './StartConfigPanel';
+import { EdgeConfigPanel } from './EdgeConfigPanel';
 import { SaveConfigDialog } from './SaveConfigDialog';
 import { RunExecutionDialog } from './RunExecutionDialog';
 
@@ -35,7 +36,7 @@ import { useImportExport } from '@/hooks/useImportExport';
 import { toast } from 'sonner';
 
 export default function OrchestratorDesigner() {
-    const { nodes, selectedNode, reset, config, loadConfig, orchestratorName, isDirty } = useDesignerStore();
+    const { nodes, selectedNode, selectedEdge, reset, config, loadConfig, orchestratorName, isDirty } = useDesignerStore();
     const [searchParams, setSearchParams] = useSearchParams();
     const configId = searchParams.get('configId');
     const { data: savedConfigs } = useConfigs();
@@ -239,13 +240,11 @@ export default function OrchestratorDesigner() {
             </div>
 
             {/* Right Sidebar: Config Panel (Conditional) */}
-            {selectedNode && (
+            {(selectedNode || selectedEdge) && (
                 <div className="w-80 h-full flex-shrink-0 z-10 overflow-y-auto border-l bg-muted/30">
-                    {selectedNode.type === 'startNode' ? (
-                        <StartConfigPanel />
-                    ) : (
-                        <StageConfigPanel stageId={selectedNode.id} />
-                    )}
+                    {selectedNode && selectedNode.type === 'startNode' && <StartConfigPanel />}
+                    {selectedNode && selectedNode.type === 'stepNode' && <StageConfigPanel stageId={selectedNode.id} />}
+                    {selectedEdge && <EdgeConfigPanel />}
                 </div>
             )}
         </div>

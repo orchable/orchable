@@ -31,11 +31,6 @@ export function useImportExport() {
 					data.stage_key || data.name?.toLowerCase() || node.id,
 				task_type: data.task_type || "",
 				prompt_template_id: data.prompt_template_id || "",
-				cardinality: data.cardinality || "1:1",
-				split_path: data.split_path || "",
-				split_mode: data.split_mode || "per_item",
-				output_mapping: data.output_mapping || "result",
-				return_along_with: data.return_along_with || [],
 				ai_settings: (() => {
 					const raw = data.ai_settings;
 					const genCfg = raw?.generationConfig || {};
@@ -43,7 +38,7 @@ export function useImportExport() {
 						generate_content_api: gcaInner,
 						responseMimeType,
 						...restGenCfg
-					} = genCfg as any;
+					} = genCfg as Record<string, unknown>;
 					return {
 						model_id: raw?.model_id || "gemini-2.0-flash",
 						generate_content_api: (raw?.generate_content_api ||
@@ -78,6 +73,22 @@ export function useImportExport() {
 			name: orchestratorName,
 			description: orchestratorDescription,
 			steps,
+			edges: edges.map((e) => {
+				const edgeData = e.data as Record<string, unknown> | undefined;
+				const ec = edgeData?.edgeConfig as import('@/lib/types').EdgeConfig | undefined;
+				return {
+					id: e.id,
+					source: e.source,
+					target: e.target,
+					edgeConfig: ec || {
+						cardinality: "1:1" as const,
+						split_path: "",
+						split_mode: "per_item" as const,
+						batch_grouping: "global" as const,
+						merge_path: "output_data",
+					},
+				};
+			}),
 		};
 
 		const payload = {

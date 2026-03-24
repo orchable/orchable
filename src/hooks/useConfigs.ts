@@ -101,16 +101,6 @@ export function useSaveOrchestrator() {
 					data.stage_key || data.name?.toLowerCase() || node.id,
 				task_type: data.task_type || "",
 				prompt_template_id: data.prompt_template_id || "",
-				cardinality: data.cardinality || "1:1",
-
-				// 1:N Split config
-				split_path: data.split_path || "",
-				split_mode: data.split_mode || "per_item",
-				batch_size: data.batch_size,
-				batch_grouping: data.batch_grouping || "global",
-				merge_path: data.merge_path || "output_data",
-				output_mapping: data.output_mapping || "result",
-				return_along_with: data.return_along_with || [],
 
 				// AI Settings
 				ai_settings: data.ai_settings || {
@@ -177,6 +167,21 @@ export function useSaveOrchestrator() {
 				description: orchestratorDescription,
 				viewport,
 				steps,
+				edges: edges.map((e) => {
+					const edgeData = e.data as Record<string, unknown> | undefined;
+					const ec = edgeData?.edgeConfig as import('@/lib/types').EdgeConfig | undefined;
+					return {
+						source: e.source,
+						target: e.target,
+						edgeConfig: ec || {
+							cardinality: "1:1" as const,
+							split_path: "",
+							split_mode: "per_item" as const,
+							batch_grouping: "global" as const,
+							merge_path: "output_data",
+						},
+					};
+				}),
 				input_mapping: inputMapping,
 				execution_delay_seconds: inputData.execution_delay_seconds,
 			};
