@@ -32,7 +32,7 @@ export function TierProvider({ children }: { children: React.ReactNode }) {
         if (user) {
             try {
                 const { keyPoolService } = await import('@/services/keyPoolService');
-                const userHasKeys = await keyPoolService.hasPersonalKeys();
+                const userHasKeys = await keyPoolService.hasPersonalKeys(tier);
                 setHasKeys(userHasKeys);
                 const { freeTierService } = await import('@/services/freeTierService');
 

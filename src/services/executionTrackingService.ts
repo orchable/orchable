@@ -756,111 +756,100 @@ export async function getRecentBatches(
 	await storage.waitForAdapter();
 	const adapter = storage.adapter;
 
-	// If using IndexedDB (free/BYOK tiers), query there
+	const mapToSummary = (b: any): BatchSummary => {
+		const total = b.total_tasks || 0;
+		const completed = b.completed_tasks || 0;
+		const failed = b.failed_tasks || 0;
+		const processing = b.processing_tasks || 0;
+
+		let calculatedStatus = b.status || "pending";
+		const isActuallyFinished =
+			(total > 0 && completed + failed >= total) ||
+			(total === 0 && completed + failed > 0 && processing === 0);
+
+		if (
+			isActuallyFinished &&
+			b.status !== "completed" &&
+			b.status !== "failed"
+		) {
+			calculatedStatus = failed > 0 ? "failed" : "completed";
+		} else if (processing > 0 || completed + failed > 0) {
+			if (b.status !== "completed" && b.status !== "failed") {
+				calculatedStatus = "processing";
+			}
+		}
+
+		return {
+			id: b.id,
+			orchestrator_name: b.name || "Generic Execution",
+			status:
+				b.status === "completed" || b.status === "failed"
+					? b.status
+					: calculatedStatus,
+			created_at: b.created_at,
+			task_count: total,
+			completed_tasks: completed,
+			failed_tasks: failed,
+			progress: total > 0 ? Math.round((completed / total) * 100) : 0,
+			launch_id: b.launch_id,
+		};
+	};
+
+	let results: BatchSummary[] = [];
+
+	// If exactly IndexedDB, just return the local batches
 	if (adapter.constructor.name === "IndexedDBAdapter") {
 		const batches = await adapter.listBatches(limit);
-		return batches.map((b) => {
-			// Recalculate status fallback
-			const total = b.total_tasks || 0;
-			const completed = b.completed_tasks || 0;
-			const failed = b.failed_tasks || 0;
-			const processing = b.processing_tasks || 0;
-			let calculatedStatus = b.status || "pending";
-
-			// Auto repair if mismatched in IndexedDB
-			const isActuallyFinished =
-				(total > 0 && completed + failed >= total) ||
-				(total === 0 && completed + failed > 0 && processing === 0);
-
-			if (
-				isActuallyFinished &&
-				b.status !== "completed" &&
-				b.status !== "failed"
-			) {
-				calculatedStatus = failed > 0 ? "failed" : "completed";
-			} else if (processing > 0 || completed + failed > 0) {
-				if (b.status !== "completed" && b.status !== "failed") {
-					calculatedStatus = "processing";
-				}
-			}
-
-			return {
-				id: b.id,
-				orchestrator_name: b.name || "Generic Execution",
-				status: calculatedStatus,
-				created_at: b.created_at,
-				task_count: total,
-				completed_tasks: completed,
-				failed_tasks: failed,
-				progress: total > 0 ? Math.round((completed / total) * 100) : 0,
-				launch_id: b.launch_id,
-			};
-		});
+		return batches.map(mapToSummary);
 	}
 
 	const {
 		data: { user },
 	} = await supabase.auth.getUser();
 
-	if (!user) return getRecentBatchesFallback(limit);
+	// Fetch from Supabase
+	if (user) {
+		const { data, error } = await supabase
+			.from("task_batches")
+			.select(
+				`
+				*,
+				lab_orchestrator_configs!task_batches_orchestrator_config_id_fkey (
+					steps
+				)
+			`,
+			)
+			.eq("created_by", user.id)
+			.order("created_at", { ascending: false })
+			.limit(limit);
 
-	const { data, error } = await supabase
-		.from("task_batches")
-		.select(
-			`
-            *,
-            lab_orchestrator_configs!task_batches_orchestrator_config_id_fkey (
-                steps
-            )
-        `,
-		)
-		.eq("created_by", user.id)
-		.order("created_at", { ascending: false })
-		.limit(limit);
-
-	if (!error && data && data.length > 0) {
-		return data.map((b) => {
-			const total = b.total_tasks || 0;
-			const completed = b.completed_tasks || 0;
-			const failed = b.failed_tasks || 0;
-			const processing = b.processing_tasks || 0;
-
-			let calculatedStatus = b.status || "pending";
-			const isActuallyFinished =
-				(total > 0 && completed + failed >= total) ||
-				(total === 0 && completed + failed > 0 && processing === 0);
-
-			if (
-				isActuallyFinished &&
-				b.status !== "completed" &&
-				b.status !== "failed"
-			) {
-				calculatedStatus = failed > 0 ? "failed" : "completed";
-			} else if (processing > 0 || completed + failed > 0) {
-				if (b.status !== "completed" && b.status !== "failed") {
-					calculatedStatus = "processing";
-				}
-			}
-
-			return {
-				id: b.id,
-				orchestrator_name: b.name || "Generic Execution",
-				status:
-					b.status === "completed" || b.status === "failed"
-						? b.status
-						: calculatedStatus,
-				created_at: b.created_at,
-				task_count: total,
-				completed_tasks: completed,
-				failed_tasks: failed,
-				progress: total > 0 ? Math.round((completed / total) * 100) : 0,
-				launch_id: b.launch_id,
-			};
-		});
+		if (!error && data && data.length > 0) {
+			results = data.map(mapToSummary);
+		} else if (error) {
+			console.error("Failed to fetch recent batches from Supabase:", error);
+		}
 	}
 
-	if (error) {
-		console.error("Failed to fetch recent batches:", error);
+	// Always fetch local batches implicitly (since web-worker tasks live here pre-sync)
+	const { db } = await import("../lib/storage/IndexedDBAdapter");
+	const localBatches = await db.task_batches.toArray();
+	const localSummaries = localBatches.map(mapToSummary);
+
+	// De-duplicate using Map
+	const batchMap = new Map<string, BatchSummary>();
+	results.forEach((b) => batchMap.set(b.id, b));
+	localSummaries.forEach((b) => batchMap.set(b.id, b));
+
+	results = Array.from(batchMap.values())
+		.sort(
+			(a, b) =>
+				new Date(b.created_at).getTime() -
+				new Date(a.created_at).getTime(),
+		)
+		.slice(0, limit);
+
+	if (results.length > 0) {
+		return results;
 	}
 
 	return getRecentBatchesFallback(limit);
